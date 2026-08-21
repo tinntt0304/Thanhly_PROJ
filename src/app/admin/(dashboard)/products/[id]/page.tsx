@@ -31,22 +31,22 @@ export default async function EditProductPage({
       <div className="flex flex-wrap gap-2">
         {product.status !== "SOLD" && (
           <form action={markSold}>
-            <button className="rounded-md border border-accent-2-300 px-3 py-1.5 text-sm text-accent-2-700 hover:bg-accent-2-100">
-              Đánh dấu đã bán
+            <button className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-accent-2-300 bg-accent-2-100/50 px-3 py-1.5 text-sm font-medium text-accent-2-700 transition-colors hover:bg-accent-2-100">
+              <span aria-hidden="true">✓</span> Đánh dấu đã bán
             </button>
           </form>
         )}
         {product.status !== "CANCELLED" && (
           <form action={markCancelled}>
-            <button className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
-              Huỷ sản phẩm
+            <button className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-red-200 bg-red-50/50 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50">
+              <span aria-hidden="true">✕</span> Huỷ sản phẩm
             </button>
           </form>
         )}
         {product.status !== "ACTIVE" && (
           <form action={markActive}>
-            <button className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50">
-              Mở lại đấu giá
+            <button className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100">
+              <span aria-hidden="true">↺</span> Mở lại đấu giá
             </button>
           </form>
         )}
