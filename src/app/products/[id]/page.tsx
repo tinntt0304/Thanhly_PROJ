@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +13,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { BidForm } from "@/components/BidForm";
 import { asAttributes } from "@/lib/attributes";
+import { ProductGallery } from "@/components/ProductGallery";
+import { TagBadges } from "@/components/TagBadges";
 
 export const dynamic = "force-dynamic";
 
@@ -40,34 +41,13 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         </Link>
 
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-100">
-              {product.images[0] ? (
-                <Image
-                  src={product.images[0]}
-                  alt={product.title}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : null}
-            </div>
-            {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto">
-                {product.images.slice(1).map((src, i) => (
-                  <div
-                    key={i}
-                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-neutral-100"
-                  >
-                    <Image src={src} alt="" fill className="object-cover" unoptimized />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductGallery images={product.images} title={product.title} />
 
           <div className="flex flex-col gap-3">
-            <StatusBadge state={state} />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge state={state} />
+              <TagBadges tags={product.tags} />
+            </div>
             <h1 className="font-heading text-xl font-bold text-text">{product.title}</h1>
             <p className="text-sm text-neutral-700">Tình trạng: {product.condition}</p>
 

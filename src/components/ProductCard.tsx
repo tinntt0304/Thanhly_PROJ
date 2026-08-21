@@ -4,6 +4,7 @@ import type { Product } from "@/generated/prisma/client";
 import { formatVND, getAuctionState } from "@/lib/auction";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
+import { TagBadges } from "@/components/TagBadges";
 
 export function ProductCard({
   product,
@@ -20,6 +21,9 @@ export function ProductCard({
       className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-surface shadow-sm transition hover:shadow-md"
     >
       <div className="relative aspect-square w-full bg-neutral-100">
+        {product.tags.length > 0 && (
+          <TagBadges tags={product.tags} className="absolute left-2 top-2 z-10" />
+        )}
         {product.images[0] ? (
           <Image
             src={product.images[0]}

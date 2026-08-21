@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/admin-guard";
 import { uploadProductImage } from "@/lib/storage";
 import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 import type { Attribute } from "@/lib/attributes";
+import { asProductTags } from "@/lib/tags";
 import type { ProductStatus } from "@/generated/prisma/client";
 
 const productSchema = z
@@ -91,6 +92,7 @@ export async function createProduct(
 
   const data = parsed.data;
   const attributes = parseAttributes(formData);
+  const tags = asProductTags(formData.getAll("tags").map(String));
 
   const product = await prisma.product.create({
     data: {
@@ -99,6 +101,7 @@ export async function createProduct(
       condition: data.condition,
       images,
       attributes,
+      tags,
       startPrice: data.startPrice,
       minBidStep: data.minBidStep,
       currentPrice: data.startPrice,
@@ -142,6 +145,7 @@ export async function updateProduct(
 
   const data = parsed.data;
   const attributes = parseAttributes(formData);
+  const tags = asProductTags(formData.getAll("tags").map(String));
 
   await prisma.product.update({
     where: { id: productId },
@@ -151,6 +155,7 @@ export async function updateProduct(
       condition: data.condition,
       images,
       attributes,
+      tags,
       startPrice: data.startPrice,
       minBidStep: data.minBidStep,
       buyNowPrice: data.buyNowPrice ?? null,

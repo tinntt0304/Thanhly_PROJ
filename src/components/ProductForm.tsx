@@ -7,6 +7,7 @@ import type { Product } from "@/generated/prisma/client";
 import type { Attribute } from "@/lib/attributes";
 import { asAttributes } from "@/lib/attributes";
 import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
+import { TAG_LABEL, TAG_VALUES, asProductTags, type ProductTag } from "@/lib/tags";
 
 const initialState: ProductFormState = {};
 
@@ -44,6 +45,11 @@ export function ProductForm({
   const totalImages = keptImages.length + pendingFiles.length;
 
   const [attributes, setAttributes] = useState<Attribute[]>(asAttributes(product?.attributes));
+  const [tags, setTags] = useState<ProductTag[]>(asProductTags(product?.tags ?? []));
+
+  function toggleTag(tag: ProductTag) {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
 
   function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -115,6 +121,25 @@ export function ProductForm({
           placeholder="Mới / Đã dùng - còn tốt / Lỗi nhẹ: ..."
           className={inputClass}
         />
+      </div>
+
+      {/* Nhãn sản phẩm */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-text">Nhãn hiển thị</label>
+        <div className="flex flex-wrap gap-3">
+          {TAG_VALUES.map((tag) => (
+            <label key={tag} className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={tags.includes(tag)}
+                onChange={() => toggleTag(tag)}
+                className="h-4 w-4 rounded border-neutral-300 text-accent-500 focus:ring-accent-500"
+              />
+              {TAG_LABEL[tag]}
+              {tags.includes(tag) && <input type="hidden" name="tags" value={tag} />}
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* Ảnh sản phẩm */}
