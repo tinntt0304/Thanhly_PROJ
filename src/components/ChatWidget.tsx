@@ -44,16 +44,23 @@ export function ChatWidget() {
     });
   }, []);
 
-  // Polling tin nhắn khi đã có phiên
+  // Polling tin nhắn + trạng thái phiên (đóng/mở) khi đã có phiên — dùng session?.id
+  // (chuỗi ổn định) làm dependency thay vì cả object session, để việc cập nhật
+  // session.status bên trong poll() không làm effect tự khởi động lại liên tục.
+  const sessionId = session?.id;
   useEffect(() => {
-    if (!session) return;
+    if (!sessionId) return;
 
     let cancelled = false;
     async function poll() {
-      if (!session) return;
-      const msgs = await getChatMessages(session.id);
+      if (!sessionId) return;
+      const [msgs, freshSession] = await Promise.all([
+        getChatMessages(sessionId),
+        getChatSession(sessionId),
+      ]);
       if (cancelled) return;
       setMessages(msgs);
+      if (freshSession) setSession(freshSession);
 
       const lastAdminMsg = [...msgs].reverse().find((m) => m.sender === "ADMIN");
       if (lastAdminMsg) {
@@ -69,7 +76,7 @@ export function ChatWidget() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [session, open]);
+  }, [sessionId, open]);
 
   function toggleOpen() {
     setOpen((prev) => {
