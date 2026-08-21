@@ -33,7 +33,8 @@ model Product {
   title       String
   description String
   condition   String // "Mới", "Đã dùng - còn tốt", "Lỗi nhẹ: ...", v.v. (free text)
-  images      String[] // URL ảnh, tối thiểu 1 ảnh bắt buộc ở tầng ứng dụng
+  images      String[] // URL ảnh (Supabase Storage), tối thiểu 1 ảnh bắt buộc ở tầng ứng dụng
+  attributes  Json     @default("[]") // thuộc tính sản phẩm: [{ name: string, value: string }]
 
   startPrice   Int // giá khởi điểm (VNĐ)
   minBidStep   Int // bước giá tối thiểu (VNĐ)

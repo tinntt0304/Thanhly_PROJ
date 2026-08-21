@@ -13,6 +13,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { BidForm } from "@/components/BidForm";
+import { asAttributes } from "@/lib/attributes";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const state = getAuctionState(product, product.bids.length > 0);
   const winningBid =
     state === "ENDED_AWAITING_CONTACT" || state === "SOLD" ? getWinningBid(product.bids) : null;
+  const attributes = asAttributes(product.attributes);
 
   return (
     <main className="flex-1">
@@ -119,6 +121,20 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           <h2 className="mb-2 text-sm font-semibold">Mô tả</h2>
           <p className="whitespace-pre-line text-sm text-neutral-700">{product.description}</p>
         </div>
+
+        {attributes.length > 0 && (
+          <div className="mt-6">
+            <h2 className="mb-2 text-sm font-semibold">Thuộc tính sản phẩm</h2>
+            <dl className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white text-sm">
+              {attributes.map((attr, i) => (
+                <div key={i} className="flex justify-between px-4 py-2">
+                  <dt className="text-neutral-500">{attr.name}</dt>
+                  <dd className="font-medium text-neutral-800">{attr.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
 
         <div className="mt-6">
           <h2 className="mb-2 text-sm font-semibold">

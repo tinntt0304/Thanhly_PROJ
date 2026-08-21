@@ -50,12 +50,37 @@ engine, khác `node.exe`) — **đã loại trừ nguyên nhân do Cloudflare WA
 test vẫn treo y hệt). Trong khi đó, chính app (qua thư viện `pg`/`@prisma/adapter-pg`)
 vẫn kết nối bình thường trên cùng mạng đó — nên chỉ riêng CLI migrate bị ảnh hưởng.
 
-Cách né tạm: chạy migration bằng chính `pg` thay vì Prisma CLI. Ví dụ script tối giản
-(đọc file `.sql` trong `prisma/migrations/<tên>/migration.sql`, chạy bằng
-`new pg.Client({ connectionString: process.env.DIRECT_URL })`, rồi tự insert 1 dòng
-vào bảng `_prisma_migrations` để Prisma coi như đã áp dụng — xem lịch sử git để tham
-khảo script mẫu đã dùng, đã xoá sau khi chạy xong). Nếu chạy migration từ máy khác/CI
-không bị chặn kiểu này thì `prisma migrate deploy` nên chạy bình thường không cần né.
+Cách né tạm: dùng `prisma/apply-migration.mjs` (đã có sẵn trong repo) — chạy migration
+bằng chính thư viện `pg` thay vì Prisma CLI, rồi tự ghi 1 dòng vào bảng
+`_prisma_migrations` để Prisma coi như đã áp dụng (giữ lịch sử migration nhất quán,
+phòng khi sau này chạy `prisma migrate` từ máy/CI không bị chặn):
+
+```bash
+node prisma/apply-migration.mjs <tên-thư-mục-migration>   # vd. 20260821130000_add_product_attributes
+```
+
+Mỗi khi thêm migration mới (sửa `schema.prisma` rồi tự viết file
+`prisma/migrations/<timestamp>_<tên>/migration.sql`), chạy lệnh trên để áp lên Supabase,
+sau đó `npx prisma generate` (lệnh này không cần kết nối DB nên luôn chạy được) để cập
+nhật type. Nếu chạy migration từ máy khác/CI không bị chặn kiểu này thì
+`prisma migrate dev`/`deploy` nên hoạt động bình thường, không cần script né.
+
+### Ảnh sản phẩm (Supabase Storage)
+
+Người bán upload ảnh trực tiếp từ máy ở trang đăng/sửa sản phẩm — lưu vào Supabase
+Storage (cùng project với DB), không cần dịch vụ ảnh riêng.
+
+`.env` cần thêm:
+
+- `SUPABASE_URL` — dạng `https://<project-ref>.supabase.co` (đã điền sẵn theo project
+  Postgres đang dùng).
+- `SUPABASE_SERVICE_ROLE_KEY` — lấy ở Supabase Dashboard → Project Settings → API →
+  mục "Project API keys" → **service_role** (secret, khác `anon` key). Chỉ dùng ở
+  server (Server Actions đã qua `requireAdmin()`), không bao giờ lộ ra trình duyệt.
+
+Bucket `product-images` (public) tự động được tạo ở lần upload đầu tiên — không cần
+tạo tay. Giới hạn: JPEG/PNG/WEBP/GIF, tối đa 5MB/ảnh, tối đa 8 ảnh/sản phẩm (chỉnh ở
+`src/lib/product-limits.ts`).
 
 ### Tài khoản admin
 
@@ -99,10 +124,13 @@ không chặn tiến độ; có thể đổi sau nếu cần:
   Hệ thống luôn chuyển sang trạng thái "Đã kết thúc — chờ liên hệ" và người bán bấm
   "Đánh dấu đã bán" thủ công sau khi chốt xong với người mua (an toàn hơn, đúng tinh
   thần P0.4 — người bán kiểm soát trạng thái cuối).
-- **Ảnh sản phẩm**: người bán dán link ảnh (mỗi dòng 1 link) thay vì upload file trực
-  tiếp — vì v1 chưa chọn nhà cung cấp lưu trữ ảnh (S3/Cloudinary/...). Có thể tự upload
-  ảnh lên bất kỳ dịch vụ ảnh nào (Imgur, Cloudinary, Google Photos share link...) rồi
-  dán link. Nâng cấp lên upload trực tiếp là việc làm sau nếu cần.
+- **Ảnh sản phẩm**: upload trực tiếp từ máy, lưu ở Supabase Storage (xem mục ở trên) —
+  không giới hạn số ảnh theo lý thuyết nhưng chặn ở 8 ảnh/sản phẩm để tránh lạm dụng.
+- **Thuộc tính sản phẩm**: cặp tên–giá trị tự do (vd. "Thương hiệu: Philips", "Dung
+  tích: 4L") do người bán tự thêm/xoá theo từng sản phẩm ở trang đăng/sửa, hiển thị
+  thành bảng thông số ở trang chi tiết. Không giới hạn số lượng, không có danh sách
+  thuộc tính chuẩn hoá theo ngành hàng (khác với hệ thống "thuộc tính" có cấu trúc của
+  Shopee/TikTok Shop) — vì v1 không có khái niệm danh mục/ngành hàng.
 - **P1.3 (tự động chuyển quyền liên hệ sau 24h không phản hồi)**: chưa làm — đúng như
   PRD xếp P1. Ở v1, người bán tự theo dõi và có thể bấm "Huỷ" một sản phẩm nếu người
   thắng bùng kèo, sau đó liên hệ người trả giá cao thứ nhì qua lịch sử trả giá trong

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "Đã kết thúc";
@@ -16,17 +16,22 @@ function formatRemaining(ms: number): string {
   return `${seconds} giây`;
 }
 
+function subscribe(callback: () => void) {
+  const id = setInterval(callback, 1000);
+  return () => clearInterval(id);
+}
+
 export function Countdown({ endTime }: { endTime: string }) {
   const target = new Date(endTime).getTime();
-  // null ban đầu để khớp giữa server/client (tránh hydration mismatch do Date.now()
-  // khác nhau giữa lúc render server và lúc hydrate client); tính lại ngay sau khi mount.
-  const [remaining, setRemaining] = useState<number | null>(null);
-
-  useEffect(() => {
-    setRemaining(target - Date.now());
-    const id = setInterval(() => setRemaining(target - Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [target]);
+  // useSyncExternalStore: getSnapshot chạy lại mỗi giây qua subscribe (tick đồng hồ).
+  // getServerSnapshot trả null để khớp với lần render đầu lúc hydrate (tránh mismatch
+  // do Date.now() khác nhau giữa server và client), React tự re-render ngay sau khi
+  // hydrate xong bằng getSnapshot thật — không cần tự setState trong effect.
+  const remaining = useSyncExternalStore(
+    subscribe,
+    () => target - Date.now(),
+    () => null
+  );
 
   if (remaining === null) {
     return <span className="text-neutral-400">...</span>;

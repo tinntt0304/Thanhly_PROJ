@@ -1,8 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { ProductFormState } from "@/lib/actions/products";
 import type { Product } from "@/generated/prisma/client";
+import type { Attribute } from "@/lib/attributes";
+import { asAttributes } from "@/lib/attributes";
+import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 
 const initialState: ProductFormState = {};
 
@@ -11,6 +15,13 @@ function toDateTimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
     date.getHours()
   )}:${pad(date.getMinutes())}`;
+}
+
+function syncFileInput(input: HTMLInputElement | null, files: File[]) {
+  if (!input) return;
+  const dt = new DataTransfer();
+  files.forEach((f) => dt.items.add(f));
+  input.files = dt.files;
 }
 
 export function ProductForm({
@@ -23,6 +34,42 @@ export function ProductForm({
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+
+  const [keptImages, setKeptImages] = useState<string[]>(product?.images ?? []);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const totalImages = keptImages.length + pendingFiles.length;
+
+  const [attributes, setAttributes] = useState<Attribute[]>(asAttributes(product?.attributes));
+
+  function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    const next = [...pendingFiles, ...selected].slice(0, MAX_IMAGES_PER_PRODUCT - keptImages.length);
+    setPendingFiles(next);
+    syncFileInput(fileInputRef.current, next);
+  }
+
+  function removePendingFile(index: number) {
+    const next = pendingFiles.filter((_, i) => i !== index);
+    setPendingFiles(next);
+    syncFileInput(fileInputRef.current, next);
+  }
+
+  function removeKeptImage(url: string) {
+    setKeptImages((prev) => prev.filter((u) => u !== url));
+  }
+
+  function addAttribute() {
+    setAttributes((prev) => [...prev, { name: "", value: "" }]);
+  }
+
+  function updateAttribute(index: number, field: "name" | "value", value: string) {
+    setAttributes((prev) => prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)));
+  }
+
+  function removeAttribute(index: number) {
+    setAttributes((prev) => prev.filter((_, i) => i !== index));
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -67,19 +114,60 @@ export function ProductForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="images" className="text-sm font-medium">
-          Link ảnh (mỗi dòng 1 link, ảnh đầu tiên là ảnh đại diện)
+      {/* Ảnh sản phẩm */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">
+          Ảnh sản phẩm ({totalImages}/{MAX_IMAGES_PER_PRODUCT}, ảnh đầu tiên là ảnh đại diện)
         </label>
-        <textarea
-          id="images"
-          name="images"
-          defaultValue={product?.images.join("\n")}
-          required
-          rows={3}
-          placeholder="https://..."
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-mono text-xs"
+
+        {(keptImages.length > 0 || pendingFiles.length > 0) && (
+          <div className="flex flex-wrap gap-2">
+            {keptImages.map((url) => (
+              <div key={url} className="relative h-20 w-20 overflow-hidden rounded-md border border-neutral-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeKeptImage(url)}
+                  className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white"
+                  aria-label="Xoá ảnh"
+                >
+                  ×
+                </button>
+                <input type="hidden" name="keptImages" value={url} />
+              </div>
+            ))}
+            {pendingFiles.map((file, i) => (
+              <div key={i} className="relative h-20 w-20 overflow-hidden rounded-md border border-neutral-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removePendingFile(i)}
+                  className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white"
+                  aria-label="Xoá ảnh"
+                >
+                  ×
+                </button>
+                <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[10px] text-white">
+                  mới
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          name="imageFiles"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          onChange={handleFilesSelected}
+          disabled={totalImages >= MAX_IMAGES_PER_PRODUCT}
+          className="text-sm"
         />
+        <p className="text-xs text-neutral-500">JPEG/PNG/WEBP/GIF, tối đa 5MB mỗi ảnh.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -139,6 +227,48 @@ export function ProductForm({
           required
           className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
+      </div>
+
+      {/* Thuộc tính sản phẩm */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">
+          Thuộc tính sản phẩm (thương hiệu, dung tích, xuất xứ...)
+        </label>
+        <div className="flex flex-col gap-2">
+          {attributes.map((attr, i) => (
+            <div key={i} className="flex gap-2">
+              <input
+                name="attrName"
+                value={attr.name}
+                onChange={(e) => updateAttribute(i, "name", e.target.value)}
+                placeholder="Tên thuộc tính (vd. Thương hiệu)"
+                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <input
+                name="attrValue"
+                value={attr.value}
+                onChange={(e) => updateAttribute(i, "value", e.target.value)}
+                placeholder="Giá trị (vd. Philips)"
+                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removeAttribute(i)}
+                className="shrink-0 rounded-md border border-neutral-300 px-2 text-sm text-neutral-500 hover:bg-neutral-50"
+                aria-label="Xoá thuộc tính"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={addAttribute}
+          className="self-start rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+        >
+          + Thêm thuộc tính
+        </button>
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

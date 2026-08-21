@@ -9,8 +9,12 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
+  // Lưu ý: bản @prisma/config đang dùng chỉ hỗ trợ `url`/`shadowDatabaseUrl`, không có
+  // `directUrl`. DIRECT_URL vẫn tồn tại trong .env và được dùng trực tiếp bởi
+  // prisma/apply-migration.mjs (script tự áp migration, xem docs/SETUP.md) — vì
+  // `prisma migrate`/`db push` qua CLI bị treo trên mạng dev này nên không phụ thuộc CLI
+  // đọc directUrl ở đây.
   datasource: {
     url: process.env["DATABASE_URL"],
-    directUrl: process.env["DIRECT_URL"],
   },
 });
