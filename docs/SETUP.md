@@ -11,29 +11,51 @@
 npm install
 ```
 
-### Database (Postgres)
+### Database (Postgres — Supabase)
 
-Dev dùng Postgres cục bộ do chính Prisma chạy (không cần cài Postgres/Docker riêng):
+Dự án đang dùng **Supabase Postgres** (project `duptlckyprmnklpkwayn`, region
+ap-northeast-1). `.env` có 2 biến:
 
-```bash
-npx prisma dev -d --name thanhly   # khởi động server Postgres cục bộ, chạy nền
-```
+- `DATABASE_URL` — **Transaction pooler** (port 6543, `pgbouncer=true`): app dùng lúc
+  chạy (nhiều kết nối ngắn hạn, hợp với Next.js/serverless).
+- `DIRECT_URL` — **Session pooler** (port 5432, không `pgbouncer`): dùng cho các thao
+  tác cần session dài hơn (advisory lock, prepared statement) như chạy migration.
 
-Lệnh trên in ra một connection string dạng
-`postgres://postgres:postgres@localhost:XXXXX/template1?sslmode=disable` — copy giá
-trị đó vào biến `DATABASE_URL` trong file `.env` (file `.env` đã có sẵn, chỉ cần sửa
-port nếu khác). Server này chạy nền trong Docker Desktop / tiến trình cục bộ; nếu tắt
-máy hoặc `npx prisma dev stop`, chạy lại lệnh trên trước khi `npm run dev`.
+Cả hai đều trỏ tới cùng host pooler (`aws-0-ap-northeast-1.pooler.supabase.com`), khác
+port. **Không dùng** "Direct connection" gốc của Supabase
+(`db.<ref>.supabase.co:5432`) — host đó chỉ hỗ trợ IPv6 và không kết nối được từ nhiều
+mạng.
 
-Với môi trường production, thay `DATABASE_URL` bằng connection string Postgres thật
-(Neon, Supabase, Railway, RDS...).
+Muốn tạo lại từ đầu (project Supabase khác)? Vào Supabase Dashboard → Project Settings
+→ Database → Connection string, lấy 2 dạng trên, thay vào `.env`.
 
-Sau khi có `DATABASE_URL`:
+Sau khi có `.env`:
 
 ```bash
 npx prisma migrate dev     # áp schema (chỉ cần lại khi schema.prisma thay đổi)
 npx prisma db seed         # tạo tài khoản admin + trust profile mặc định
 ```
+
+**Muốn dev offline, không cần mạng?** Có thể quay lại Postgres cục bộ:
+`npx prisma dev -d --name thanhly` in ra một connection string dạng
+`postgres://postgres:postgres@localhost:XXXXX/template1?sslmode=disable` — tạm thời
+dùng làm `DATABASE_URL` (và `DIRECT_URL` giống hệt, không cần pooler khi chạy local).
+
+#### ⚠️ Nếu `prisma migrate dev`/`migrate deploy`/`migrate status` bị treo (không lỗi, không chạy xong)
+
+Đã gặp trên máy dev: Prisma CLI dùng một engine riêng (viết bằng Rust) để chạy
+migration, engine này bị treo khi kết nối Supabase qua mạng có phần mềm chặn/giám sát
+kết nối theo từng process (ví dụ antivirus/EDR chặn riêng file thực thi của Prisma
+engine, khác `node.exe`) — **đã loại trừ nguyên nhân do Cloudflare WARP** (tắt WARP
+test vẫn treo y hệt). Trong khi đó, chính app (qua thư viện `pg`/`@prisma/adapter-pg`)
+vẫn kết nối bình thường trên cùng mạng đó — nên chỉ riêng CLI migrate bị ảnh hưởng.
+
+Cách né tạm: chạy migration bằng chính `pg` thay vì Prisma CLI. Ví dụ script tối giản
+(đọc file `.sql` trong `prisma/migrations/<tên>/migration.sql`, chạy bằng
+`new pg.Client({ connectionString: process.env.DIRECT_URL })`, rồi tự insert 1 dòng
+vào bảng `_prisma_migrations` để Prisma coi như đã áp dụng — xem lịch sử git để tham
+khảo script mẫu đã dùng, đã xoá sau khi chạy xong). Nếu chạy migration từ máy khác/CI
+không bị chặn kiểu này thì `prisma migrate deploy` nên chạy bình thường không cần né.
 
 ### Tài khoản admin
 
@@ -57,9 +79,14 @@ npm run build
 npm run start
 ```
 
-Biến môi trường cần có khi deploy: `DATABASE_URL`, `AUTH_SECRET` (chuỗi ngẫu nhiên dài,
-dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng lúc seed, không
-cần giữ lại sau đó).
+Biến môi trường cần có khi deploy: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (chuỗi
+ngẫu nhiên dài, dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng
+lúc seed, không cần giữ lại sau đó).
+
+Lưu ý về `sslmode`: `.env` hiện dùng `sslmode=no-verify` vì mạng máy dev chặn việc xác
+thực chuỗi chứng chỉ TLS đầy đủ (xem mục treo `migrate` bên dưới). Khi deploy lên hạ
+tầng không bị chặn kiểu này (Vercel, VPS thông thường...), nên đổi lại thành
+`sslmode=require` để bật xác thực chứng chỉ đầy đủ, an toàn hơn.
 
 ## Những quyết định/giả định đã chốt khi implement (PRD không nói rõ)
 
