@@ -38,6 +38,16 @@
   --color-accent-2-500: #74815a;
   --color-accent-2-600: #5c6a44;
   --color-accent-2-700: #47532f;
+
+  /* Màu riêng cho nhãn "sticker" (Hot Deal / Nổi bật) — rực hơn hẳn accent/accent-2
+   * dùng cho nút bấm & badge trạng thái, để nổi bật thật sự giữa các thành phần khác. */
+  --color-hot-400: #f0602f;
+  --color-hot-500: #e2451f;
+  --color-hot-600: #c0350f;
+
+  --color-gold-300: #f3c65f;
+  --color-gold-400: #eab63c;
+  --color-gold-600: #b8860f;
 }
 
 body {
