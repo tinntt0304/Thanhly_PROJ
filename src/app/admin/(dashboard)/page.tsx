@@ -18,16 +18,20 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">Sản phẩm ({products.length})</h1>
+      <h1 className="font-heading text-lg font-bold text-text">Sản phẩm ({products.length})</h1>
 
       {products.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          Chưa có sản phẩm nào. <Link href="/admin/products/new" className="underline">Đăng sản phẩm đầu tiên</Link>.
+        <p className="text-sm text-neutral-700">
+          Chưa có sản phẩm nào.{" "}
+          <Link href="/admin/products/new" className="text-accent-600 underline">
+            Đăng sản phẩm đầu tiên
+          </Link>
+          .
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase text-neutral-500">
+            <thead className="border-b border-neutral-200 bg-neutral-100 text-left text-xs uppercase text-neutral-700">
               <tr>
                 <th className="px-4 py-2">Sản phẩm</th>
                 <th className="px-4 py-2">Trạng thái</th>
@@ -53,7 +57,7 @@ export default async function AdminDashboardPage() {
                     <td className="px-4 py-2">
                       <Link
                         href={`/admin/products/${product.id}`}
-                        className="font-medium hover:underline"
+                        className="font-medium text-text hover:underline"
                       >
                         {product.title}
                       </Link>
@@ -67,7 +71,7 @@ export default async function AdminDashboardPage() {
                       <div className="flex flex-wrap gap-2">
                         {product.status !== "SOLD" && (
                           <form action={markSold}>
-                            <button className="rounded-md border border-blue-300 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50">
+                            <button className="rounded-md border border-accent-2-300 px-2 py-1 text-xs text-accent-2-700 hover:bg-accent-2-100">
                               Đánh dấu đã bán
                             </button>
                           </form>

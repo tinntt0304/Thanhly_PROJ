@@ -19,8 +19,8 @@ export default async function EditProductPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Sửa sản phẩm</h1>
-        <span className="text-sm text-neutral-500">
+        <h1 className="font-heading text-lg font-bold text-text">Sửa sản phẩm</h1>
+        <span className="text-sm text-neutral-700">
           Trạng thái: {PRODUCT_STATUS_LABEL[product.status]}
         </span>
       </div>
@@ -28,7 +28,7 @@ export default async function EditProductPage({
       <div className="flex flex-wrap gap-2">
         {product.status !== "SOLD" && (
           <form action={markSold}>
-            <button className="rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50">
+            <button className="rounded-md border border-accent-2-300 px-3 py-1.5 text-sm text-accent-2-700 hover:bg-accent-2-100">
               Đánh dấu đã bán
             </button>
           </form>

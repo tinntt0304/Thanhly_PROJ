@@ -10,6 +10,9 @@ import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 
 const initialState: ProductFormState = {};
 
+const inputClass =
+  "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text placeholder:text-neutral-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
+
 function toDateTimeLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
@@ -74,7 +77,7 @@ export function ProductForm({
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="title" className="text-sm font-medium">
+        <label htmlFor="title" className="text-sm font-medium text-text">
           Tên sản phẩm
         </label>
         <input
@@ -82,12 +85,12 @@ export function ProductForm({
           name="title"
           defaultValue={product?.title}
           required
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={inputClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="description" className="text-sm font-medium">
+        <label htmlFor="description" className="text-sm font-medium text-text">
           Mô tả
         </label>
         <textarea
@@ -96,12 +99,12 @@ export function ProductForm({
           defaultValue={product?.description}
           required
           rows={4}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={inputClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="condition" className="text-sm font-medium">
+        <label htmlFor="condition" className="text-sm font-medium text-text">
           Tình trạng
         </label>
         <input
@@ -110,13 +113,13 @@ export function ProductForm({
           defaultValue={product?.condition}
           required
           placeholder="Mới / Đã dùng - còn tốt / Lỗi nhẹ: ..."
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={inputClass}
         />
       </div>
 
       {/* Ảnh sản phẩm */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">
+        <label className="text-sm font-medium text-text">
           Ảnh sản phẩm ({totalImages}/{MAX_IMAGES_PER_PRODUCT}, ảnh đầu tiên là ảnh đại diện)
         </label>
 
@@ -172,7 +175,7 @@ export function ProductForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
-          <label htmlFor="startPrice" className="text-sm font-medium">
+          <label htmlFor="startPrice" className="text-sm font-medium text-text">
             Giá khởi điểm (đ)
           </label>
           <input
@@ -182,11 +185,11 @@ export function ProductForm({
             min={1}
             defaultValue={product?.startPrice}
             required
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className={inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="minBidStep" className="text-sm font-medium">
+          <label htmlFor="minBidStep" className="text-sm font-medium text-text">
             Bước giá tối thiểu (đ)
           </label>
           <input
@@ -196,13 +199,13 @@ export function ProductForm({
             min={1}
             defaultValue={product?.minBidStep}
             required
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className={inputClass}
           />
         </div>
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="buyNowPrice" className="text-sm font-medium">
+        <label htmlFor="buyNowPrice" className="text-sm font-medium text-text">
           Giá mua ngay (đ) — để trống nếu không dùng
         </label>
         <input
@@ -211,12 +214,12 @@ export function ProductForm({
           type="number"
           min={1}
           defaultValue={product?.buyNowPrice ?? undefined}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={inputClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="endTime" className="text-sm font-medium">
+        <label htmlFor="endTime" className="text-sm font-medium text-text">
           Thời gian kết thúc
         </label>
         <input
@@ -225,13 +228,13 @@ export function ProductForm({
           type="datetime-local"
           defaultValue={product ? toDateTimeLocal(product.endTime) : undefined}
           required
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={inputClass}
         />
       </div>
 
       {/* Thuộc tính sản phẩm */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">
+        <label className="text-sm font-medium text-text">
           Thuộc tính sản phẩm (thương hiệu, dung tích, xuất xứ...)
         </label>
         <div className="flex flex-col gap-2">
@@ -242,14 +245,14 @@ export function ProductForm({
                 value={attr.name}
                 onChange={(e) => updateAttribute(i, "name", e.target.value)}
                 placeholder="Tên thuộc tính (vd. Thương hiệu)"
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                className={`flex-1 ${inputClass}`}
               />
               <input
                 name="attrValue"
                 value={attr.value}
                 onChange={(e) => updateAttribute(i, "value", e.target.value)}
                 placeholder="Giá trị (vd. Philips)"
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                className={`flex-1 ${inputClass}`}
               />
               <button
                 type="button"
@@ -276,7 +279,7 @@ export function ProductForm({
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="self-start rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
       >
         {pending ? "Đang lưu..." : submitLabel}
       </button>

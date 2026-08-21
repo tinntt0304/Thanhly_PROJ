@@ -17,7 +17,7 @@ export function ProductCard({
   return (
     <Link
       href={`/products/${product.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-surface shadow-sm transition hover:shadow-md"
     >
       <div className="relative aspect-square w-full bg-neutral-100">
         {product.images[0] ? (
@@ -30,21 +30,21 @@ export function ProductCard({
             unoptimized
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-neutral-400">
+          <div className="flex h-full items-center justify-center text-neutral-500">
             Không có ảnh
           </div>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-2 text-sm font-medium">{product.title}</h3>
+          <h3 className="line-clamp-2 font-heading text-sm font-medium text-text">
+            {product.title}
+          </h3>
         </div>
         <StatusBadge state={state} />
         <div className="mt-auto flex flex-col gap-1">
-          <p className="text-lg font-semibold text-neutral-900">
-            {formatVND(product.currentPrice)}
-          </p>
-          <p className="text-xs text-neutral-500">
+          <p className="text-lg font-semibold text-text">{formatVND(product.currentPrice)}</p>
+          <p className="text-xs text-neutral-700">
             {bidCount} lượt trả giá ·{" "}
             {state === "BIDDING" ? <Countdown endTime={product.endTime.toISOString()} /> : "—"}
           </p>

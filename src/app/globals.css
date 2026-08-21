@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+ * Bảng màu "hifen" — anchor chính thức từ brand_assets/README.md:
+ *   accent-500 (terracotta) #c67139, accent-2-600 (sage) #5c6a44,
+ *   accent-2-100 (sage tint) #e9ecdf, badge cream #f3e6c9, text #201e1d.
+ * Các sắc độ còn lại (50/100/300/700/900...) là suy ra để đủ dùng cho UI, không phải
+ * token gốc của design system — thay bằng giá trị thật nếu có styles.css đầy đủ sau này.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-baloo);
+  --font-body: var(--font-be-vietnam);
+  --font-wordmark: var(--font-caprasimo);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-bg: #faf5e7;
+  --color-surface: #ffffff;
+  --color-text: #201e1d;
+
+  --color-neutral-50: #faf5e7;
+  --color-neutral-100: #f3e6c9;
+  --color-neutral-200: #e9dcbc;
+  --color-neutral-300: #d8c9a8;
+  --color-neutral-500: #a89b83;
+  --color-neutral-700: #6b6058;
+  --color-neutral-800: #453f3a;
+  --color-neutral-900: #201e1d;
+
+  --color-accent-100: #f6e3d3;
+  --color-accent-300: #dfa878;
+  --color-accent-500: #c67139;
+  --color-accent-600: #a85c2a;
+  --color-accent-700: #82461f;
+
+  --color-accent-2-100: #e9ecdf;
+  --color-accent-2-300: #adba90;
+  --color-accent-2-500: #74815a;
+  --color-accent-2-600: #5c6a44;
+  --color-accent-2-700: #47532f;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
 }

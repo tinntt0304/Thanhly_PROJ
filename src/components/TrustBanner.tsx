@@ -10,16 +10,20 @@ export function TrustBanner({
   reviews: Review[];
 }) {
   return (
-    <section className="border-b border-neutral-200 bg-white">
+    <section className="border-b border-neutral-200 bg-accent-2-100/50">
       <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-amber-500">★ {avgRating.toFixed(1)}</span>
-            <span className="text-sm text-neutral-500">đánh giá trung bình</span>
+            <span className="font-heading text-2xl font-bold text-accent-600">
+              ★ {avgRating.toFixed(1)}
+            </span>
+            <span className="text-sm text-neutral-700">đánh giá trung bình</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">{soldCount.toLocaleString("vi-VN")}</span>
-            <span className="text-sm text-neutral-500">đơn đã bán trên sàn cũ</span>
+            <span className="font-heading text-2xl font-bold text-text">
+              {soldCount.toLocaleString("vi-VN")}
+            </span>
+            <span className="text-sm text-neutral-700">đơn đã bán trên sàn cũ</span>
           </div>
         </div>
 
@@ -28,10 +32,10 @@ export function TrustBanner({
             {reviews.map((review, i) => (
               <div
                 key={i}
-                className="min-w-[220px] max-w-xs shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-3"
+                className="min-w-[220px] max-w-xs shrink-0 rounded-lg border border-neutral-200 bg-surface p-3"
               >
-                <p className="text-sm text-neutral-700">&ldquo;{review.text}&rdquo;</p>
-                <p className="mt-2 text-xs font-medium text-neutral-500">— {review.author}</p>
+                <p className="text-sm text-text">&ldquo;{review.text}&rdquo;</p>
+                <p className="mt-2 text-xs font-medium text-neutral-700">— {review.author}</p>
               </div>
             ))}
           </div>

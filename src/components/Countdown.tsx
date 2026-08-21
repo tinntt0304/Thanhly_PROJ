@@ -38,7 +38,7 @@ export function Countdown({ endTime }: { endTime: string }) {
   }
 
   return (
-    <span className={remaining <= 0 ? "text-neutral-500" : "text-red-600 font-medium"}>
+    <span className={remaining <= 0 ? "text-neutral-500" : "text-accent-600 font-medium"}>
       {formatRemaining(remaining)}
     </span>
   );
