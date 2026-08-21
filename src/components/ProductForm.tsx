@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import type { ProductFormState } from "@/lib/actions/products";
 import type { Product } from "@/generated/prisma/client";
 import type { Attribute } from "@/lib/attributes";
@@ -45,6 +45,9 @@ export function ProductForm({
   const totalImages = keptImages.length + pendingFiles.length;
 
   const [attributes, setAttributes] = useState<Attribute[]>(asAttributes(product?.attributes));
+  // Text đang gõ dở cho ô nhập giá trị của từng thuộc tính (chưa "chốt" thành tag) —
+  // song song theo index với `attributes`.
+  const [valueDrafts, setValueDrafts] = useState<string[]>(attributes.map(() => ""));
   const [tags, setTags] = useState<ProductTag[]>(asProductTags(product?.tags ?? []));
 
   function toggleTag(tag: ProductTag) {
@@ -69,15 +72,51 @@ export function ProductForm({
   }
 
   function addAttribute() {
-    setAttributes((prev) => [...prev, { name: "", value: "" }]);
+    setAttributes((prev) => [...prev, { name: "", values: [] }]);
+    setValueDrafts((prev) => [...prev, ""]);
   }
 
-  function updateAttribute(index: number, field: "name" | "value", value: string) {
-    setAttributes((prev) => prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)));
+  function updateAttributeName(index: number, name: string) {
+    setAttributes((prev) => prev.map((a, i) => (i === index ? { ...a, name } : a)));
   }
 
   function removeAttribute(index: number) {
     setAttributes((prev) => prev.filter((_, i) => i !== index));
+    setValueDrafts((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Chốt text đang gõ thành 1 hoặc nhiều tag giá trị — hỗ trợ dán/gõ nhiều giá trị
+  // cùng lúc cách nhau bằng dấu phẩy (vd. "Đỏ, Xanh, Vàng" -> 3 tag).
+  function commitValueDraft(index: number, raw: string) {
+    const newValues = raw
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (newValues.length === 0) return;
+
+    setAttributes((prev) =>
+      prev.map((a, i) =>
+        i === index ? { ...a, values: [...new Set([...a.values, ...newValues])] } : a
+      )
+    );
+    setValueDrafts((prev) => prev.map((d, i) => (i === index ? "" : d)));
+  }
+
+  function removeAttributeValue(index: number, valueIndex: number) {
+    setAttributes((prev) =>
+      prev.map((a, i) =>
+        i === index ? { ...a, values: a.values.filter((_, vi) => vi !== valueIndex) } : a
+      )
+    );
+  }
+
+  function handleValueDraftKeyDown(index: number, e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      commitValueDraft(index, valueDrafts[index] ?? "");
+    } else if (e.key === "Backspace" && !valueDrafts[index] && attributes[index].values.length > 0) {
+      removeAttributeValue(index, attributes[index].values.length - 1);
+    }
   }
 
   return (
@@ -260,33 +299,67 @@ export function ProductForm({
       {/* Thuộc tính sản phẩm */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-text">
-          Thuộc tính sản phẩm (thương hiệu, dung tích, xuất xứ...)
+          Thuộc tính sản phẩm (thương hiệu, màu sắc, dung tích...)
         </label>
-        <div className="flex flex-col gap-2">
+        <p className="text-xs text-neutral-500">
+          Nếu 1 thuộc tính có nhiều giá trị (vd. Màu sắc: Đỏ, Xanh, Vàng), gõ từng giá trị
+          rồi nhấn Enter hoặc dấu phẩy — mỗi giá trị sẽ hiện thành 1 tag riêng.
+        </p>
+        <div className="flex flex-col gap-3">
           {attributes.map((attr, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                name="attrName"
-                value={attr.name}
-                onChange={(e) => updateAttribute(i, "name", e.target.value)}
-                placeholder="Tên thuộc tính (vd. Thương hiệu)"
-                className={`flex-1 ${inputClass}`}
-              />
-              <input
-                name="attrValue"
-                value={attr.value}
-                onChange={(e) => updateAttribute(i, "value", e.target.value)}
-                placeholder="Giá trị (vd. Philips)"
-                className={`flex-1 ${inputClass}`}
-              />
-              <button
-                type="button"
-                onClick={() => removeAttribute(i)}
-                className="shrink-0 rounded-md border border-neutral-300 px-2 text-sm text-neutral-500 hover:bg-neutral-50"
-                aria-label="Xoá thuộc tính"
+            <div key={i} className="flex flex-col gap-2 rounded-md border border-neutral-200 p-3">
+              <div className="flex gap-2">
+                <input
+                  value={attr.name}
+                  onChange={(e) => updateAttributeName(i, e.target.value)}
+                  placeholder="Tên thuộc tính (vd. Màu sắc)"
+                  className={`flex-1 ${inputClass}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeAttribute(i)}
+                  className="shrink-0 rounded-md border border-neutral-300 px-2 text-sm text-neutral-500 hover:bg-neutral-50"
+                  aria-label="Xoá thuộc tính"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div
+                className={`flex flex-wrap items-center gap-1.5 ${inputClass}`}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    (e.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus();
+                  }
+                }}
               >
-                ×
-              </button>
+                {attr.values.map((val, vi) => (
+                  <span
+                    key={val + vi}
+                    className="inline-flex items-center gap-1 rounded-full bg-accent-2-100 px-2 py-0.5 text-xs font-medium text-accent-2-700"
+                  >
+                    {val}
+                    <button
+                      type="button"
+                      onClick={() => removeAttributeValue(i, vi)}
+                      aria-label={`Xoá giá trị ${val}`}
+                      className="text-accent-2-700/70 hover:text-accent-2-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  value={valueDrafts[i] ?? ""}
+                  onChange={(e) =>
+                    setValueDrafts((prev) => prev.map((d, di) => (di === i ? e.target.value : d)))
+                  }
+                  onKeyDown={(e) => handleValueDraftKeyDown(i, e)}
+                  onBlur={() => commitValueDraft(i, valueDrafts[i] ?? "")}
+                  placeholder={attr.values.length === 0 ? "Giá trị (vd. Đỏ), Enter để thêm" : ""}
+                  className="min-w-[120px] flex-1 border-none bg-transparent p-0 text-sm outline-none placeholder:text-neutral-500"
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -297,6 +370,26 @@ export function ProductForm({
         >
           + Thêm thuộc tính
         </button>
+        {/* Gộp cả giá trị đang gõ dở (chưa nhấn Enter/phẩy) vào lúc submit, để không mất
+            dữ liệu nếu người dùng bấm nút Lưu ngay sau khi gõ mà quên nhấn Enter. */}
+        <input
+          type="hidden"
+          name="attributesJson"
+          value={JSON.stringify(
+            attributes
+              .map((a, i) => {
+                const draftValues = (valueDrafts[i] ?? "")
+                  .split(",")
+                  .map((v) => v.trim())
+                  .filter(Boolean);
+                return {
+                  name: a.name.trim(),
+                  values: [...new Set([...a.values, ...draftValues])],
+                };
+              })
+              .filter((a) => a.name.length > 0 && a.values.length > 0)
+          )}
+        />
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

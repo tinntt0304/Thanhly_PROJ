@@ -35,12 +35,36 @@ const productSchema = z
 
 export type ProductFormState = { error?: string };
 
+const attributesJsonSchema = z.array(
+  z.object({
+    name: z.string(),
+    values: z.array(z.string()),
+  })
+);
+
+// Thuộc tính được gửi lên dạng 1 chuỗi JSON (mỗi thuộc tính có thể có nhiều giá trị,
+// hiển thị thành nhiều tag riêng) thay vì các input tên/giá trị rời rạc — xem
+// ProductForm.tsx.
 function parseAttributes(formData: FormData): Attribute[] {
-  const names = formData.getAll("attrName").map(String);
-  const values = formData.getAll("attrValue").map(String);
-  return names
-    .map((name, i) => ({ name: name.trim(), value: (values[i] ?? "").trim() }))
-    .filter((a) => a.name.length > 0 && a.value.length > 0);
+  const raw = formData.get("attributesJson");
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  const result = attributesJsonSchema.safeParse(parsed);
+  if (!result.success) return [];
+
+  return result.data
+    .map((a) => ({
+      name: a.name.trim(),
+      values: a.values.map((v) => v.trim()).filter(Boolean),
+    }))
+    .filter((a) => a.name.length > 0 && a.values.length > 0);
 }
 
 // Trả về danh sách URL ảnh cuối cùng = ảnh cũ được giữ lại + ảnh mới upload lên
