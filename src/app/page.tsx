@@ -4,6 +4,7 @@ import { TrustBanner } from "@/components/TrustBanner";
 import { HomeProductSections } from "@/components/HomeProductSections";
 import { Logo } from "@/components/Logo";
 import { getAuctionState } from "@/lib/auction";
+import { ChatWidget } from "@/components/ChatWidget";
 import type { Review } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export default async function HomePage() {
           <HomeProductSections products={homeProducts} />
         )}
       </section>
+
+      <ChatWidget />
     </main>
   );
 }

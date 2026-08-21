@@ -15,6 +15,7 @@ import { BidForm } from "@/components/BidForm";
 import { asAttributes } from "@/lib/attributes";
 import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
+import { ChatWidget } from "@/components/ChatWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           )}
         </div>
       </div>
+
+      <ChatWidget />
     </main>
   );
 }

@@ -79,3 +79,47 @@ model TrustProfile {
 
   updatedAt DateTime @updatedAt
 }
+
+enum ChatSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum ChatSender {
+  VISITOR
+  ADMIN
+}
+
+// Phiên chat giữa 1 khách (không cần tài khoản, định danh bằng id ngẫu nhiên lưu ở
+// localStorage — coi như "vé" ra vào, giống tinh thần không-tài-khoản của cả trang)
+// với người bán. Không có bảng User cho khách nên visitorName/visitorPhone lưu trực
+// tiếp ở đây.
+model ChatSession {
+  id String @id @default(cuid())
+
+  visitorName  String
+  visitorPhone String
+
+  status ChatSessionStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // cập nhật mỗi khi có tin nhắn mới — dùng để sắp xếp danh sách chat ở admin
+
+  messages ChatMessage[]
+
+  @@index([updatedAt])
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+
+  sender  ChatSender
+  content String
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+}
