@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState, type FormEvent } from "react";
 import { placeBid, type BidFormState } from "@/lib/actions/bids";
 
 const initialState: BidFormState = {};
@@ -10,6 +10,9 @@ const inputClass =
 
 export function BidForm({ productId, minAllowed }: { productId: string; minAllowed: number }) {
   const [state, formAction, pending] = useActionState(placeBid, initialState);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
 
   if (state.success) {
     return (
@@ -20,9 +23,29 @@ export function BidForm({ productId, minAllowed }: { productId: string; minAllow
     );
   }
 
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    const phone = phoneRef.current?.value.trim() ?? "";
+    const amount = Number(amountRef.current?.value);
+
+    if (!/^0\d{9}$/.test(phone)) {
+      e.preventDefault();
+      setClientError("Số điện thoại phải có đúng 10 chữ số (ví dụ: 0901234567).");
+      return;
+    }
+    if (!amount || amount < minAllowed) {
+      e.preventDefault();
+      setClientError(`Mức giá phải từ ${minAllowed.toLocaleString("vi-VN")}đ trở lên.`);
+      return;
+    }
+    setClientError(null);
+  }
+
+  const displayedError = clientError ?? state.error;
+
   return (
     <form
       action={formAction}
+      onSubmit={handleSubmit}
       className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4"
     >
       <input type="hidden" name="productId" value={productId} />
@@ -31,9 +54,12 @@ export function BidForm({ productId, minAllowed }: { productId: string; minAllow
           Số điện thoại
         </label>
         <input
+          ref={phoneRef}
           id="phone"
           name="phone"
           type="tel"
+          inputMode="numeric"
+          maxLength={10}
           required
           placeholder="0901234567"
           className={inputClass}
@@ -44,17 +70,17 @@ export function BidForm({ productId, minAllowed }: { productId: string; minAllow
           Mức giá muốn trả (từ {minAllowed.toLocaleString("vi-VN")}đ)
         </label>
         <input
+          ref={amountRef}
           id="amount"
           name="amount"
           type="number"
           required
-          min={minAllowed}
           step={1000}
           placeholder={String(minAllowed)}
           className={inputClass}
         />
       </div>
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {displayedError && <p className="text-sm text-red-600">{displayedError}</p>}
       <button
         type="submit"
         disabled={pending}

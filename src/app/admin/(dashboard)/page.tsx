@@ -36,17 +36,18 @@ export default async function AdminDashboardPage() {
                 <th className="px-4 py-2">Sản phẩm</th>
                 <th className="px-4 py-2">Trạng thái</th>
                 <th className="px-4 py-2">Giá hiện tại</th>
-                <th className="px-4 py-2">Người thắng (SĐT đầy đủ)</th>
+                <th className="px-4 py-2">Lượt trả giá</th>
+                <th className="px-4 py-2">Người trả giá cao nhất (SĐT đầy đủ)</th>
                 <th className="px-4 py-2">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {products.map((product) => {
                 const state = getAuctionState(product, product.bids.length > 0);
-                const winningBid =
-                  state === "ENDED_AWAITING_CONTACT" || state === "SOLD"
-                    ? getWinningBid(product.bids)
-                    : null;
+                // Hiển thị người trả giá cao nhất bất kể phiên còn mở hay đã kết thúc —
+                // để người bán theo dõi được ai đang đấu giá sản phẩm nào ngay trong lúc
+                // phiên còn diễn ra, không phải chờ đến khi kết thúc mới thấy SĐT.
+                const topBid = getWinningBid(product.bids);
 
                 const markSold = setProductStatus.bind(null, product.id, "SOLD");
                 const markCancelled = setProductStatus.bind(null, product.id, "CANCELLED");
@@ -64,8 +65,18 @@ export default async function AdminDashboardPage() {
                     </td>
                     <td className="px-4 py-2">{AUCTION_STATE_LABEL[state]}</td>
                     <td className="px-4 py-2">{formatVND(product.currentPrice)}</td>
+                    <td className="px-4 py-2">{product.bids.length}</td>
                     <td className="px-4 py-2">
-                      {winningBid ? winningBid.phone : "—"}
+                      {topBid ? (
+                        <span>
+                          {topBid.phone}{" "}
+                          <span className="text-xs text-neutral-500">
+                            ({state === "BIDDING" ? "đang dẫn đầu" : "cao nhất"})
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-2">

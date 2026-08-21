@@ -10,7 +10,7 @@ const bidSchema = z.object({
   phone: z
     .string()
     .trim()
-    .regex(/^0\d{9,10}$/, "Số điện thoại không hợp lệ (ví dụ: 0901234567)"),
+    .regex(/^0\d{9}$/, "Số điện thoại phải có đúng 10 chữ số (ví dụ: 0901234567)"),
   amount: z.coerce.number().int().positive("Mức giá không hợp lệ"),
 });
 

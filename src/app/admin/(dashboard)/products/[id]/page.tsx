@@ -2,13 +2,16 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateProduct, setProductStatus } from "@/lib/actions/products";
 import { ProductForm } from "@/components/ProductForm";
-import { PRODUCT_STATUS_LABEL } from "@/lib/auction";
+import { PRODUCT_STATUS_LABEL, formatDateTime, formatVND } from "@/lib/auction";
 
 export default async function EditProductPage({
   params,
 }: PageProps<"/admin/products/[id]">) {
   const { id } = await params;
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: { bids: { orderBy: { amount: "desc" } } },
+  });
   if (!product) notFound();
 
   const boundUpdate = updateProduct.bind(null, product.id);
@@ -46,6 +49,43 @@ export default async function EditProductPage({
               Mở lại đấu giá
             </button>
           </form>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h2 className="font-heading text-sm font-bold text-text">
+          Lịch sử trả giá ({product.bids.length}) — SĐT đầy đủ
+        </h2>
+        {product.bids.length === 0 ? (
+          <p className="text-sm text-neutral-700">Chưa có ai trả giá cho sản phẩm này.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-surface">
+            <table className="w-full text-sm">
+              <thead className="border-b border-neutral-200 bg-neutral-100 text-left text-xs uppercase text-neutral-700">
+                <tr>
+                  <th className="px-4 py-2">SĐT</th>
+                  <th className="px-4 py-2">Mức giá</th>
+                  <th className="px-4 py-2">Thời gian</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {product.bids.map((bid, i) => (
+                  <tr key={bid.id} className={i === 0 ? "bg-accent-100/50" : undefined}>
+                    <td className="px-4 py-2 font-medium text-text">
+                      {bid.phone}
+                      {i === 0 && (
+                        <span className="ml-2 text-xs font-normal text-accent-700">
+                          cao nhất
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">{formatVND(bid.amount)}</td>
+                    <td className="px-4 py-2 text-neutral-700">{formatDateTime(bid.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
