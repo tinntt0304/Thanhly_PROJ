@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Trạng thái do người bán chốt thủ công. Trạng thái "đã kết thúc chờ liên hệ" /
+// "chưa bán" (hết giờ, không ai trả giá) được SUY RA từ endTime + bids tại
+// thời điểm đọc dữ liệu, không lưu trực tiếp — tránh cần cron job nào chạy nền.
+enum ProductStatus {
+  ACTIVE // đang mở đấu giá (hoặc đã hết giờ, chờ người bán xử lý)
+  SOLD // người bán đã đánh dấu giao dịch hoàn tất
+  CANCELLED // người bán huỷ (vd. người thắng bùng kèo, hàng lỗi phát sinh...)
+}
+
+model Admin {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id String @id @default(cuid())
+
+  title       String
+  description String
+  condition   String // "Mới", "Đã dùng - còn tốt", "Lỗi nhẹ: ...", v.v. (free text)
+  images      String[] // URL ảnh, tối thiểu 1 ảnh bắt buộc ở tầng ứng dụng
+
+  startPrice   Int // giá khởi điểm (VNĐ)
+  minBidStep   Int // bước giá tối thiểu (VNĐ)
+  currentPrice Int // giá hiện tại = startPrice ban đầu, cập nhật theo lượt trả giá cao nhất
+  buyNowPrice  Int? // P1.1 - giá mua ngay, optional
+
+  endTime DateTime // thời điểm kết thúc phiên đấu giá
+
+  status ProductStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bids Bid[]
+
+  @@index([status, endTime])
+}
+
+model Bid {
+  id String @id @default(cuid())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  phone  String // SĐT người trả giá; ẩn một phần khi hiển thị công khai
+  amount Int
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, amount])
+}
+
+// Singleton: nội dung "bằng chứng uy tín" hiển thị đầu trang chủ (P0.5).
+// Chỉ nên có duy nhất 1 dòng trong bảng này.
+model TrustProfile {
+  id String @id @default(cuid())
+
+  avgRating Float // vd. 4.8
+  soldCount Int // số đơn đã bán từ sàn cũ
+  reviews   Json // mảng { author: string; text: string; imageUrl?: string }[]
+
+  updatedAt DateTime @updatedAt
+}
