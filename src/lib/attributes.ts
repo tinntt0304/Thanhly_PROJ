@@ -17,7 +17,13 @@ export function asAttributes(value: unknown): Attribute[] {
       if (Array.isArray(rawValues)) {
         values = rawValues.filter((x): x is string => typeof x === "string");
       } else if (typeof legacyValue === "string") {
-        values = [legacyValue];
+        // Dữ liệu cũ có thể đã lưu nhiều giá trị gộp chung 1 chuỗi cách nhau bằng dấu
+        // phẩy (trước khi có UI tag riêng biệt) — tách ra để mỗi giá trị thành 1 tag,
+        // nhất quán với cách nhập mới.
+        values = legacyValue
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
       } else {
         values = [];
       }
