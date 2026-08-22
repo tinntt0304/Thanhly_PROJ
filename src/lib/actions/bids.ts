@@ -55,6 +55,10 @@ export async function placeBid(
         data: { currentPrice: amount },
       });
       if (updateResult.count === 0) {
+        const sameAmountBid = await tx.bid.findFirst({ where: { productId, amount } });
+        if (sameAmountBid) {
+          throw new Error("Đã có người đấu giá mức giá này. Vui lòng đấu giá lại.");
+        }
         throw new Error("Vừa có người trả giá khác nhanh hơn, vui lòng tải lại trang và thử lại.");
       }
 
