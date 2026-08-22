@@ -3,6 +3,7 @@
 **Phiên bản:** v1 (MVP)
 **Tác giả:** Tín (Product Owner)
 **Ngày:** 21/08/2026
+**Cập nhật triển khai gần nhất:** 22/08/2026 — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế) để biết tình trạng thực tế so với PRD gốc bên dưới (PRD gốc giữ nguyên không sửa, chỉ nối thêm mục 9).
 
 ---
 
@@ -162,6 +163,50 @@ Nếu không giải quyết: hàng tồn phải bán tháo giá rẻ qua các nh
   - **Tuần 1-2 (song song):** Thu thập bằng chứng uy tín từ sàn cũ, chuẩn bị danh sách sản phẩm, bắt đầu chia sẻ vào nhóm mua bán.
   - **Sau ngày 7:** Đánh giá leading indicators — nếu traffic/tỷ lệ trả giá thấp hơn kỳ vọng nhiều, cân nhắc bổ sung P1.1 (Mua ngay) sớm để tăng tốc độ chốt thay vì chờ đấu giá.
   - **Ngày 30:** Tổng kết, đóng chiến dịch.
+
+---
+
+## 9. Trạng thái triển khai thực tế
+
+*(Nối thêm 22/08/2026, sau khi build xong bản đầu và triển khai thêm một số việc phát sinh trong quá trình dùng thử. Mục này không sửa lại các mục 1-8 ở trên — đó vẫn là bản PRD gốc.)*
+
+**Repo:** https://github.com/tinntt0304/Thanhly_PROJ · Stack: Next.js + TypeScript + Tailwind + Prisma/Supabase Postgres + Supabase Storage.
+
+### P0 — đã xong, có vài điều chỉnh so với PRD gốc
+- **P0.1 Đăng sản phẩm** — Xong. Ảnh giờ **upload trực tiếp từ thiết bị** (Supabase Storage, tối đa 8 ảnh/sản phẩm, 5MB/ảnh) thay vì chỉ yêu cầu "tối thiểu 1 ảnh" chung chung.
+- **P0.2 Đấu giá công khai với SĐT** — Xong, siết chặt hơn PRD gốc: SĐT bắt buộc **đúng 10 chữ số** (không phải chỉ "bắt buộc"), validate cả client lẫn server. Lỗi mức giá dưới bước tối thiểu hiện rõ trong form thay vì phụ thuộc validation mặc định của trình duyệt.
+- **P0.3 Kết thúc phiên tự động** — Xong, suy ra trạng thái từ `endTime` + lượt trả giá tại thời điểm đọc, không cần cron job.
+- **P0.4 Trang quản lý người bán** — Xong, vượt yêu cầu gốc: ngoài xem trạng thái/người thắng, admin còn thấy **người đang trả giá cao nhất + SĐT đầy đủ ngay cả khi phiên còn đang mở** (PRD gốc chỉ yêu cầu thấy sau khi kết thúc), và có bảng lịch sử trả giá đầy đủ cho từng sản phẩm.
+- **P0.5 Bằng chứng uy tín** — Xong.
+
+### Trả lời các Open Questions (mục 7) qua việc triển khai
+1. **Bước giá tối thiểu**: đã chốt là **số VNĐ cố định**, người bán tự đặt theo từng sản phẩm (không làm theo %).
+2. **Chỉ 1 lượt trả giá bằng đúng giá khởi điểm**: đã chốt **không** tự động coi là "đã bán" — luôn về trạng thái "Đã kết thúc — chờ liên hệ", người bán xác nhận thủ công.
+3. **Cơ chế xác nhận người thắng 24h**: chưa triển khai (vẫn P1, xem bên dưới).
+4. **Giới hạn số sản phẩm đăng cùng lúc**: không giới hạn cứng; trang chủ đã có tìm kiếm để xử lý danh sách dài (xem mục "Ngoài phạm vi PRD gốc" bên dưới).
+5. **Pháp lý hiển thị SĐT công khai (ẩn một phần)**: vẫn mở, chưa xác nhận — không chặn triển khai như PRD gốc đã ghi.
+
+### P1 — chưa làm (đúng như PRD xếp loại, trừ khi ghi chú khác)
+- P1.1 "Mua ngay": **một phần** — schema đã có `buyNowPrice` và hiển thị giá mua ngay ở trang sản phẩm, nhưng **chưa có nút "Mua ngay" để chốt phiên ngay lập tức**.
+- P1.2 Chia sẻ mạng xã hội: chưa làm.
+- P1.3 Xử lý người thắng không phản hồi (24h): chưa làm.
+- P1.4 Cảnh báo SĐT từng bùng kèo: chưa làm.
+
+### Ngoài phạm vi PRD gốc — bổ sung trong quá trình dùng thử
+Các việc này phát sinh từ phản hồi thực tế khi bắt đầu dùng thử, không có trong PRD gốc:
+
+- **Nhận diện thương hiệu "hifen"** — logo, favicon, bảng màu (cream/sage/terracotta), font Baloo 2 + Be Vietnam Pro (chọn để đảm bảo hiển thị đúng tiếng Việt, khác font gốc trong `brand_assets/` là Caprasimo/Figtree vốn thiếu bộ ký tự tiếng Việt). Định vị thương hiệu cụ thể hơn PRD gốc: "đồ mẹ & bé, thú cưng thanh lý" thay vì thanh lý chung chung.
+- **Thuộc tính sản phẩm nhiều giá trị** — 1 thuộc tính (vd. "Màu sắc") có thể gắn nhiều giá trị (Đỏ, Xanh, Vàng...), mỗi giá trị hiện thành 1 tag riêng, cả ở form admin lẫn trang công khai.
+- **Nhãn sản phẩm "Nổi bật" / "Hot Deal"** — admin gắn được qua checkbox, hiện dạng sticker (icon + màu rực) trên ảnh sản phẩm.
+- **Gallery ảnh xem được nhiều ảnh** — bấm thumbnail để đổi ảnh chính ở trang chi tiết sản phẩm.
+- **Tìm kiếm sản phẩm theo tên** — lọc tức thời, không phân biệt dấu tiếng Việt.
+- **Trang chủ chia 2 khối** — "Sản phẩm đang thanh lý" (còn thời gian đấu giá) và "Sản phẩm đã kết thúc" (hết giờ/đã bán/đã huỷ), hiển thị cùng lúc.
+- **Chat trực tiếp khách ↔ người bán** — khách chat không cần tài khoản (nhập Tên + SĐT lần đầu), người bán trả lời qua trang `/admin/chat`; cập nhật qua polling 5 giây (kể cả trạng thái đóng/mở phiên), không cần tải lại trang.
+
+### Hạ tầng (không có trong PRD gốc vì PRD không đi vào kỹ thuật)
+- **Database:** Supabase Postgres (project `duptlckyprmnklpkwayn`).
+- **Lưu trữ ảnh:** Supabase Storage, bucket `product-images` (public).
+- **Deploy:** Vercel (xem `docs/SETUP.md` để biết chi tiết biến môi trường).
 
 ---
 
