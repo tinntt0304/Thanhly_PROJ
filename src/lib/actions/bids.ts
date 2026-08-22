@@ -43,6 +43,15 @@ export async function placeBid(
         throw new Error("Phiên đấu giá này không còn mở để trả giá.");
       }
 
+      // currentPrice luôn được cập nhật cùng lúc với việc tạo 1 Bid có amount tương ứng,
+      // nên nếu đã có bid trùng đúng số tiền này thì chắc chắn là 2 người cùng đẩy 1 mức
+      // giá — kiểm tra trước, báo lỗi rõ ràng thay vì lỗi "thấp hơn mức tối thiểu" chung
+      // chung (vì mức tối thiểu đọc được ở đây đã dựa trên currentPrice mới nhất).
+      const sameAmountBid = await tx.bid.findFirst({ where: { productId, amount } });
+      if (sameAmountBid) {
+        throw new Error("Đã có người đấu giá mức giá này. Vui lòng đấu giá lại.");
+      }
+
       const minAllowed = minNextBid(product);
       if (amount < minAllowed) {
         throw new Error(`Mức giá phải từ ${minAllowed.toLocaleString("vi-VN")}đ trở lên.`);
@@ -55,10 +64,6 @@ export async function placeBid(
         data: { currentPrice: amount },
       });
       if (updateResult.count === 0) {
-        const sameAmountBid = await tx.bid.findFirst({ where: { productId, amount } });
-        if (sameAmountBid) {
-          throw new Error("Đã có người đấu giá mức giá này. Vui lòng đấu giá lại.");
-        }
         throw new Error("Vừa có người trả giá khác nhanh hơn, vui lòng tải lại trang và thử lại.");
       }
 
