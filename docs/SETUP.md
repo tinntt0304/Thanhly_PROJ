@@ -108,10 +108,41 @@ Biến môi trường cần có khi deploy: `DATABASE_URL`, `DIRECT_URL`, `AUTH_
 ngẫu nhiên dài, dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng
 lúc seed, không cần giữ lại sau đó).
 
-Lưu ý về `sslmode`: `.env` hiện dùng `sslmode=no-verify` vì mạng máy dev chặn việc xác
-thực chuỗi chứng chỉ TLS đầy đủ (xem mục treo `migrate` bên dưới). Khi deploy lên hạ
-tầng không bị chặn kiểu này (Vercel, VPS thông thường...), nên đổi lại thành
-`sslmode=require` để bật xác thực chứng chỉ đầy đủ, an toàn hơn.
+Lưu ý về `sslmode`: dùng `sslmode=no-verify` cho `DATABASE_URL` — **ở mọi nơi, kể cả
+production trên Vercel**, không phải chỉ máy dev. Ban đầu tưởng lỗi TLS chỉ do mạng máy
+dev (Cloudflare WARP), nhưng deploy thử lên Vercel với `sslmode=require` vẫn gặp y hệt
+lỗi `self-signed certificate in certificate chain` (Prisma code `P1011`) — tức đây là
+vấn đề giữa chuỗi chứng chỉ của Supabase Postgres pooler và thư viện `pg`
+(`@prisma/adapter-pg`), không liên quan mạng cụ thể nào. Kết luận: **luôn dùng
+`sslmode=no-verify`** cho `DATABASE_URL` khi dùng Supabase Postgres qua driver adapter
+`pg` theo cách dự án này đang làm.
+
+## Deploy lên Vercel
+
+Đã deploy: **https://thanhly-dau-gia-hifen.vercel.app** (project Vercel: `tinntt/thanhly-dau-gia-hifen`).
+
+Biến môi trường đã cấu hình trên Vercel (Project Settings → Environment Variables →
+Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy migration cục bộ qua
+`prisma/apply-migration.mjs`, app lúc chạy không đụng tới):
+
+- `DATABASE_URL` — giống `.env` cục bộ (transaction pooler, `sslmode=no-verify`).
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — giống `.env` cục bộ.
+- `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
+  cho production.
+
+`.vercelignore` chặn không cho `.env` cục bộ bị upload kèm lúc deploy (tránh lẫn giá
+trị dev vào build production).
+
+**Deploy lại sau khi sửa code:**
+
+```bash
+npx vercel --prod --yes
+```
+
+**Lưu ý:** lúc setup, `vercel link` không tự kết nối được GitHub repo
+(`tinntt0304/Thanhly_PROJ`) để tự deploy mỗi lần `git push` — cần vào Vercel Dashboard →
+project → Settings → Git → Connect Git Repository để bật, hoặc tiếp tục deploy thủ công
+bằng lệnh trên.
 
 ## Những quyết định/giả định đã chốt khi implement (PRD không nói rõ)
 

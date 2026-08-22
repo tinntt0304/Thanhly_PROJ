@@ -1,0 +1,6 @@
+# Không upload file .env cục bộ khi deploy — biến môi trường thật đã cấu hình
+# trực tiếp trên Vercel (Project Settings > Environment Variables), tránh lẫn giá trị
+# dev-only (vd. sslmode=no-verify chỉ dùng để né firewall máy dev) vào build production.
+.env
+.env.*
+!.env.example
