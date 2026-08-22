@@ -37,6 +37,8 @@ model Product {
   attributes  Json     @default("[]") // thuộc tính sản phẩm: [{ name: string, value: string }]
   tags        String[] @default([]) // nhãn hiển thị: "FEATURED" | "HOT_DEAL" (whitelist ở src/lib/tags.ts)
 
+  quantity Int @default(1) // số lượng người bán muốn bán
+
   startPrice   Int // giá khởi điểm (VNĐ)
   minBidStep   Int // bước giá tối thiểu (VNĐ)
   currentPrice Int // giá hiện tại = startPrice ban đầu, cập nhật theo lượt trả giá cao nhất

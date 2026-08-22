@@ -50,7 +50,14 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               <TagBadges tags={product.tags} />
             </div>
             <h1 className="font-heading text-xl font-bold text-text">{product.title}</h1>
-            <p className="text-sm text-neutral-700">Tình trạng: {product.condition}</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-accent-2-100 px-3 py-1.5 text-sm font-semibold text-accent-2-700">
+                <span aria-hidden="true">🏷️</span> Tình trạng: {product.condition}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-accent-100 px-3 py-1.5 text-sm font-semibold text-accent-700">
+                <span aria-hidden="true">📦</span> Số lượng: {product.quantity}
+              </span>
+            </div>
 
             <div className="rounded-lg border border-neutral-200 bg-surface p-4">
               <p className="text-sm text-neutral-700">Giá hiện tại</p>

@@ -162,6 +162,22 @@ export function ProductForm({
         />
       </div>
 
+      <div className="flex flex-col gap-1">
+        <label htmlFor="quantity" className="text-sm font-medium text-text">
+          Số lượng muốn bán
+        </label>
+        <input
+          id="quantity"
+          name="quantity"
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={product?.quantity ?? 1}
+          required
+          className={inputClass}
+        />
+      </div>
+
       {/* Nhãn sản phẩm */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-text">Nhãn hiển thị</label>
