@@ -8,18 +8,12 @@ import type { Attribute } from "@/lib/attributes";
 import { asAttributes } from "@/lib/attributes";
 import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 import { TAG_LABEL, TAG_VALUES, asProductTags, type ProductTag } from "@/lib/tags";
+import { toDateTimeLocal } from "@/lib/datetime";
 
 const initialState: ProductFormState = {};
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text placeholder:text-neutral-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
-
-function toDateTimeLocal(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}`;
-}
 
 function syncFileInput(input: HTMLInputElement | null, files: File[]) {
   if (!input) return;

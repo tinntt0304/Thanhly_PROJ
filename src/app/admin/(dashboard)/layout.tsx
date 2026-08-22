@@ -22,6 +22,9 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
               <Link href="/admin/products/new" className="text-neutral-700 hover:text-text">
                 + Đăng sản phẩm
               </Link>
+              <Link href="/admin/products/import" className="text-neutral-700 hover:text-text">
+                Import Excel
+              </Link>
               <Link href="/admin/settings" className="text-neutral-700 hover:text-text">
                 Bằng chứng uy tín
               </Link>

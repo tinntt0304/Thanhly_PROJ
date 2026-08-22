@@ -18,7 +18,15 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-lg font-bold text-text">Sản phẩm ({products.length})</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-heading text-lg font-bold text-text">Sản phẩm ({products.length})</h1>
+        <Link
+          href="/admin/products/import"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+        >
+          Import từ Excel
+        </Link>
+      </div>
 
       {products.length === 0 ? (
         <p className="text-sm text-neutral-700">
