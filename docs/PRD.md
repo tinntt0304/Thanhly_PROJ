@@ -3,7 +3,7 @@
 **Phiên bản:** v1 (MVP)
 **Tác giả:** Tín (Product Owner)
 **Ngày:** 21/08/2026
-**Cập nhật triển khai gần nhất:** 22/08/2026 — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế) để biết tình trạng thực tế so với PRD gốc bên dưới (PRD gốc giữ nguyên không sửa, chỉ nối thêm mục 9).
+**Cập nhật triển khai gần nhất:** 23/08/2026 — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế) để biết tình trạng thực tế so với PRD gốc bên dưới (PRD gốc giữ nguyên không sửa, chỉ nối thêm mục 9). **Lưu ý quan trọng:** Non-Goal #3 (không mở rộng đa người bán) đã bị **đảo ngược** ngày 23/08/2026 — xem chi tiết ở mục 9.
 
 ---
 
@@ -30,7 +30,7 @@ Nếu không giải quyết: hàng tồn phải bán tháo giá rẻ qua các nh
 
 1. **Không xây tài khoản/giỏ hàng cho người mua** — vì đây là sự kiện một lần, chi phí xây hệ thống tài khoản không tương xứng với lợi ích. Người mua chỉ cần để lại SĐT khi trả giá.
 2. **Không tích hợp thanh toán online** — giao dịch chốt qua liên hệ trực tiếp (SĐT/Zalo), giữ đúng tinh thần thanh lý cá nhân, tránh rủi ro pháp lý và chi phí tích hợp cổng thanh toán cho một chiến dịch ngắn hạn.
-3. **Không mở rộng thành marketplace đa người bán** — đây là quyết định đã chốt sau khi cân nhắc rủi ro chicken-and-egg (cần cả cung lẫn cầu cùng lúc) và thiếu cơ chế ràng buộc giao dịch giữa người lạ với người lạ. Có thể xem xét lại **sau khi** mô hình đơn-người-bán được validate thành công.
+3. **Không mở rộng thành marketplace đa người bán** — đây là quyết định đã chốt sau khi cân nhắc rủi ro chicken-and-egg (cần cả cung lẫn cầu cùng lúc) và thiếu cơ chế ràng buộc giao dịch giữa người lạ với người lạ. Có thể xem xét lại **sau khi** mô hình đơn-người-bán được validate thành công. **⚠️ ĐÃ ĐẢO NGƯỢC ngày 23/08/2026** — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế), phần "Thay đổi phạm vi lớn: mở marketplace đa người bán".
 4. **Không có app di động riêng** — trang web responsive là đủ cho quy mô một chiến dịch thanh lý.
 5. **Không xây hệ thống chấm điểm uy tín tự động (reputation engine)** — ở v1, việc theo dõi SĐT từng bùng kèo sẽ làm thủ công; tự động hóa việc này để version sau nếu mô hình được nhân rộng.
 
@@ -116,7 +116,7 @@ Nếu không giải quyết: hàng tồn phải bán tháo giá rẻ qua các nh
 
 ### Future Considerations (P2)
 
-**P2.1 — Mô hình marketplace đa người bán** — đã chốt là non-goal cho v1 (xem mục 3). Nếu theo đuổi sau này, cần thiết kế lại từ đầu: tài khoản người bán, xác thực danh tính, cơ chế ký quỹ/đặt cọc để ràng buộc giao dịch giữa người lạ với người lạ, và giải quyết bài toán chicken-and-egg. Ghi nhận ở đây để không vô tình thiết kế kiến trúc dữ liệu quá cứng nhắc cho một-người-bán, phòng khi cần mở rộng.
+**P2.1 — Mô hình marketplace đa người bán** — đã chốt là non-goal cho v1 (xem mục 3). Nếu theo đuổi sau này, cần thiết kế lại từ đầu: tài khoản người bán, xác thực danh tính, cơ chế ký quỹ/đặt cọc để ràng buộc giao dịch giữa người lạ với người lạ, và giải quyết bài toán chicken-and-egg. Ghi nhận ở đây để không vô tình thiết kế kiến trúc dữ liệu quá cứng nhắc cho một-người-bán, phòng khi cần mở rộng. **⚠️ Đã triển khai một phần ngày 23/08/2026, sớm hơn dự kiến của PRD gốc** — xem mục 9.
 
 **P2.2 — Hệ thống chấm điểm uy tín tự động** — tự động tính điểm tin cậy người mua dựa trên lịch sử trả giá/thắng/hoàn tất giao dịch.
 
@@ -192,6 +192,31 @@ Nếu không giải quyết: hàng tồn phải bán tháo giá rẻ qua các nh
 - P1.3 Xử lý người thắng không phản hồi (24h): chưa làm.
 - P1.4 Cảnh báo SĐT từng bùng kèo: chưa làm.
 
+### Thay đổi phạm vi lớn: mở marketplace đa người bán (23/08/2026)
+
+PRD gốc (mục 3, Non-Goal #3 và mục 19, P2.1) chốt rõ v1 chỉ có **1 người bán duy nhất**,
+việc mở rộng đa người bán để "sau khi mô hình đơn-người-bán được validate thành công".
+Theo yêu cầu trực tiếp của product owner ngày 23/08/2026 — **sớm hơn nhiều** so với mốc
+đó — hệ thống đã được mở rộng thành marketplace nhiều người bán:
+
+- **Tài khoản có vai trò (role):** `SUPERADMIN` (vận hành sàn, tài khoản admin gốc từ
+  PRD/P0.4 tự động được nâng lên vai trò này) và `SELLER` (người bán tự đăng ký công
+  khai ở `/admin/register` để đăng sản phẩm của riêng mình).
+- **Sản phẩm gắn với người bán (`sellerId`)** — mỗi SELLER chỉ thấy/sửa được sản phẩm
+  của chính mình (kiểm tra quyền ở cả server action lẫn URL trực tiếp); SUPERADMIN thấy
+  và quản lý được sản phẩm của tất cả người bán.
+- **Chưa giải quyết** các rủi ro P2.1 đã lường trước: xác thực danh tính người bán, cơ
+  chế ký quỹ/đặt cọc ràng buộc giao dịch, bài toán chicken-and-egg (thu hút cả người
+  bán lẫn người mua). Đăng ký hiện tự do, không có bước duyệt/xác minh.
+- **Chat hỗ trợ và "Bằng chứng uy tín"** vẫn là **1 hộp thư/nội dung chung cho cả sàn**
+  (chỉ SUPERADMIN thấy), **chưa tách riêng theo từng người bán** — nếu một khách hỏi về
+  sản phẩm của SELLER A, tin nhắn vẫn về chung 1 hộp thư do SUPERADMIN quản lý, không
+  tự động chuyển tới đúng SELLER A.
+- **Quản lý danh mục** (`/admin/danh-muc`, chỉ SUPERADMIN) — trang mới quản lý menu điều
+  hướng công khai, đăng/sửa/ẩn thông báo (Announcement), và nội dung trang tĩnh "Về
+  chúng tôi" (SiteContent) — có trang công khai tương ứng ở `/thong-bao` và
+  `/ve-chung-toi`.
+
 ### Ngoài phạm vi PRD gốc — bổ sung trong quá trình dùng thử
 Các việc này phát sinh từ phản hồi thực tế khi bắt đầu dùng thử, không có trong PRD gốc:
 
@@ -199,14 +224,17 @@ Các việc này phát sinh từ phản hồi thực tế khi bắt đầu dùng
 - **Thuộc tính sản phẩm nhiều giá trị** — 1 thuộc tính (vd. "Màu sắc") có thể gắn nhiều giá trị (Đỏ, Xanh, Vàng...), mỗi giá trị hiện thành 1 tag riêng, cả ở form admin lẫn trang công khai.
 - **Nhãn sản phẩm "Nổi bật" / "Hot Deal"** — admin gắn được qua checkbox, hiện dạng sticker (icon + màu rực) trên ảnh sản phẩm.
 - **Gallery ảnh xem được nhiều ảnh** — bấm thumbnail để đổi ảnh chính ở trang chi tiết sản phẩm.
-- **Tìm kiếm sản phẩm theo tên** — lọc tức thời, không phân biệt dấu tiếng Việt.
+- **Tìm kiếm sản phẩm theo tên** — lọc tức thời, không phân biệt dấu tiếng Việt; từ 23/08/2026 tích hợp thêm vào ô tìm kiếm ở banner đầu trang chủ (qua query param `?q=`).
 - **Trang chủ chia 2 khối** — "Sản phẩm đang thanh lý" (còn thời gian đấu giá) và "Sản phẩm đã kết thúc" (hết giờ/đã bán/đã huỷ), hiển thị cùng lúc.
-- **Chat trực tiếp khách ↔ người bán** — khách chat không cần tài khoản (nhập Tên + SĐT lần đầu), người bán trả lời qua trang `/admin/chat`; cập nhật qua polling 5 giây (kể cả trạng thái đóng/mở phiên), không cần tải lại trang.
+- **Chat trực tiếp khách ↔ người bán** — khách chat không cần tài khoản (nhập Tên + SĐT lần đầu), người bán trả lời qua trang `/admin/chat`; cập nhật qua polling 5 giây (kể cả trạng thái đóng/mở phiên), không cần tải lại trang. Từ 23/08/2026: chỉ SUPERADMIN truy cập được (xem phần marketplace ở trên).
+- **Header & banner trang chủ thiết kế lại (23/08/2026)** — header nền tối, menu rút gọn (Trang chủ / Thông báo & Tin tức / Về chúng tôi), đồng hồ trực tiếp, nút "Người bán" (chưa đăng nhập) hoặc "Quản lý" (đã đăng nhập); banner hero tìm kiếm phía trên trang chủ. Giữ nguyên bảng màu thương hiệu hifen, chỉ theo bố cục tham khảo từ 1 trang đấu giá khác.
+- **Import sản phẩm hàng loạt từ Excel (22/08/2026)** — trang `/admin/products/import`: tải file mẫu `.xlsx`, tải file đã điền lên để tạo nhiều sản phẩm cùng lúc, thống kê thành công/lỗi, sửa trực tiếp và thử lại từng dòng lỗi ngay trên trang.
+- **Thông báo phân biệt trường hợp trùng mức giá (22/08/2026)** — khi 2 người cùng trả giá đúng 1 mức tiền gần như đồng thời, người bấm sau thấy thông báo riêng "Đã có người đấu giá mức giá này" thay vì lỗi chung chung "thấp hơn mức tối thiểu".
 
 ### Hạ tầng (không có trong PRD gốc vì PRD không đi vào kỹ thuật)
 - **Database:** Supabase Postgres (project `duptlckyprmnklpkwayn`).
 - **Lưu trữ ảnh:** Supabase Storage, bucket `product-images` (public).
-- **Deploy:** Vercel (xem `docs/SETUP.md` để biết chi tiết biến môi trường).
+- **Deploy:** Vercel — production tại https://thanhly-dau-gia-hifen.vercel.app (xem `docs/SETUP.md` để biết chi tiết biến môi trường).
 
 ---
 
