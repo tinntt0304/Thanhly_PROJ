@@ -43,10 +43,12 @@ export function Logo({
   size = "sm",
   withTagline = false,
   href = "/",
+  onDark = false,
 }: {
   size?: keyof typeof SIZE_PRESETS;
   withTagline?: boolean;
   href?: string | null;
+  onDark?: boolean;
 }) {
   const preset = SIZE_PRESETS[size];
 
@@ -55,14 +57,14 @@ export function Logo({
       <LogoIcon size={preset.icon} />
       <div className="flex flex-col" style={{ gap: 4 }}>
         <span
-          className="font-wordmark leading-none text-text"
+          className={`font-wordmark leading-none ${onDark ? "text-neutral-50" : "text-text"}`}
           style={{ fontSize: preset.wordmark }}
         >
           hifen
         </span>
         {withTagline && (
           <span
-            className="font-body text-neutral-700"
+            className={`font-body ${onDark ? "text-neutral-300" : "text-neutral-700"}`}
             style={{ fontSize: 15, letterSpacing: "0.02em" }}
           >
             đồ mẹ &amp; bé · thú cưng thanh lý

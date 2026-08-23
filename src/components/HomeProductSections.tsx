@@ -27,8 +27,14 @@ function ProductGrid({
   );
 }
 
-export function HomeProductSections({ products }: { products: HomeProduct[] }) {
-  const [query, setQuery] = useState("");
+export function HomeProductSections({
+  products,
+  initialQuery = "",
+}: {
+  products: HomeProduct[];
+  initialQuery?: string;
+}) {
+  const [query, setQuery] = useState(initialQuery);
 
   const filtered = useMemo(
     () => products.filter((p) => matchesSearch(p.product.title, query)),

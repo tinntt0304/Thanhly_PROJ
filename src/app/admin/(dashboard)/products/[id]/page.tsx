@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/admin-guard";
 import { updateProduct, setProductStatus } from "@/lib/actions/products";
 import { ProductForm } from "@/components/ProductForm";
 import { PRODUCT_STATUS_LABEL, formatDateTime, formatVND } from "@/lib/auction";
@@ -7,12 +8,14 @@ import { PRODUCT_STATUS_LABEL, formatDateTime, formatVND } from "@/lib/auction";
 export default async function EditProductPage({
   params,
 }: PageProps<"/admin/products/[id]">) {
+  const session = await requireAdmin();
   const { id } = await params;
   const product = await prisma.product.findUnique({
     where: { id },
     include: { bids: { orderBy: { amount: "desc" } } },
   });
   if (!product) notFound();
+  if (session.user.role !== "SUPERADMIN" && product.sellerId !== session.user.id) notFound();
 
   const boundUpdate = updateProduct.bind(null, product.id);
   const markSold = setProductStatus.bind(null, product.id, "SOLD");

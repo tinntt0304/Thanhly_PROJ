@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireSuperAdmin } from "@/lib/admin-guard";
 import { parseReviews } from "@/lib/reviews";
 
 const trustSchema = z.object({
@@ -18,7 +18,7 @@ export async function updateTrustProfile(
   _prevState: TrustFormState | undefined,
   formData: FormData
 ): Promise<TrustFormState> {
-  await requireAdmin();
+  await requireSuperAdmin();
 
   const parsed = trustSchema.safeParse({
     avgRating: formData.get("avgRating"),

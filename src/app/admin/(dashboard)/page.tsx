@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/admin-guard";
 import {
   formatVND,
   getAuctionState,
@@ -11,9 +12,15 @@ import { setProductStatus } from "@/lib/actions/products";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const session = await requireAdmin();
+  const isSuperAdmin = session.user.role === "SUPERADMIN";
+
+  // SUPERADMIN thấy sản phẩm của tất cả người bán (để giám sát toàn sàn); SELLER chỉ
+  // thấy sản phẩm của chính mình.
   const products = await prisma.product.findMany({
+    where: isSuperAdmin ? undefined : { sellerId: session.user.id },
     orderBy: [{ createdAt: "desc" }],
-    include: { bids: { orderBy: { amount: "desc" } } },
+    include: { bids: { orderBy: { amount: "desc" } }, seller: { select: { name: true } } },
   });
 
   return (
@@ -42,6 +49,7 @@ export default async function AdminDashboardPage() {
             <thead className="border-b border-neutral-200 bg-neutral-100 text-left text-xs uppercase text-neutral-700">
               <tr>
                 <th className="px-4 py-2">Sản phẩm</th>
+                {isSuperAdmin && <th className="px-4 py-2">Người bán</th>}
                 <th className="px-4 py-2">Trạng thái</th>
                 <th className="px-4 py-2">Giá hiện tại</th>
                 <th className="px-4 py-2">Lượt trả giá</th>
@@ -71,6 +79,9 @@ export default async function AdminDashboardPage() {
                         {product.title}
                       </Link>
                     </td>
+                    {isSuperAdmin && (
+                      <td className="px-4 py-2 text-neutral-700">{product.seller?.name ?? "—"}</td>
+                    )}
                     <td className="px-4 py-2">{AUCTION_STATE_LABEL[state]}</td>
                     <td className="px-4 py-2">{formatVND(product.currentPrice)}</td>
                     <td className="px-4 py-2">{product.bids.length}</td>

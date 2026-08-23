@@ -68,6 +68,19 @@ function parseAttributes(formData: FormData): Attribute[] {
     .filter((a) => a.name.length > 0 && a.values.length > 0);
 }
 
+// SELLER chỉ được sửa/đổi trạng thái sản phẩm của chính mình — SUPERADMIN thấy và sửa
+// được tất cả. Ném lỗi nếu không có quyền (đọc được bằng try/catch ở caller).
+async function assertOwnsProduct(userId: string, role: string, productId: string) {
+  if (role === "SUPERADMIN") return;
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { sellerId: true },
+  });
+  if (!product || product.sellerId !== userId) {
+    throw new Error("Bạn không có quyền chỉnh sửa sản phẩm này.");
+  }
+}
+
 // Trả về danh sách URL ảnh cuối cùng = ảnh cũ được giữ lại + ảnh mới upload lên
 // Supabase Storage. Ném lỗi (đọc được bằng try/catch ở caller) nếu upload thất bại
 // hoặc không đủ ảnh.
@@ -92,7 +105,7 @@ export async function createProduct(
   _prevState: ProductFormState | undefined,
   formData: FormData
 ): Promise<ProductFormState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const parsed = productSchema.safeParse({
     title: formData.get("title"),
@@ -122,6 +135,7 @@ export async function createProduct(
 
   const product = await prisma.product.create({
     data: {
+      sellerId: session.user.id,
       title: data.title,
       description: data.description,
       condition: data.condition,
@@ -147,7 +161,13 @@ export async function updateProduct(
   _prevState: ProductFormState | undefined,
   formData: FormData
 ): Promise<ProductFormState> {
-  await requireAdmin();
+  const session = await requireAdmin();
+
+  try {
+    await assertOwnsProduct(session.user.id, session.user.role, productId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Không có quyền." };
+  }
 
   const parsed = productSchema.safeParse({
     title: formData.get("title"),
@@ -200,7 +220,8 @@ export async function updateProduct(
 }
 
 export async function setProductStatus(productId: string, status: ProductStatus) {
-  await requireAdmin();
+  const session = await requireAdmin();
+  await assertOwnsProduct(session.user.id, session.user.role, productId);
 
   await prisma.product.update({
     where: { id: productId },

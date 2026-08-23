@@ -21,20 +21,24 @@ export type ImportSummary = {
   results: ImportRowResult[];
 };
 
-async function createFromRow(row: number, input: ImportRowInput): Promise<ImportRowResult> {
+async function createFromRow(
+  row: number,
+  input: ImportRowInput,
+  sellerId: string
+): Promise<ImportRowResult> {
   const validated = validateImportRow(input);
   if (!validated.ok) {
     return { row, input, success: false, error: validated.error };
   }
 
-  const product = await prisma.product.create({ data: validated.data });
+  const product = await prisma.product.create({ data: { ...validated.data, sellerId } });
   return { row, input, success: true, productId: product.id, productTitle: product.title };
 }
 
 export async function importProductsFromExcel(
   formData: FormData
 ): Promise<ImportSummary | { error: string }> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -56,7 +60,7 @@ export async function importProductsFromExcel(
   const results: ImportRowResult[] = [];
   // Chạy tuần tự (không Promise.all) để tránh dồn dập hàng trăm insert cùng lúc vào DB.
   for (let i = 0; i < rows.length; i++) {
-    results.push(await createFromRow(i + 2, rows[i])); // +2: dòng 1 là header
+    results.push(await createFromRow(i + 2, rows[i], session.user.id)); // +2: dòng 1 là header
   }
 
   const successCount = results.filter((r) => r.success).length;
@@ -74,9 +78,9 @@ export async function importProductsFromExcel(
 }
 
 export async function retryImportRow(row: number, input: ImportRowInput): Promise<ImportRowResult> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
-  const result = await createFromRow(row, input);
+  const result = await createFromRow(row, input, session.user.id);
   if (result.success) {
     revalidatePath("/");
     revalidatePath("/admin");

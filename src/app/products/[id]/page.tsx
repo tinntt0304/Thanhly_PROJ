@@ -16,6 +16,7 @@ import { asAttributes } from "@/lib/attributes";
 import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
 import { ChatWidget } from "@/components/ChatWidget";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
 
   return (
     <main className="flex-1">
+      <SiteHeader />
       <div className="mx-auto max-w-3xl px-4 py-6">
         <Link href="/" className="text-sm text-neutral-700 hover:text-text">
           ← Quay lại danh sách

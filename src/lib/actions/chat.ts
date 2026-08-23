@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireSuperAdmin } from "@/lib/admin-guard";
 import { revalidatePath } from "next/cache";
 
 export type ChatMessageDTO = {
@@ -110,7 +110,7 @@ export async function sendAdminMessage(
   sessionId: string,
   content: string
 ): Promise<{ error?: string }> {
-  await requireAdmin();
+  await requireSuperAdmin();
 
   const parsed = contentSchema.safeParse(content);
   if (!parsed.success) return { error: "Nội dung tin nhắn không hợp lệ." };
@@ -128,7 +128,7 @@ export async function sendAdminMessage(
 }
 
 export async function listChatSessions(): Promise<ChatSessionSummaryDTO[]> {
-  await requireAdmin();
+  await requireSuperAdmin();
 
   const sessions = await prisma.chatSession.findMany({
     orderBy: { updatedAt: "desc" },
@@ -154,7 +154,7 @@ export async function setChatSessionStatus(
   sessionId: string,
   status: "OPEN" | "CLOSED"
 ): Promise<void> {
-  await requireAdmin();
+  await requireSuperAdmin();
   await prisma.chatSession.update({ where: { id: sessionId }, data: { status } });
   revalidatePath("/admin/chat");
 }

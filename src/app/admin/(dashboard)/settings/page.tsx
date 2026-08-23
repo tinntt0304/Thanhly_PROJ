@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import { requireSuperAdmin } from "@/lib/admin-guard";
 import { reviewsToText, type Review } from "@/lib/reviews";
 import { TrustProfileForm } from "@/components/TrustProfileForm";
 
 export default async function AdminSettingsPage() {
+  await requireSuperAdmin();
   const trustProfile = await prisma.trustProfile.findFirst();
 
   return (

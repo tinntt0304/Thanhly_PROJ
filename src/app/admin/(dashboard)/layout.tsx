@@ -5,12 +5,17 @@ import { Logo } from "@/components/Logo";
 import { listChatSessions } from "@/lib/actions/chat";
 
 export default async function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
-  await requireAdmin();
+  const session = await requireAdmin();
+  const isSuperAdmin = session.user.role === "SUPERADMIN";
 
-  const sessions = await listChatSessions();
-  const awaitingReplyCount = sessions.filter(
-    (s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR"
-  ).length;
+  // Chat hỗ trợ là hộp thư chung của cả sàn (chỉ superadmin) — không gọi listChatSessions()
+  // (đã đổi sang requireSuperAdmin() trong chat.ts) khi đang là SELLER, tránh bị redirect()
+  // giữa chừng lúc render layout.
+  const awaitingReplyCount = isSuperAdmin
+    ? (await listChatSessions()).filter(
+        (s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR"
+      ).length
+    : 0;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -25,17 +30,27 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
               <Link href="/admin/products/import" className="text-neutral-700 hover:text-text">
                 Import Excel
               </Link>
-              <Link href="/admin/settings" className="text-neutral-700 hover:text-text">
-                Bằng chứng uy tín
-              </Link>
-              <Link href="/admin/chat" className="flex items-center gap-1.5 text-neutral-700 hover:text-text">
-                Chat hỗ trợ
-                {awaitingReplyCount > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1 text-xs font-medium text-white">
-                    {awaitingReplyCount}
-                  </span>
-                )}
-              </Link>
+              {isSuperAdmin && (
+                <>
+                  <Link href="/admin/danh-muc" className="text-neutral-700 hover:text-text">
+                    Quản lý danh mục
+                  </Link>
+                  <Link href="/admin/settings" className="text-neutral-700 hover:text-text">
+                    Bằng chứng uy tín
+                  </Link>
+                  <Link
+                    href="/admin/chat"
+                    className="flex items-center gap-1.5 text-neutral-700 hover:text-text"
+                  >
+                    Chat hỗ trợ
+                    {awaitingReplyCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1 text-xs font-medium text-white">
+                        {awaitingReplyCount}
+                      </span>
+                    )}
+                  </Link>
+                </>
+              )}
               <Link href="/" className="text-neutral-700 hover:text-text">
                 Xem trang công khai
               </Link>
