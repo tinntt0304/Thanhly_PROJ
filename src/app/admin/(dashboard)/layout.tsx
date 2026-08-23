@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-guard";
 import { signOut } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { listChatSessions } from "@/lib/actions/chat";
+import { AdminSidebar } from "@/components/AdminSidebar";
 
 export default async function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAdmin();
@@ -17,58 +17,24 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
       ).length
     : 0;
 
+  async function signOutAction() {
+    "use server";
+    await signOut({ redirectTo: "/" });
+  }
+
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-neutral-200 bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-6">
-            <Logo size="sm" href="/admin" />
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/admin/products/new" className="text-neutral-700 hover:text-text">
-                + Đăng sản phẩm
-              </Link>
-              <Link href="/admin/products/import" className="text-neutral-700 hover:text-text">
-                Import Excel
-              </Link>
-              {isSuperAdmin && (
-                <>
-                  <Link href="/admin/danh-muc" className="text-neutral-700 hover:text-text">
-                    Quản lý danh mục
-                  </Link>
-                  <Link href="/admin/settings" className="text-neutral-700 hover:text-text">
-                    Bằng chứng uy tín
-                  </Link>
-                  <Link
-                    href="/admin/chat"
-                    className="flex items-center gap-1.5 text-neutral-700 hover:text-text"
-                  >
-                    Chat hỗ trợ
-                    {awaitingReplyCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1 text-xs font-medium text-white">
-                        {awaitingReplyCount}
-                      </span>
-                    )}
-                  </Link>
-                </>
-              )}
-              <Link href="/" className="text-neutral-700 hover:text-text">
-                Xem trang công khai
-              </Link>
-            </nav>
-          </div>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/" });
-            }}
-          >
-            <button type="submit" className="text-sm text-neutral-700 hover:text-text">
-              Đăng xuất
-            </button>
-          </form>
-        </div>
+      <header className="border-b border-neutral-200 bg-surface px-4 py-3">
+        <Logo size="sm" href="/admin" />
       </header>
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
+      <div className="flex flex-1 flex-col sm:flex-row">
+        <AdminSidebar
+          isSuperAdmin={isSuperAdmin}
+          awaitingReplyCount={awaitingReplyCount}
+          signOutAction={signOutAction}
+        />
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
+      </div>
     </div>
   );
 }

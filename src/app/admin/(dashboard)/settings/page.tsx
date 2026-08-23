@@ -8,7 +8,7 @@ export default async function AdminSettingsPage() {
   const trustProfile = await prisma.trustProfile.findFirst();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-2xl flex-col gap-4">
       <h1 className="text-lg font-semibold">Bằng chứng uy tín (hiển thị ở trang chủ)</h1>
       <TrustProfileForm
         avgRating={trustProfile?.avgRating ?? 5}

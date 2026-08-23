@@ -23,7 +23,7 @@ export default async function EditProductPage({
   const markActive = setProductStatus.bind(null, product.id, "ACTIVE");
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex max-w-3xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-lg font-bold text-text">Sửa sản phẩm</h1>
         <span className="text-sm text-neutral-700">
