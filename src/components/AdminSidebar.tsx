@@ -54,6 +54,13 @@ function ChatIcon() {
     </svg>
   );
 }
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+    </svg>
+  );
+}
 function EyeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -113,6 +120,7 @@ export function AdminSidebar({
     { href: "/admin/danh-muc", label: "Quản lý danh mục", icon: <MenuIcon /> },
     { href: "/admin/settings", label: "Bằng chứng uy tín", icon: <StarIcon /> },
     { href: "/admin/chat", label: "Chat hỗ trợ", icon: <ChatIcon />, badge: awaitingReplyCount },
+    { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
   ];
 
   return (

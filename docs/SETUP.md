@@ -82,6 +82,24 @@ Bucket `product-images` (public) tự động được tạo ở lần upload đ
 tạo tay. Giới hạn: JPEG/PNG/WEBP/GIF, tối đa 5MB/ảnh, tối đa 8 ảnh/sản phẩm (chỉnh ở
 `src/lib/product-limits.ts`).
 
+### Tìm nhóm Facebook theo từ khóa (Apify)
+
+Trang `/admin/nhom-facebook` (chỉ superadmin) gọi actor Apify
+[`scraper-engine/facebook-groups-search-scraper`](https://apify.com/scraper-engine/facebook-groups-search-scraper)
+để tìm nhóm Facebook theo từ khóa, phục vụ việc mang sản phẩm sang chia sẻ (không tự
+scrape Facebook — dùng dịch vụ bên thứ ba đã có sẵn, người dùng tự chịu trách nhiệm về
+tài khoản Apify/chi phí credit).
+
+`.env` cần thêm:
+
+- `APIFY_API_TOKEN` — lấy ở Apify Console → Settings → API & Integrations. Chưa điền
+  thì trang báo lỗi thiếu cấu hình, không chặn các tính năng khác của app.
+
+Actor tính số kết quả tối đa (`maxItems`) theo **từng từ khóa** — nhập nhiều từ khóa
+cùng lúc sẽ nhân số lượng gọi/credit tương ứng. Giới hạn cứng ở
+`src/lib/facebook-groups.ts` (`MAX_ITEMS_LIMIT = 100`/từ khóa) để tránh tốn credit
+ngoài ý muốn.
+
 ### Tài khoản admin
 
 Seed đọc `ADMIN_EMAIL` / `ADMIN_PASSWORD` từ `.env` (đã có giá trị mặc định để dev —
@@ -106,7 +124,8 @@ npm run start
 
 Biến môi trường cần có khi deploy: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (chuỗi
 ngẫu nhiên dài, dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng
-lúc seed, không cần giữ lại sau đó).
+lúc seed, không cần giữ lại sau đó), `APIFY_API_TOKEN` (tùy chọn — chỉ cần nếu dùng
+tính năng tìm nhóm Facebook).
 
 Lưu ý về `sslmode`: dùng `sslmode=no-verify` cho `DATABASE_URL` — **ở mọi nơi, kể cả
 production trên Vercel**, không phải chỉ máy dev. Ban đầu tưởng lỗi TLS chỉ do mạng máy
@@ -127,6 +146,7 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 
 - `DATABASE_URL` — giống `.env` cục bộ (transaction pooler, `sslmode=no-verify`).
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — giống `.env` cục bộ.
+- `APIFY_API_TOKEN` — giống `.env` cục bộ, chỉ cần nếu dùng tính năng tìm nhóm Facebook.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 
