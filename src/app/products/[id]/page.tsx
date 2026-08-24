@@ -1,3 +1,5 @@
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -17,16 +19,49 @@ import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
 import { ChatWidget } from "@/components/ChatWidget";
 import { SiteHeader } from "@/components/SiteHeader";
+import { ShareButtons } from "@/components/ShareButtons";
+import { getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+// cache() dedupe cùng 1 lượt fetch giữa generateMetadata() và component trang bên dưới
+// trong cùng 1 request, tránh query Prisma 2 lần cho mỗi lượt xem trang sản phẩm.
+const getProduct = cache((id: string) =>
+  prisma.product.findUnique({
+    where: { id },
+    include: { bids: { orderBy: { createdAt: "desc" } } },
+  })
+);
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/products/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const product = await getProduct(id);
+  if (!product) return {};
+
+  const title = `${product.title} — hifen`;
+  const description = `${product.description.slice(0, 150)} · Giá hiện tại: ${formatVND(product.currentPrice)}`;
+  const url = `${getSiteUrl()}/products/${id}`;
+  const image = product.images[0];
+
+  return {
+    title,
+    description,
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url,
+      images: image ? [{ url: image }] : undefined,
+    },
+  };
+}
 
 export default async function ProductPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
 
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: { bids: { orderBy: { createdAt: "desc" } } },
-  });
+  const product = await getProduct(id);
 
   if (!product) notFound();
 
@@ -60,6 +95,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                 <span aria-hidden="true">📦</span> Số lượng: {product.quantity}
               </span>
             </div>
+
+            <ShareButtons url={`${getSiteUrl()}/products/${product.id}`} title={product.title} />
 
             <div className="rounded-lg border border-neutral-200 bg-surface p-4">
               <p className="text-sm text-neutral-700">Giá hiện tại</p>

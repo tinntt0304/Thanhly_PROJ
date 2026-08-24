@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Baloo_2, Be_Vietnam_Pro, Caprasimo } from "next/font/google";
+import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 // Heading font — dùng cho toàn bộ tiêu đề tiếng Việt trong app (có subset "vietnamese").
@@ -26,9 +27,21 @@ const caprasimo = Caprasimo({
   weight: "400",
 });
 
+const siteTitle = "hifen — Đồ mẹ & bé, thú cưng thanh lý";
+const siteDescription =
+  "Trang thanh lý đồ mẹ & bé, thú cưng kiểu đấu giá — trả giá bằng SĐT, không cần tài khoản.";
+
 export const metadata: Metadata = {
-  title: "hifen — Đồ mẹ & bé, thú cưng thanh lý",
-  description: "Trang thanh lý đồ mẹ & bé, thú cưng kiểu đấu giá — trả giá bằng SĐT, không cần tài khoản.",
+  metadataBase: new URL(getSiteUrl()),
+  title: siteTitle,
+  description: siteDescription,
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    siteName: "hifen",
+    title: siteTitle,
+    description: siteDescription,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
