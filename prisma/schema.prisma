@@ -173,3 +173,37 @@ model Announcement {
 
   @@index([published, createdAt])
 }
+
+// Lưu lại nhóm Facebook tìm được qua /admin/nhom-facebook — upsert theo fbId (id nhóm
+// thật trên Facebook) nên tìm trùng nhiều lần không tạo bản ghi trùng, chỉ cập nhật
+// lastSeenAt + gộp thêm từ khóa mới vào keywords nếu có.
+model FacebookGroup {
+  id           String   @id @default(cuid())
+  fbId         String   @unique
+  name         String
+  url          String
+  visibility   String?
+  memberCount  Int?
+  postsPerDay  Float?
+  description  String?
+  keywords     String[] @default([])
+
+  firstFoundAt DateTime @default(now())
+  lastSeenAt   DateTime @updatedAt
+
+  @@index([lastSeenAt])
+}
+
+// Nhật ký mỗi từ khóa thực sự đã gọi Apify (không log từ khóa được phục vụ từ cache) —
+// dùng để tránh gọi lại Apify cho từ khóa vừa tìm gần đây, tiết kiệm credit.
+model FacebookKeywordSearch {
+  id          String   @id @default(cuid())
+  keyword     String
+  maxItems    Int
+  resultCount Int
+  newCount    Int
+
+  searchedAt DateTime @default(now())
+
+  @@index([keyword, searchedAt])
+}

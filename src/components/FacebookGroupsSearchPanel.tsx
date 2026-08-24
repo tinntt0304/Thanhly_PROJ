@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   searchFacebookGroups,
+  listSavedFacebookGroups,
   type FacebookGroupsSearchResult,
+  type FacebookGroupResultItem,
+  type SavedFacebookGroup,
 } from "@/lib/actions/facebook-groups";
-import { DEFAULT_MAX_ITEMS, MAX_ITEMS_LIMIT, type FacebookGroupItem } from "@/lib/facebook-groups";
+import { DEFAULT_MAX_ITEMS, MAX_ITEMS_LIMIT, SEARCH_CACHE_HOURS } from "@/lib/facebook-groups";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
@@ -14,38 +17,122 @@ function formatNumber(n: number | null): string {
   return n === null ? "—" : n.toLocaleString("vi-VN");
 }
 
-export function FacebookGroupsSearchPanel() {
+function formatRelativeHours(iso: string): string {
+  const hours = Math.round((Date.now() - new Date(iso).getTime()) / 3600000);
+  if (hours <= 0) return "vừa xong";
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${Math.round(hours / 24)} ngày trước`;
+}
+
+function GroupTable({
+  rows,
+}: {
+  rows: {
+    fbId: string;
+    name: string;
+    url: string;
+    description: string | null;
+    keywordsLabel: string;
+    memberCount: number | null;
+    postsPerDay: number | null;
+    visibility: string | null;
+    badge?: { text: string; className: string };
+  }[];
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-neutral-500">Không có nhóm nào.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-surface">
+      <table className="w-full text-sm">
+        <thead className="border-b border-neutral-200 bg-neutral-100 text-left text-xs uppercase text-neutral-700">
+          <tr>
+            <th className="px-4 py-2">Nhóm</th>
+            <th className="px-4 py-2">Từ khóa</th>
+            <th className="px-4 py-2">Thành viên</th>
+            <th className="px-4 py-2">Bài đăng/ngày</th>
+            <th className="px-4 py-2">Hiển thị</th>
+            <th className="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-neutral-100">
+          {rows.map((g) => (
+            <tr key={g.fbId}>
+              <td className="max-w-xs px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-text">{g.name}</p>
+                  {g.badge && (
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${g.badge.className}`}>
+                      {g.badge.text}
+                    </span>
+                  )}
+                </div>
+                {g.description && (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{g.description}</p>
+                )}
+              </td>
+              <td className="px-4 py-2 text-neutral-700">{g.keywordsLabel || "—"}</td>
+              <td className="px-4 py-2 text-neutral-700">{formatNumber(g.memberCount)}</td>
+              <td className="px-4 py-2 text-neutral-700">
+                {g.postsPerDay === null ? "—" : g.postsPerDay.toLocaleString("vi-VN")}
+              </td>
+              <td className="px-4 py-2 text-neutral-700">{g.visibility ?? "—"}</td>
+              <td className="px-4 py-2">
+                {g.url && (
+                  <a
+                    href={g.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent-600 underline"
+                  >
+                    Mở nhóm
+                  </a>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SearchTab() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<FacebookGroupItem[] | null>(null);
+  const [result, setResult] = useState<Extract<FacebookGroupsSearchResult, { ok: true }> | null>(null);
+  const [onlyNew, setOnlyNew] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setSearching(true);
     setError(null);
     try {
-      const res: FacebookGroupsSearchResult = await searchFacebookGroups(formData);
+      const res = await searchFacebookGroups(formData);
       if (res.ok) {
-        setItems(res.items);
+        setResult(res);
+        setOnlyNew(false);
       } else {
         setError(res.error);
-        setItems(null);
+        setResult(null);
       }
     } finally {
       setSearching(false);
     }
   }
 
+  const items = result?.items ?? [];
+  const visibleItems = onlyNew ? items.filter((i) => i.isNew) : items;
+  const newCount = items.filter((i) => i.isNew).length;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
-        <div>
-          <h1 className="font-heading text-lg font-bold text-text">Tìm nhóm Facebook theo từ khóa</h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            Dùng để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ. Dữ liệu lấy qua actor
-            Apify (<code className="text-xs">scraper-engine/facebook-groups-search-scraper</code>),
-            tốn credit Apify mỗi lần tìm.
-          </p>
-        </div>
+        <p className="text-sm text-neutral-600">
+          Dùng để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ. Dữ liệu lấy qua actor
+          Apify (<code className="text-xs">scraper-engine/facebook-groups-search-scraper</code>),
+          tốn credit Apify mỗi lần gọi thật. Từ khóa vừa tìm trong {SEARCH_CACHE_HOURS} giờ qua sẽ
+          tự dùng lại kết quả đã lưu thay vì gọi lại API.
+        </p>
 
         <form action={handleSubmit} className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-[240px] flex-1 flex-col gap-1">
@@ -74,6 +161,10 @@ export function FacebookGroupsSearchPanel() {
               className={inputClass}
             />
           </div>
+          <label className="flex items-center gap-2 pb-2 text-sm text-neutral-700">
+            <input type="checkbox" name="forceRefresh" className="h-4 w-4 rounded border-neutral-300" />
+            Bắt buộc tìm lại (bỏ qua cache)
+          </label>
           <button
             type="submit"
             disabled={searching}
@@ -85,64 +176,144 @@ export function FacebookGroupsSearchPanel() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
-      {items && (
+      {result && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-neutral-700">
-            Tìm thấy <strong>{items.length}</strong> nhóm.
-          </p>
-
-          {items.length === 0 ? (
-            <p className="text-sm text-neutral-500">Không tìm thấy nhóm nào khớp từ khóa.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-surface">
-              <table className="w-full text-sm">
-                <thead className="border-b border-neutral-200 bg-neutral-100 text-left text-xs uppercase text-neutral-700">
-                  <tr>
-                    <th className="px-4 py-2">Nhóm</th>
-                    <th className="px-4 py-2">Từ khóa</th>
-                    <th className="px-4 py-2">Thành viên</th>
-                    <th className="px-4 py-2">Bài đăng/ngày</th>
-                    <th className="px-4 py-2">Hiển thị</th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {items.map((g, i) => (
-                    <tr key={g.id || `${g.url}-${i}`}>
-                      <td className="max-w-xs px-4 py-2">
-                        <p className="font-medium text-text">{g.name}</p>
-                        {g.description && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">
-                            {g.description}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-neutral-700">{g.query ?? "—"}</td>
-                      <td className="px-4 py-2 text-neutral-700">{formatNumber(g.memberCount)}</td>
-                      <td className="px-4 py-2 text-neutral-700">
-                        {g.postsPerDay === null ? "—" : g.postsPerDay.toLocaleString("vi-VN")}
-                      </td>
-                      <td className="px-4 py-2 text-neutral-700">{g.visibility ?? "—"}</td>
-                      <td className="px-4 py-2">
-                        {g.url && (
-                          <a
-                            href={g.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent-600 underline"
-                          >
-                            Mở nhóm
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {result.cachedKeywords.length > 0 && (
+            <div className="rounded-lg border border-gold-400/60 bg-gold-300/20 p-3 text-sm text-neutral-800">
+              <p className="font-medium">Đã dùng lại kết quả cũ cho {result.cachedKeywords.length} từ khóa (không tốn credit):</p>
+              <ul className="mt-1 list-disc pl-5">
+                {result.cachedKeywords.map((c) => (
+                  <li key={c.keyword}>
+                    &ldquo;{c.keyword}&rdquo; — tìm {formatRelativeHours(c.searchedAt)} ({c.resultCount} kết quả,{" "}
+                    {c.newCount} nhóm mới lúc đó)
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-neutral-700">
+              Tổng <strong>{items.length}</strong> nhóm ({newCount} nhóm mới chưa từng thấy).
+            </p>
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={onlyNew}
+                onChange={(e) => setOnlyNew(e.target.checked)}
+                className="h-4 w-4 rounded border-neutral-300"
+              />
+              Chỉ hiện nhóm mới
+            </label>
+          </div>
+
+          <GroupTable
+            rows={visibleItems.map((g: FacebookGroupResultItem) => ({
+              fbId: g.fbId,
+              name: g.name,
+              url: g.url,
+              description: g.description,
+              keywordsLabel: g.matchedKeywords.join(", "),
+              memberCount: g.memberCount,
+              postsPerDay: g.postsPerDay,
+              visibility: g.visibility,
+              badge: g.isNew
+                ? { text: "Mới", className: "bg-accent-2-100 text-accent-2-700" }
+                : g.fromCache
+                  ? { text: "Từ cache", className: "bg-neutral-100 text-neutral-600" }
+                  : { text: "Đã biết", className: "bg-neutral-100 text-neutral-600" },
+            }))}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+function SavedTab() {
+  const [query, setQuery] = useState("");
+  const [groups, setGroups] = useState<SavedFacebookGroup[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    listSavedFacebookGroups(query).then((res) => {
+      if (!cancelled) {
+        setGroups(res);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  // setLoading(true) chạy ngay trong handler thay đổi ô lọc (tương tác thật của người
+  // dùng), không đặt trong effect — tránh lỗi lint react-hooks/set-state-in-effect vì
+  // effect chỉ nên setState trong callback bất đồng bộ (đã làm ở trên).
+  function handleQueryChange(value: string) {
+    setLoading(true);
+    setQuery(value);
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <input
+        value={query}
+        onChange={(e) => handleQueryChange(e.target.value)}
+        placeholder="Lọc theo tên nhóm hoặc từ khóa..."
+        className={inputClass}
+      />
+      {loading ? (
+        <p className="text-sm text-neutral-500">Đang tải...</p>
+      ) : (
+        <>
+          <p className="text-sm text-neutral-700">
+            {groups?.length ?? 0} nhóm đã lưu (tối đa 300 nhóm gần nhất).
+          </p>
+          <GroupTable
+            rows={(groups ?? []).map((g) => ({
+              fbId: g.fbId,
+              name: g.name,
+              url: g.url,
+              description: g.description,
+              keywordsLabel: g.keywords.join(", "),
+              memberCount: g.memberCount,
+              postsPerDay: g.postsPerDay,
+              visibility: g.visibility,
+            }))}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+export function FacebookGroupsSearchPanel() {
+  const [tab, setTab] = useState<"search" | "saved">("search");
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="font-heading text-lg font-bold text-text">Tìm nhóm Facebook theo từ khóa</h1>
+
+      <div className="flex gap-2 border-b border-neutral-200 text-sm">
+        <button
+          type="button"
+          onClick={() => setTab("search")}
+          className={`px-3 py-2 ${tab === "search" ? "border-b-2 border-accent-500 font-medium text-text" : "text-neutral-500"}`}
+        >
+          Tìm kiếm mới
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("saved")}
+          className={`px-3 py-2 ${tab === "saved" ? "border-b-2 border-accent-500 font-medium text-text" : "text-neutral-500"}`}
+        >
+          Đã lưu
+        </button>
+      </div>
+
+      {tab === "search" ? <SearchTab /> : <SavedTab />}
     </div>
   );
 }

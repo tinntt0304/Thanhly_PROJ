@@ -9,6 +9,11 @@ const ACTOR_ID = "scraper-engine~facebook-groups-search-scraper"; // "/" -> "~" 
 export const MAX_ITEMS_LIMIT = 100;
 export const DEFAULT_MAX_ITEMS = 20;
 
+// Từ khóa đã gọi Apify trong khoảng thời gian này thì lần tìm sau (nếu không tick
+// "bắt buộc tìm lại") sẽ dùng lại kết quả đã lưu trong DB thay vì gọi lại API — tiết
+// kiệm credit Apify cho các lượt tìm trùng từ khóa gần nhau.
+export const SEARCH_CACHE_HOURS = 12;
+
 export type FacebookGroupItem = {
   id: string;
   name: string;
