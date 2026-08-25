@@ -232,33 +232,58 @@ export type SavedFacebookGroup = {
   lastSeenAt: string;
 };
 
-export async function listSavedFacebookGroups(query?: string): Promise<SavedFacebookGroup[]> {
+export type SavedFacebookGroupsPage = {
+  items: SavedFacebookGroup[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+export const SAVED_GROUPS_PAGE_SIZE = 50;
+
+export async function listSavedFacebookGroups(
+  query?: string,
+  page: number = 1
+): Promise<SavedFacebookGroupsPage> {
   await requireSuperAdmin();
 
   const trimmed = query?.trim();
-  const groups = await prisma.facebookGroup.findMany({
-    where: trimmed
-      ? {
-          OR: [
-            { name: { contains: trimmed, mode: "insensitive" } },
-            { keywords: { has: trimmed.toLowerCase() } },
-          ],
-        }
-      : undefined,
-    orderBy: { lastSeenAt: "desc" },
-    take: 300,
-  });
+  const where = trimmed
+    ? {
+        OR: [
+          { name: { contains: trimmed, mode: "insensitive" as const } },
+          { keywords: { has: trimmed.toLowerCase() } },
+        ],
+      }
+    : undefined;
 
-  return groups.map((g) => ({
-    fbId: g.fbId,
-    name: g.name,
-    url: g.url,
-    visibility: g.visibility,
-    memberCount: g.memberCount,
-    postsPerDay: g.postsPerDay,
-    description: g.description,
-    keywords: g.keywords,
-    firstFoundAt: g.firstFoundAt.toISOString(),
-    lastSeenAt: g.lastSeenAt.toISOString(),
-  }));
+  const safePage = Math.max(1, Math.trunc(page) || 1);
+
+  const [groups, totalCount] = await Promise.all([
+    prisma.facebookGroup.findMany({
+      where,
+      orderBy: { lastSeenAt: "desc" },
+      skip: (safePage - 1) * SAVED_GROUPS_PAGE_SIZE,
+      take: SAVED_GROUPS_PAGE_SIZE,
+    }),
+    prisma.facebookGroup.count({ where }),
+  ]);
+
+  return {
+    items: groups.map((g) => ({
+      fbId: g.fbId,
+      name: g.name,
+      url: g.url,
+      visibility: g.visibility,
+      memberCount: g.memberCount,
+      postsPerDay: g.postsPerDay,
+      description: g.description,
+      keywords: g.keywords,
+      firstFoundAt: g.firstFoundAt.toISOString(),
+      lastSeenAt: g.lastSeenAt.toISOString(),
+    })),
+    totalCount,
+    page: safePage,
+    pageSize: SAVED_GROUPS_PAGE_SIZE,
+  };
 }

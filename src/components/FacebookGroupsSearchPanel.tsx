@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   searchFacebookGroups,
   listSavedFacebookGroups,
+  SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupsSearchResult,
   type FacebookGroupResultItem,
   type SavedFacebookGroup,
@@ -126,6 +127,16 @@ function SearchTab() {
 
   return (
     <div className="flex flex-col gap-6">
+      {searching && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-8 py-6 shadow-lg">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-accent-100 border-t-accent-500" />
+            <p className="text-sm font-medium text-text">Đang tìm nhóm Facebook...</p>
+            <p className="text-xs text-neutral-500">Có thể mất vài chục giây, vui lòng đợi.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
         <p className="text-sm text-neutral-600">
           Dùng để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ. Dữ liệu lấy qua actor
@@ -232,29 +243,40 @@ function SearchTab() {
 
 function SavedTab() {
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [groups, setGroups] = useState<SavedFacebookGroup[] | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    listSavedFacebookGroups(query).then((res) => {
+    listSavedFacebookGroups(query, page).then((res) => {
       if (!cancelled) {
-        setGroups(res);
+        setGroups(res.items);
+        setTotalCount(res.totalCount);
         setLoading(false);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, page]);
 
-  // setLoading(true) chạy ngay trong handler thay đổi ô lọc (tương tác thật của người
-  // dùng), không đặt trong effect — tránh lỗi lint react-hooks/set-state-in-effect vì
-  // effect chỉ nên setState trong callback bất đồng bộ (đã làm ở trên).
+  // setLoading(true) chạy ngay trong handler thay đổi ô lọc/trang (tương tác thật của
+  // người dùng), không đặt trong effect — tránh lỗi lint react-hooks/set-state-in-effect
+  // vì effect chỉ nên setState trong callback bất đồng bộ (đã làm ở trên).
   function handleQueryChange(value: string) {
     setLoading(true);
     setQuery(value);
+    setPage(1); // đổi bộ lọc thì quay về trang 1, tránh trang hiện tại vượt quá số trang mới
   }
+
+  function handlePageChange(next: number) {
+    setLoading(true);
+    setPage(next);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / SAVED_GROUPS_PAGE_SIZE));
 
   return (
     <div className="flex flex-col gap-3">
@@ -269,7 +291,7 @@ function SavedTab() {
       ) : (
         <>
           <p className="text-sm text-neutral-700">
-            {groups?.length ?? 0} nhóm đã lưu (tối đa 300 nhóm gần nhất).
+            {totalCount} nhóm đã lưu — trang {page}/{totalPages}.
           </p>
           <GroupTable
             rows={(groups ?? []).map((g) => ({
@@ -283,6 +305,29 @@ function SavedTab() {
               visibility: g.visibility,
             }))}
           />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page <= 1}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Trang trước
+              </button>
+              <span className="text-sm text-neutral-700">
+                Trang {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page >= totalPages}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Trang sau →
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

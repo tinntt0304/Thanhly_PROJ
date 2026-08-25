@@ -25,17 +25,42 @@ export type FacebookGroupItem = {
   description: string | null;
 };
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+// Actor Apify trả tên/mô tả nhóm lấy từ HTML gốc của Facebook, trong đó ký tự có dấu bị
+// mã hoá thành HTML entity (vd. "ộ" -> "&#x1ed8;") thay vì Unicode thật — giải mã lại ở
+// đây trước khi lưu DB, nếu không React sẽ hiện nguyên văn chuỗi entity ra màn hình.
+function decodeHtmlEntities(input: string): string {
+  return input.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const isHex = entity[1] === "x" || entity[1] === "X";
+      const code = parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+    }
+    return NAMED_HTML_ENTITIES[entity] ?? match;
+  });
+}
+
 function normalizeItem(item: unknown): FacebookGroupItem {
   const o = (item ?? {}) as Record<string, unknown>;
+  const name = typeof o.name === "string" && o.name.trim() ? o.name : "(Không có tên)";
+  const description = typeof o.groupDescription === "string" ? o.groupDescription : null;
   return {
     id: typeof o.id === "string" ? o.id : "",
-    name: typeof o.name === "string" && o.name.trim() ? o.name : "(Không có tên)",
+    name: decodeHtmlEntities(name),
     url: typeof o.url === "string" ? o.url : "",
     query: typeof o.query === "string" ? o.query : null,
     visibility: typeof o.visibility === "string" ? o.visibility : null,
     memberCount: typeof o.memberCountNumeric === "number" ? o.memberCountNumeric : null,
     postsPerDay: typeof o.postsPerDayNumeric === "number" ? o.postsPerDayNumeric : null,
-    description: typeof o.groupDescription === "string" ? o.groupDescription : null,
+    description: description ? decodeHtmlEntities(description) : null,
   };
 }
 
