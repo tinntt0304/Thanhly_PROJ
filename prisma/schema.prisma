@@ -40,9 +40,11 @@ model User {
 
   createdAt DateTime @default(now())
 
-  products           Product[]
-  creditTransactions CreditTransaction[]
-  topUpRequests      TopUpRequest[]
+  products              Product[]
+  creditTransactions    CreditTransaction[]
+  topUpRequests         TopUpRequest[]
+  facebookGroups        FacebookGroup[]
+  facebookKeywordSearch FacebookKeywordSearch[]
 }
 
 model Product {
@@ -178,30 +180,40 @@ model Announcement {
   @@index([published, createdAt])
 }
 
-// Lưu lại nhóm Facebook tìm được qua /admin/nhom-facebook — upsert theo fbId (id nhóm
-// thật trên Facebook) nên tìm trùng nhiều lần không tạo bản ghi trùng, chỉ cập nhật
-// lastSeenAt + gộp thêm từ khóa mới vào keywords nếu có.
+// Lưu lại nhóm Facebook tìm được qua /admin/nhom-facebook — riêng theo từng tài khoản
+// (nhóm của tài khoản nào chỉ tài khoản đó thấy), upsert theo (fbId, userId) nên cùng 1
+// người tìm trùng nhiều lần không tạo bản ghi trùng, chỉ cập nhật lastSeenAt + gộp thêm
+// từ khóa mới. 2 người khác nhau cùng tìm ra 1 nhóm Facebook thật thì mỗi người có 1
+// bản ghi riêng (không chia sẻ giữa các tài khoản).
 model FacebookGroup {
-  id           String   @id @default(cuid())
-  fbId         String   @unique
-  name         String
-  url          String
-  visibility   String?
-  memberCount  Int?
-  postsPerDay  Float?
-  description  String?
-  keywords     String[] @default([])
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  fbId        String
+  name        String
+  url         String
+  visibility  String?
+  memberCount Int?
+  postsPerDay Float?
+  description String?
+  keywords    String[] @default([])
 
   firstFoundAt DateTime @default(now())
   lastSeenAt   DateTime @updatedAt
 
-  @@index([lastSeenAt])
+  @@unique([fbId, userId])
+  @@index([userId, lastSeenAt])
 }
 
 // Nhật ký mỗi từ khóa thực sự đã gọi Apify (không log từ khóa được phục vụ từ cache) —
-// dùng để tránh gọi lại Apify cho từ khóa vừa tìm gần đây, tiết kiệm credit.
+// riêng theo từng tài khoản, dùng để tránh gọi lại Apify cho từ khóa CHÍNH tài khoản đó
+// vừa tìm gần đây (không chia sẻ cache giữa các người bán khác nhau).
 model FacebookKeywordSearch {
-  id          String   @id @default(cuid())
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
   keyword     String
   maxItems    Int
   resultCount Int
@@ -209,7 +221,7 @@ model FacebookKeywordSearch {
 
   searchedAt DateTime @default(now())
 
-  @@index([keyword, searchedAt])
+  @@index([userId, keyword, searchedAt])
 }
 
 enum CreditTransactionType {

@@ -162,8 +162,9 @@ function SearchTab() {
         <p className="text-sm text-neutral-600">
           Dùng để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ. Dữ liệu lấy qua actor
           Apify (<code className="text-xs">scraper-engine/facebook-groups-search-scraper</code>),
-          tốn credit Apify mỗi lần gọi thật. Từ khóa vừa tìm trong {SEARCH_CACHE_HOURS} giờ qua sẽ
-          tự dùng lại kết quả đã lưu thay vì gọi lại API.
+          tốn credit mỗi lần gọi thật. Nhóm tìm được chỉ riêng tài khoản bạn thấy. Từ khóa chính
+          bạn vừa tìm trong {SEARCH_CACHE_HOURS} giờ qua sẽ tự dùng lại kết quả đã lưu thay vì gọi
+          lại API.
         </p>
 
         <form action={handleSubmit} onSubmit={handleFormSubmit} className="flex flex-wrap items-end gap-3">

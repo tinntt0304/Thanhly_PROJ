@@ -96,7 +96,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
   } else {
     for (const keyword of keywords) {
       const recent = await prisma.facebookKeywordSearch.findFirst({
-        where: { keyword: cacheKey(keyword), searchedAt: { gte: cacheCutoff } },
+        where: { userId: session.user.id, keyword: cacheKey(keyword), searchedAt: { gte: cacheCutoff } },
         orderBy: { searchedAt: "desc" },
       });
       if (recent) {
@@ -169,7 +169,9 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
       const counts = countsByKeyword.get(cacheKey(matchedKeyword));
       if (counts) counts.resultCount += 1;
 
-      const existing = await prisma.facebookGroup.findUnique({ where: { fbId: item.id } });
+      const existing = await prisma.facebookGroup.findUnique({
+        where: { fbId_userId: { fbId: item.id, userId: session.user.id } },
+      });
       const isNew = !existing;
       if (isNew && counts) counts.newCount += 1;
 
@@ -180,7 +182,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
       mergedKeywords.add(cacheKey(matchedKeyword));
 
       const saved = await prisma.facebookGroup.upsert({
-        where: { fbId: item.id },
+        where: { fbId_userId: { fbId: item.id, userId: session.user.id } },
         update: {
           name: item.name,
           url: item.url,
@@ -191,6 +193,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
           keywords: [...mergedKeywords],
         },
         create: {
+          userId: session.user.id,
           fbId: item.id,
           name: item.name,
           url: item.url,
@@ -218,6 +221,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
 
     await prisma.facebookKeywordSearch.createMany({
       data: keywordsToSearch.map((keyword) => ({
+        userId: session.user.id,
         keyword: cacheKey(keyword),
         maxItems,
         resultCount: countsByKeyword.get(cacheKey(keyword))?.resultCount ?? 0,
@@ -229,7 +233,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
   // Từ khóa phục vụ từ cache: lấy lại nhóm đã lưu có gắn từ khóa đó, không gọi Apify.
   for (const cached of cachedKeywords) {
     const saved = await prisma.facebookGroup.findMany({
-      where: { keywords: { has: cacheKey(cached.keyword) } },
+      where: { userId: session.user.id, keywords: { has: cacheKey(cached.keyword) } },
       orderBy: { lastSeenAt: "desc" },
       take: maxItems,
     });
@@ -294,17 +298,20 @@ export async function listSavedFacebookGroups(
   query?: string,
   page: number = 1
 ): Promise<SavedFacebookGroupsPage> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const trimmed = query?.trim();
-  const where = trimmed
-    ? {
-        OR: [
-          { name: { contains: trimmed, mode: "insensitive" as const } },
-          { keywords: { has: trimmed.toLowerCase() } },
-        ],
-      }
-    : undefined;
+  const where = {
+    userId: session.user.id,
+    ...(trimmed
+      ? {
+          OR: [
+            { name: { contains: trimmed, mode: "insensitive" as const } },
+            { keywords: { has: trimmed.toLowerCase() } },
+          ],
+        }
+      : {}),
+  };
 
   const safePage = Math.max(1, Math.trunc(page) || 1);
 
