@@ -3,7 +3,7 @@
 **Phiên bản:** v1 (MVP)
 **Tác giả:** Tín (Product Owner)
 **Ngày:** 21/08/2026
-**Cập nhật triển khai gần nhất:** 23/08/2026 — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế) để biết tình trạng thực tế so với PRD gốc bên dưới (PRD gốc giữ nguyên không sửa, chỉ nối thêm mục 9). **Lưu ý quan trọng:** Non-Goal #3 (không mở rộng đa người bán) đã bị **đảo ngược** ngày 23/08/2026 — xem chi tiết ở mục 9.
+**Cập nhật triển khai gần nhất:** 25/08/2026 — xem [mục 9](#9-trạng-thái-triển-khai-thực-tế) để biết tình trạng thực tế so với PRD gốc bên dưới (PRD gốc giữ nguyên không sửa, chỉ nối thêm mục 9). **Lưu ý quan trọng:** Non-Goal #3 (không mở rộng đa người bán) đã bị **đảo ngược** ngày 23/08/2026 — xem chi tiết ở mục 9.
 
 ---
 
@@ -186,9 +186,9 @@ Nếu không giải quyết: hàng tồn phải bán tháo giá rẻ qua các nh
 4. **Giới hạn số sản phẩm đăng cùng lúc**: không giới hạn cứng; trang chủ đã có tìm kiếm để xử lý danh sách dài (xem mục "Ngoài phạm vi PRD gốc" bên dưới).
 5. **Pháp lý hiển thị SĐT công khai (ẩn một phần)**: vẫn mở, chưa xác nhận — không chặn triển khai như PRD gốc đã ghi.
 
-### P1 — chưa làm (đúng như PRD xếp loại, trừ khi ghi chú khác)
+### P1 — trạng thái
 - P1.1 "Mua ngay": **một phần** — schema đã có `buyNowPrice` và hiển thị giá mua ngay ở trang sản phẩm, nhưng **chưa có nút "Mua ngay" để chốt phiên ngay lập tức**.
-- P1.2 Chia sẻ mạng xã hội: chưa làm.
+- **P1.2 Chia sẻ mạng xã hội — Xong (24/08/2026).** Trang chi tiết sản phẩm có nút chia sẻ: link Facebook sharer trực tiếp, Web Share API cho Zalo/ứng dụng khác (chỉ hiện trên trình duyệt hỗ trợ, chủ yếu mobile — Zalo không có sharer URL công khai ổn định như Facebook nên dùng share sheet gốc của hệ điều hành), và nút sao chép link làm fallback. Thêm `generateMetadata` (Open Graph: ảnh/tên/giá sản phẩm) để link hiện đúng ảnh preview khi dán vào Facebook/Zalo — đúng yêu cầu gốc "kèm ảnh preview". Domain chia sẻ lấy từ biến môi trường tuỳ chọn `NEXT_PUBLIC_SITE_URL` (chưa cấu hình thì tự dùng domain production hiện tại làm mặc định, xem `docs/SETUP.md`).
 - P1.3 Xử lý người thắng không phản hồi (24h): chưa làm.
 - P1.4 Cảnh báo SĐT từng bùng kèo: chưa làm.
 
@@ -230,6 +230,8 @@ Các việc này phát sinh từ phản hồi thực tế khi bắt đầu dùng
 - **Header & banner trang chủ thiết kế lại (23/08/2026)** — header nền tối, menu rút gọn (Trang chủ / Thông báo & Tin tức / Về chúng tôi), đồng hồ trực tiếp, nút "Người bán" (chưa đăng nhập) hoặc "Quản lý" (đã đăng nhập); banner hero tìm kiếm phía trên trang chủ. Giữ nguyên bảng màu thương hiệu hifen, chỉ theo bố cục tham khảo từ 1 trang đấu giá khác.
 - **Import sản phẩm hàng loạt từ Excel (22/08/2026)** — trang `/admin/products/import`: tải file mẫu `.xlsx`, tải file đã điền lên để tạo nhiều sản phẩm cùng lúc, thống kê thành công/lỗi, sửa trực tiếp và thử lại từng dòng lỗi ngay trên trang.
 - **Thông báo phân biệt trường hợp trùng mức giá (22/08/2026)** — khi 2 người cùng trả giá đúng 1 mức tiền gần như đồng thời, người bấm sau thấy thông báo riêng "Đã có người đấu giá mức giá này" thay vì lỗi chung chung "thấp hơn mức tối thiểu".
+- **Tìm nhóm Facebook theo từ khóa (24/08/2026)** — trang `/admin/nhom-facebook` (chỉ SUPERADMIN) gọi actor Apify để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ, hỗ trợ nhu cầu chia sẻ thủ công ở P1.2/user story gốc. Kết quả lưu cache vào DB (bảng `FacebookGroup`/`FacebookKeywordSearch`) — từ khóa tìm lại trong 12 giờ dùng lại kết quả cũ, không gọi lại Apify tốn credit; tab "Đã lưu" xem lại toàn bộ nhóm đã từng tìm, có lọc theo tên/từ khóa và phân trang 50 dòng/trang (25/08/2026). Giới hạn cứng 100 kết quả/từ khóa để tránh tốn credit ngoài ý muốn. Popup loading có animation khi đang gọi API (25/08/2026). Cần biến môi trường `APIFY_API_TOKEN` (xem `docs/SETUP.md`), chưa cấu hình thì trang báo lỗi rõ ràng, không chặn tính năng khác.
+- **Sửa lỗi hiển thị tên/mô tả nhóm Facebook (25/08/2026)** — dữ liệu từ Apify lấy từ HTML gốc của Facebook nên ký tự có dấu bị mã hoá dạng HTML entity (vd. `&#x1ed8;` thay vì `ộ`); đã thêm bước giải mã trước khi lưu DB và backfill lại dữ liệu cũ.
 
 ### Hạ tầng (không có trong PRD gốc vì PRD không đi vào kỹ thuật)
 - **Database:** Supabase Postgres (project `duptlckyprmnklpkwayn`).

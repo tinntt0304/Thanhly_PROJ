@@ -125,7 +125,10 @@ npm run start
 Biến môi trường cần có khi deploy: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (chuỗi
 ngẫu nhiên dài, dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng
 lúc seed, không cần giữ lại sau đó), `APIFY_API_TOKEN` (tùy chọn — chỉ cần nếu dùng
-tính năng tìm nhóm Facebook).
+tính năng tìm nhóm Facebook), `NEXT_PUBLIC_SITE_URL` (tùy chọn — domain đầy đủ dạng
+`https://...`, dùng làm `metadataBase`/Open Graph khi chia sẻ sản phẩm ra Facebook/Zalo
+(P1.2); chưa cấu hình thì code tự fallback về domain production hiện tại, xem
+`src/lib/site.ts`).
 
 Lưu ý về `sslmode`: dùng `sslmode=no-verify` cho `DATABASE_URL` — **ở mọi nơi, kể cả
 production trên Vercel**, không phải chỉ máy dev. Ban đầu tưởng lỗi TLS chỉ do mạng máy
@@ -149,6 +152,9 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 - `APIFY_API_TOKEN` — giống `.env` cục bộ, chỉ cần nếu dùng tính năng tìm nhóm Facebook.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
+- `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback
+  về đúng domain production ở trên nên chưa gây lỗi, nhưng nếu domain đổi thì phải set
+  biến này thay vì sửa code (xem `src/lib/site.ts`).
 
 `.vercelignore` chặn không cho `.env` cục bộ bị upload kèm lúc deploy (tránh lẫn giá
 trị dev vào build production).
