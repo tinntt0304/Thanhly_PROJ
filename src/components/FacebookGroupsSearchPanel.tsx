@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   searchFacebookGroups,
   listSavedFacebookGroups,
@@ -115,7 +116,6 @@ function SearchTab() {
   const [onlyNew, setOnlyNew] = useState(false);
 
   async function handleSubmit(formData: FormData) {
-    setSearching(true);
     setError(null);
     try {
       const res = await searchFacebookGroups(formData);
@@ -129,6 +129,14 @@ function SearchTab() {
     } finally {
       setSearching(false);
     }
+  }
+
+  // Bật "searching" ở đây (onClick, ngoài transition của form action) thay vì đầu
+  // handleSubmit: handleSubmit chạy như một phần transition của chính server action, nên
+  // Next.js giữ mọi state update trong đó lại, không paint lên màn hình cho tới khi
+  // request xong — flushSync ép React vẽ ngay lập tức trước khi transition bắt đầu.
+  function handleSubmitClick() {
+    flushSync(() => setSearching(true));
   }
 
   const items = result?.items ?? [];
@@ -188,6 +196,7 @@ function SearchTab() {
           </label>
           <button
             type="submit"
+            onClick={handleSubmitClick}
             disabled={searching}
             className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
           >
