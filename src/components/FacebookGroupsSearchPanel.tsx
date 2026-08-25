@@ -197,10 +197,9 @@ function SearchTab() {
           <button
             type="submit"
             onClick={handleSubmitClick}
-            disabled={searching}
-            className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
+            className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
           >
-            {searching ? "Đang tìm..." : "Tìm kiếm"}
+            Tìm kiếm
           </button>
         </form>
         {error && <p className="text-sm text-red-600">{error}</p>}
