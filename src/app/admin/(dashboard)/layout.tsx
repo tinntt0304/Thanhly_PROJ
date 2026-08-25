@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/admin-guard";
 import { signOut } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { listChatSessions } from "@/lib/actions/chat";
+import { getCreditBalance } from "@/lib/credits";
 import { AdminSidebar } from "@/components/AdminSidebar";
 
 export default async function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,11 +12,15 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
   // Chat hỗ trợ là hộp thư chung của cả sàn (chỉ superadmin) — không gọi listChatSessions()
   // (đã đổi sang requireSuperAdmin() trong chat.ts) khi đang là SELLER, tránh bị redirect()
   // giữa chừng lúc render layout.
-  const awaitingReplyCount = isSuperAdmin
-    ? (await listChatSessions()).filter(
-        (s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR"
-      ).length
-    : 0;
+  const [awaitingReplyCount, creditBalance] = await Promise.all([
+    isSuperAdmin
+      ? listChatSessions().then(
+          (sessions) =>
+            sessions.filter((s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR").length
+        )
+      : Promise.resolve(0),
+    getCreditBalance(session.user.id),
+  ]);
 
   async function signOutAction() {
     "use server";
@@ -31,6 +36,7 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
         <AdminSidebar
           isSuperAdmin={isSuperAdmin}
           awaitingReplyCount={awaitingReplyCount}
+          creditBalance={creditBalance}
           signOutAction={signOutAction}
         />
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>

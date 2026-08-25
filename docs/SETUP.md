@@ -82,9 +82,10 @@ Bucket `product-images` (public) tự động được tạo ở lần upload đ
 tạo tay. Giới hạn: JPEG/PNG/WEBP/GIF, tối đa 5MB/ảnh, tối đa 8 ảnh/sản phẩm (chỉnh ở
 `src/lib/product-limits.ts`).
 
-### Tìm nhóm Facebook theo từ khóa (Apify)
+### Tìm nhóm Facebook theo từ khóa (Apify) + hệ thống credit trả phí
 
-Trang `/admin/nhom-facebook` (chỉ superadmin) gọi actor Apify
+Trang `/admin/nhom-facebook` (mọi tài khoản đã đăng nhập — SUPERADMIN lẫn SELLER) gọi
+actor Apify
 [`scraper-engine/facebook-groups-search-scraper`](https://apify.com/scraper-engine/facebook-groups-search-scraper)
 để tìm nhóm Facebook theo từ khóa, phục vụ việc mang sản phẩm sang chia sẻ (không tự
 scrape Facebook — dùng dịch vụ bên thứ ba đã có sẵn, người dùng tự chịu trách nhiệm về
@@ -99,6 +100,28 @@ Actor tính số kết quả tối đa (`maxItems`) theo **từng từ khóa** �
 cùng lúc sẽ nhân số lượng gọi/credit tương ứng. Giới hạn cứng ở
 `src/lib/facebook-groups.ts` (`MAX_ITEMS_LIMIT = 100`/từ khóa) để tránh tốn credit
 ngoài ý muốn.
+
+**SELLER phải trả phí credit** cho mỗi lượt tìm thực sự gọi Apify (lượt phục vụ từ cache
+thì miễn phí) — SUPERADMIN không bị tính phí. Giá bán/kết quả chỉnh ở
+`/admin/danh-muc` (mặc định `DEFAULT_PRICE_PER_RESULT` trong `src/lib/credits.ts`).
+
+Nạp credit qua chuyển khoản ngân hàng tự động đối soát bằng **SePay** (`/admin/nap-credit`):
+
+- `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_HOLDER` — tài khoản ngân hàng
+  nhận tiền, dùng tạo mã QR VietQR động (`vietqr.app/img?...`). `SEPAY_BANK_CODE` lấy
+  theo danh sách ngân hàng VietQR hỗ trợ (vd. `vietcombank`, `acb`, `mbbank`).
+- `SEPAY_WEBHOOK_API_KEY` — đặt ở SePay Dashboard → WebHooks → thêm mới → Authentication
+  Type = "API Key", trỏ webhook URL về `https://<domain>/api/webhooks/sepay`. SePay gửi
+  lại đúng key này trong header `Authorization` mỗi khi có giao dịch — dùng xác thực
+  webhook thật sự đến từ SePay.
+
+Chưa điền các biến `SEPAY_*` thì trang nạp credit vẫn tạo được mã tham chiếu nhưng báo
+"chưa cấu hình tài khoản nhận tiền", không tạo được QR — không chặn tính năng khác.
+
+Webhook `/api/webhooks/sepay` khớp giao dịch với yêu cầu nạp đang chờ (`TopUpRequest`)
+bằng cách tìm `referenceCode` (nhúng trong nội dung chuyển khoản/QR) xuất hiện trong
+`content` SePay gửi về — idempotent (gọi lại nhiều lần không cộng tiền 2 lần nhờ kiểm
+tra `status` trong 1 transaction DB).
 
 ### Tài khoản admin
 
@@ -125,7 +148,9 @@ npm run start
 Biến môi trường cần có khi deploy: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (chuỗi
 ngẫu nhiên dài, dùng `openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (dùng
 lúc seed, không cần giữ lại sau đó), `APIFY_API_TOKEN` (tùy chọn — chỉ cần nếu dùng
-tính năng tìm nhóm Facebook), `NEXT_PUBLIC_SITE_URL` (tùy chọn — domain đầy đủ dạng
+tính năng tìm nhóm Facebook), `SEPAY_BANK_ACCOUNT`/`SEPAY_BANK_CODE`/
+`SEPAY_ACCOUNT_HOLDER`/`SEPAY_WEBHOOK_API_KEY` (tùy chọn — chỉ cần nếu dùng nạp credit
+qua SePay), `NEXT_PUBLIC_SITE_URL` (tùy chọn — domain đầy đủ dạng
 `https://...`, dùng làm `metadataBase`/Open Graph khi chia sẻ sản phẩm ra Facebook/Zalo
 (P1.2); chưa cấu hình thì code tự fallback về domain production hiện tại, xem
 `src/lib/site.ts`).
@@ -150,6 +175,9 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 - `DATABASE_URL` — giống `.env` cục bộ (transaction pooler, `sslmode=no-verify`).
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — giống `.env` cục bộ.
 - `APIFY_API_TOKEN` — giống `.env` cục bộ, chỉ cần nếu dùng tính năng tìm nhóm Facebook.
+- `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_HOLDER`, `SEPAY_WEBHOOK_API_KEY`
+  — giống `.env` cục bộ, chỉ cần nếu dùng nạp credit qua SePay. Webhook SePay phải trỏ về
+  `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/sepay`.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 - `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback

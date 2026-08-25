@@ -36,9 +36,13 @@ model User {
   phone        String?
   role         UserRole @default(SELLER)
 
+  creditBalance Int @default(0) // VNĐ — trừ khi tìm nhóm Facebook (chỉ gọi Apify thật), cộng khi nạp qua SePay
+
   createdAt DateTime @default(now())
 
-  products Product[]
+  products           Product[]
+  creditTransactions CreditTransaction[]
+  topUpRequests      TopUpRequest[]
 }
 
 model Product {
@@ -206,4 +210,60 @@ model FacebookKeywordSearch {
   searchedAt DateTime @default(now())
 
   @@index([keyword, searchedAt])
+}
+
+enum CreditTransactionType {
+  TOPUP // nạp tiền qua SePay
+  SEARCH_CHARGE // trừ tiền do 1 lượt tìm nhóm Facebook gọi Apify thật
+  ADJUSTMENT // superadmin tự cộng/trừ tay
+}
+
+// Sổ cái credit — mỗi thay đổi số dư (nạp/trừ/điều chỉnh tay) đều ghi 1 dòng ở đây kèm
+// balanceAfter để đối soát sau này, không chỉ dựa vào User.creditBalance hiện tại.
+model CreditTransaction {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  type         CreditTransactionType
+  amount       Int // dương = cộng, âm = trừ (VNĐ)
+  balanceAfter Int
+  description  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum TopUpRequestStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+}
+
+// 1 lượt yêu cầu nạp tiền qua SePay — referenceCode nhúng vào nội dung chuyển khoản
+// (hiện trong mã QR) để khớp với webhook SePay gửi về khi có giao dịch ngân hàng thật.
+model TopUpRequest {
+  id            String             @id @default(cuid())
+  user          User               @relation(fields: [userId], references: [id])
+  userId        String
+  amount        Int // số tiền yêu cầu nạp, hiển thị lên QR
+  referenceCode String             @unique
+  status        TopUpRequestStatus @default(PENDING)
+
+  creditedAmount     Int? // số tiền thực nhận từ SePay (có thể khác amount nếu chuyển dư/thiếu)
+  sepayRawContent    String? // nội dung chuyển khoản thật từ webhook — giữ lại để đối soát khi có tranh chấp
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([referenceCode])
+  @@index([userId, status])
+}
+
+// Cấu hình giá bán lại — singleton theo key, superadmin chỉnh ở /admin/danh-muc.
+model PricingConfig {
+  key            String   @id
+  pricePerResult Int // VNĐ / kết quả trả về từ 1 lượt gọi Apify thật (tìm nhóm Facebook)
+  updatedAt      DateTime @updatedAt
 }

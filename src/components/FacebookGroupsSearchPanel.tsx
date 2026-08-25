@@ -223,6 +223,15 @@ function SearchTab() {
             </div>
           )}
 
+          {result.balanceAfter !== null && (
+            <p className="text-sm text-neutral-700">
+              {result.charged > 0
+                ? `Đã trừ ${result.charged.toLocaleString("vi-VN")}đ cho lượt tìm này.`
+                : "Lượt tìm này không tốn credit (dùng kết quả đã lưu)."}{" "}
+              Số dư còn lại: <strong>{result.balanceAfter.toLocaleString("vi-VN")}đ</strong>.
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-neutral-700">
               Tổng <strong>{items.length}</strong> nhóm ({newCount} nhóm mới chưa từng thấy).

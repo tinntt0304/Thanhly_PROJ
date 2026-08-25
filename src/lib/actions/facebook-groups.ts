@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSuperAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/admin-guard";
 import {
   runFacebookGroupsSearch,
   MAX_ITEMS_LIMIT,
@@ -10,6 +10,7 @@ import {
   SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupItem,
 } from "@/lib/facebook-groups";
+import { chargeForSearch, getPricePerResult } from "@/lib/credits";
 
 export type FacebookGroupResultItem = {
   fbId: string;
@@ -37,6 +38,8 @@ export type FacebookGroupsSearchResult =
       items: FacebookGroupResultItem[];
       cachedKeywords: CachedKeywordNotice[];
       searchedKeywords: string[];
+      charged: number;
+      balanceAfter: number | null; // null = superadmin, không tính phí nên không có ý nghĩa hiển thị
     }
   | { ok: false; error: string };
 
@@ -57,7 +60,8 @@ function cacheKey(keyword: string): string {
 }
 
 export async function searchFacebookGroups(formData: FormData): Promise<FacebookGroupsSearchResult> {
-  await requireSuperAdmin();
+  const session = await requireAdmin();
+  const isSuperAdmin = session.user.role === "SUPERADMIN";
 
   const parsed = searchSchema.safeParse({
     keywords: formData.get("keywords"),
@@ -109,15 +113,49 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
   }
 
   const resultItems = new Map<string, FacebookGroupResultItem>();
+  const pricePerResult = await getPricePerResult();
+  let charged = 0;
+  let balanceAfter: number | null = null;
 
   // 1 lượt gọi Apify duy nhất cho TẤT CẢ từ khóa cần tìm mới (actor nhận mảng từ khóa),
   // thay vì gọi riêng từng từ khóa — giảm số lần gọi API.
   if (keywordsToSearch.length > 0) {
+    // Chặn trước khi gọi Apify nếu chắc chắn không đủ credit cho số kết quả tối đa có
+    // thể trả về — tránh tốn credit Apify thật cho 1 lượt tìm mà người dùng không trả
+    // nổi. Superadmin (chủ sàn) không bị tính phí.
+    if (!isSuperAdmin) {
+      const worstCaseCost = keywordsToSearch.length * maxItems * pricePerResult;
+      const balance = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { creditBalance: true },
+      });
+      if ((balance?.creditBalance ?? 0) < worstCaseCost) {
+        return {
+          ok: false,
+          error: `Số dư có thể không đủ cho lượt tìm này (tối đa ${worstCaseCost.toLocaleString("vi-VN")}đ nếu đủ ${maxItems} kết quả/từ khóa), số dư hiện tại ${(balance?.creditBalance ?? 0).toLocaleString("vi-VN")}đ. Giảm số kết quả hoặc nạp thêm credit.`,
+        };
+      }
+    }
+
     let liveItems: FacebookGroupItem[];
     try {
       liveItems = await runFacebookGroupsSearch(keywordsToSearch, maxItems);
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Không gọi được API tìm kiếm." };
+    }
+
+    if (!isSuperAdmin) {
+      const chargeResult = await chargeForSearch(
+        session.user.id,
+        liveItems.length,
+        pricePerResult,
+        `Tìm nhóm Facebook: ${keywordsToSearch.join(", ")}`
+      );
+      if (!chargeResult.ok) {
+        return { ok: false, error: chargeResult.error };
+      }
+      charged = chargeResult.charged;
+      balanceAfter = chargeResult.balanceAfter;
     }
 
     const countsByKeyword = new Map<string, { resultCount: number; newCount: number }>();
@@ -212,11 +250,23 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
     }
   }
 
+  // Lượt tìm phục vụ hoàn toàn từ cache không trừ tiền (charged/balanceAfter vẫn ở giá
+  // trị mặc định) — vẫn lấy số dư hiện tại để hiển thị cho người bán biết còn bao nhiêu.
+  if (!isSuperAdmin && balanceAfter === null) {
+    const current = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { creditBalance: true },
+    });
+    balanceAfter = current?.creditBalance ?? 0;
+  }
+
   return {
     ok: true,
     items: [...resultItems.values()],
     cachedKeywords,
     searchedKeywords: keywordsToSearch,
+    charged,
+    balanceAfter,
   };
 }
 
@@ -244,7 +294,7 @@ export async function listSavedFacebookGroups(
   query?: string,
   page: number = 1
 ): Promise<SavedFacebookGroupsPage> {
-  await requireSuperAdmin();
+  await requireAdmin();
 
   const trimmed = query?.trim();
   const where = trimmed

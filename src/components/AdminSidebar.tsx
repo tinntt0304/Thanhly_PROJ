@@ -61,6 +61,13 @@ function SearchIcon() {
     </svg>
   );
 }
+function WalletIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12V7H5a2 2 0 010-4h14v4M3 5v14a2 2 0 002 2h16v-5M18 12a2 2 0 000 4h3v-4h-3z" />
+    </svg>
+  );
+}
 function EyeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -104,23 +111,25 @@ function NavLink({ item }: { item: NavItem }) {
 export function AdminSidebar({
   isSuperAdmin,
   awaitingReplyCount,
+  creditBalance,
   signOutAction,
 }: {
   isSuperAdmin: boolean;
   awaitingReplyCount: number;
+  creditBalance: number;
   signOutAction: () => Promise<void>;
 }) {
   const productItems: NavItem[] = [
     { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true },
     { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon /> },
     { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon /> },
+    { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
   ];
 
   const adminItems: NavItem[] = [
     { href: "/admin/danh-muc", label: "Quản lý danh mục", icon: <MenuIcon /> },
     { href: "/admin/settings", label: "Bằng chứng uy tín", icon: <StarIcon /> },
     { href: "/admin/chat", label: "Chat hỗ trợ", icon: <ChatIcon />, badge: awaitingReplyCount },
-    { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
   ];
 
   return (
@@ -145,7 +154,17 @@ export function AdminSidebar({
         )}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-1 border-t border-neutral-200 px-3 py-3">
+      <div className="mt-auto flex flex-col gap-2 border-t border-neutral-200 px-3 py-3">
+        {!isSuperAdmin && (
+          <Link
+            href="/admin/nap-credit"
+            className="flex items-center gap-3 rounded-md bg-accent-100 px-3 py-2 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-100/70"
+          >
+            <WalletIcon />
+            <span className="flex-1">Số dư credit</span>
+            <span>{creditBalance.toLocaleString("vi-VN")}đ</span>
+          </Link>
+        )}
         <Link
           href="/"
           className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-text"
