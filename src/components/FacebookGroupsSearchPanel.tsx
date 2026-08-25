@@ -22,6 +22,12 @@ function formatNumber(n: number | null): string {
   return n === null ? "—" : n.toLocaleString("vi-VN");
 }
 
+// Apify trả postsPerDay dạng số thập phân (trung bình bài đăng/ngày) — làm tròn để hiển
+// thị gọn hơn, không cần độ chính xác từng phần trăm bài đăng.
+function formatPostsPerDay(n: number | null): string {
+  return n === null ? "—" : Math.round(n).toLocaleString("vi-VN");
+}
+
 function formatRelativeHours(iso: string): string {
   const hours = Math.round((Date.now() - new Date(iso).getTime()) / 3600000);
   if (hours <= 0) return "vừa xong";
@@ -79,7 +85,7 @@ function GroupTable({
               <td className="px-4 py-2 text-neutral-700">{g.keywordsLabel || "—"}</td>
               <td className="px-4 py-2 text-neutral-700">{formatNumber(g.memberCount)}</td>
               <td className="px-4 py-2 text-neutral-700">
-                {g.postsPerDay === null ? "—" : g.postsPerDay.toLocaleString("vi-VN")}
+                {formatPostsPerDay(g.postsPerDay)}
               </td>
               <td className="px-4 py-2 text-neutral-700">{g.visibility ?? "—"}</td>
               <td className="px-4 py-2">
