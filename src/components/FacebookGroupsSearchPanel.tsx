@@ -131,11 +131,14 @@ function SearchTab() {
     }
   }
 
-  // Bật "searching" ở đây (onClick, ngoài transition của form action) thay vì đầu
-  // handleSubmit: handleSubmit chạy như một phần transition của chính server action, nên
-  // Next.js giữ mọi state update trong đó lại, không paint lên màn hình cho tới khi
-  // request xong — flushSync ép React vẽ ngay lập tức trước khi transition bắt đầu.
-  function handleSubmitClick() {
+  // Bật "searching" ở đây (onSubmit của <form>, ngoài transition của form action) thay
+  // vì đầu handleSubmit: handleSubmit chạy như một phần transition của chính server
+  // action, nên Next.js giữ mọi state update trong đó lại, không paint lên màn hình cho
+  // tới khi request xong — flushSync ép React vẽ ngay trước khi transition bắt đầu.
+  // Dùng onSubmit của <form> (không phải onClick của nút) vì sự kiện submit chỉ cháy
+  // SAU KHI trình duyệt đã kiểm tra input required hợp lệ — onClick cháy bất kể input
+  // trống hay không, từng khiến popup bật lên rồi kẹt mãi khi submit bị validation chặn.
+  function handleFormSubmit() {
     flushSync(() => setSearching(true));
   }
 
@@ -163,7 +166,7 @@ function SearchTab() {
           tự dùng lại kết quả đã lưu thay vì gọi lại API.
         </p>
 
-        <form action={handleSubmit} className="flex flex-wrap items-end gap-3">
+        <form action={handleSubmit} onSubmit={handleFormSubmit} className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-[240px] flex-1 flex-col gap-1">
             <label htmlFor="keywords" className="text-sm font-medium text-text">
               Từ khóa (cách nhau dấu phẩy nếu tìm nhiều từ)
@@ -196,7 +199,6 @@ function SearchTab() {
           </label>
           <button
             type="submit"
-            onClick={handleSubmitClick}
             className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
           >
             Tìm kiếm
