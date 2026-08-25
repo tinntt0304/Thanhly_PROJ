@@ -7,6 +7,7 @@ import {
   runFacebookGroupsSearch,
   MAX_ITEMS_LIMIT,
   SEARCH_CACHE_HOURS,
+  SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupItem,
 } from "@/lib/facebook-groups";
 
@@ -238,8 +239,6 @@ export type SavedFacebookGroupsPage = {
   page: number;
   pageSize: number;
 };
-
-export const SAVED_GROUPS_PAGE_SIZE = 50;
 
 export async function listSavedFacebookGroups(
   query?: string,

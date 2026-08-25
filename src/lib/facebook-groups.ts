@@ -14,6 +14,11 @@ export const DEFAULT_MAX_ITEMS = 20;
 // kiệm credit Apify cho các lượt tìm trùng từ khóa gần nhau.
 export const SEARCH_CACHE_HOURS = 12;
 
+// Đặt ở đây (không phải file "use server") vì module Server Actions chỉ được phép
+// export async function — export thêm 1 hằng số thường sẽ làm Next.js build lỗi
+// "module has no exports at all".
+export const SAVED_GROUPS_PAGE_SIZE = 50;
+
 export type FacebookGroupItem = {
   id: string;
   name: string;

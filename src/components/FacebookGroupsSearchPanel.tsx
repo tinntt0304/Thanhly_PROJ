@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import {
   searchFacebookGroups,
   listSavedFacebookGroups,
-  SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupsSearchResult,
   type FacebookGroupResultItem,
   type SavedFacebookGroup,
 } from "@/lib/actions/facebook-groups";
-import { DEFAULT_MAX_ITEMS, MAX_ITEMS_LIMIT, SEARCH_CACHE_HOURS } from "@/lib/facebook-groups";
+import {
+  DEFAULT_MAX_ITEMS,
+  MAX_ITEMS_LIMIT,
+  SEARCH_CACHE_HOURS,
+  SAVED_GROUPS_PAGE_SIZE,
+} from "@/lib/facebook-groups";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
