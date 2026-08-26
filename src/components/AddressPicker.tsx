@@ -44,8 +44,7 @@ export function AddressPicker({
 
   useEffect(() => {
     getGhnProvinces()
-      .then(setProvinces)
-      .catch((e) => setError(e instanceof Error ? e.message : "Không tải được danh sách tỉnh/thành."))
+      .then((res) => (res.ok ? setProvinces(res.data) : setError(res.error)))
       .finally(() => setLoadingProvinces(false));
   }, []);
 
@@ -56,16 +55,14 @@ export function AddressPicker({
   useEffect(() => {
     if (!provinceId) return;
     getGhnDistricts(Number(provinceId))
-      .then(setDistricts)
-      .catch((e) => setError(e instanceof Error ? e.message : "Không tải được danh sách quận/huyện."))
+      .then((res) => (res.ok ? setDistricts(res.data) : setError(res.error)))
       .finally(() => setLoadingDistricts(false));
   }, [provinceId]);
 
   useEffect(() => {
     if (!districtId) return;
     getGhnWards(Number(districtId))
-      .then(setWards)
-      .catch((e) => setError(e instanceof Error ? e.message : "Không tải được danh sách phường/xã."))
+      .then((res) => (res.ok ? setWards(res.data) : setError(res.error)))
       .finally(() => setLoadingWards(false));
   }, [districtId]);
 

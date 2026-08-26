@@ -14,26 +14,46 @@ import {
   cancelGhnOrder,
   REQUIRED_NOTE_OPTIONS,
   type RequiredNote,
+  type GhnProvince,
+  type GhnDistrict,
+  type GhnWard,
 } from "@/lib/ghn";
 import { ORDERS_PAGE_SIZE } from "@/lib/orders";
 
 // ===== Tra cứu tỉnh/quận/phường GHN — dùng cho AddressPicker ở form tạo đơn =====
 // Chỉ cần đăng nhập (không cần quyền đặc biệt), bọc lại thành server action vì
 // GHN_TOKEN chỉ có ở server, client không được gọi thẳng API GHN.
-
-export async function getGhnProvinces() {
-  await requireAdmin();
-  return ghnGetProvinces();
+//
+// PHẢI bắt lỗi ở đây và trả về {ok:false, error} thay vì để throw xuyên qua ranh giới
+// Server Action: Next.js production tự động che thông báo lỗi thật của mọi throw không
+// bắt trong Server Action (chỉ còn "Minified React error #441" phía client, không đọc
+// được lý do) — im ắng làm lộ vấn đề rất khó debug. Đây là quy ước bắt buộc cho MỌI
+// server action gọi ra ngoài (Apify/SePay/GHN) trong dự án, xem searchFacebookGroups.
+async function safeGhnCall<T>(fn: () => Promise<T>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, data: await fn() };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gọi API GHN thất bại." };
+  }
 }
 
-export async function getGhnDistricts(provinceId: number) {
+export async function getGhnProvinces(): Promise<{ ok: true; data: GhnProvince[] } | { ok: false; error: string }> {
   await requireAdmin();
-  return ghnGetDistricts(provinceId);
+  return safeGhnCall(ghnGetProvinces);
 }
 
-export async function getGhnWards(districtId: number) {
+export async function getGhnDistricts(
+  provinceId: number
+): Promise<{ ok: true; data: GhnDistrict[] } | { ok: false; error: string }> {
   await requireAdmin();
-  return ghnGetWards(districtId);
+  return safeGhnCall(() => ghnGetDistricts(provinceId));
+}
+
+export async function getGhnWards(
+  districtId: number
+): Promise<{ ok: true; data: GhnWard[] } | { ok: false; error: string }> {
+  await requireAdmin();
+  return safeGhnCall(() => ghnGetWards(districtId));
 }
 
 // SELLER chỉ thao tác được đơn của chính mình — SUPERADMIN thấy và sửa được tất cả,
