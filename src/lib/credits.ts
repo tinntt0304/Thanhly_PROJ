@@ -21,6 +21,21 @@ export async function setPricePerResult(pricePerResult: number): Promise<void> {
   });
 }
 
+// null = không giới hạn — mặc định chưa đặt giới hạn nào cho tới khi superadmin cấu
+// hình ở /admin/danh-muc, tránh áp một con số tùy tiện không có căn cứ kinh doanh.
+export async function getMaxTopUpAmount(): Promise<number | null> {
+  const config = await prisma.pricingConfig.findUnique({ where: { key: PRICING_KEY } });
+  return config?.maxTopUpAmount ?? null;
+}
+
+export async function setMaxTopUpAmount(maxTopUpAmount: number | null): Promise<void> {
+  await prisma.pricingConfig.upsert({
+    where: { key: PRICING_KEY },
+    update: { maxTopUpAmount },
+    create: { key: PRICING_KEY, pricePerResult: DEFAULT_PRICE_PER_RESULT, maxTopUpAmount },
+  });
+}
+
 export async function getCreditBalance(userId: string): Promise<number> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { creditBalance: true } });
   return user?.creditBalance ?? 0;

@@ -277,5 +277,6 @@ model TopUpRequest {
 model PricingConfig {
   key            String   @id
   pricePerResult Int // VNĐ / kết quả trả về từ 1 lượt gọi Apify thật (tìm nhóm Facebook)
+  maxTopUpAmount Int? // VNĐ — giới hạn tối đa 1 lượt nạp credit; null = không giới hạn
   updatedAt      DateTime @updatedAt
 }

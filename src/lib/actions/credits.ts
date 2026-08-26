@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireSuperAdmin } from "@/lib/admin-guard";
-import { getPricePerResult, setPricePerResult } from "@/lib/credits";
+import { getPricePerResult, setPricePerResult, getMaxTopUpAmount, setMaxTopUpAmount } from "@/lib/credits";
 import { generateTopUpReferenceCode, buildTopUpQrUrl } from "@/lib/sepay";
 
 const MIN_TOPUP_AMOUNT = 10_000;
@@ -21,6 +21,14 @@ export async function createTopUpRequest(formData: FormData): Promise<CreateTopU
     .safeParse({ amount: formData.get("amount") });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Số tiền không hợp lệ." };
+  }
+
+  const maxTopUpAmount = await getMaxTopUpAmount();
+  if (maxTopUpAmount !== null && parsed.data.amount > maxTopUpAmount) {
+    return {
+      ok: false,
+      error: `Số tiền nạp tối đa cho phép là ${maxTopUpAmount.toLocaleString("vi-VN")}đ.`,
+    };
   }
 
   const referenceCode = generateTopUpReferenceCode();
@@ -44,15 +52,16 @@ export async function getTopUpRequestStatus(requestId: string): Promise<TopUpSta
   return { status: request.status, creditedAmount: request.creditedAmount };
 }
 
-export type MyCreditInfo = { balance: number; pricePerResult: number };
+export type MyCreditInfo = { balance: number; pricePerResult: number; maxTopUpAmount: number | null };
 
 export async function getMyCreditInfo(): Promise<MyCreditInfo> {
   const session = await requireAdmin();
-  const [user, pricePerResult] = await Promise.all([
+  const [user, pricePerResult, maxTopUpAmount] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.user.id }, select: { creditBalance: true } }),
     getPricePerResult(),
+    getMaxTopUpAmount(),
   ]);
-  return { balance: user?.creditBalance ?? 0, pricePerResult };
+  return { balance: user?.creditBalance ?? 0, pricePerResult, maxTopUpAmount };
 }
 
 export type CreditTransactionDTO = {
@@ -97,6 +106,32 @@ export async function updatePricePerResult(
   if (!parsed.success) return { error: "Giá không hợp lệ." };
 
   await setPricePerResult(parsed.data.pricePerResult);
+  revalidatePath("/admin/danh-muc");
+  return {};
+}
+
+export type MaxTopUpFormState = { error?: string };
+
+export async function updateMaxTopUpAmount(
+  _prevState: MaxTopUpFormState | undefined,
+  formData: FormData
+): Promise<MaxTopUpFormState> {
+  await requireSuperAdmin();
+
+  // Ô để trống -> không giới hạn (null); có nhập thì phải là số nguyên dương.
+  const raw = formData.get("maxTopUpAmount");
+  if (!raw || raw === "") {
+    await setMaxTopUpAmount(null);
+    revalidatePath("/admin/danh-muc");
+    return {};
+  }
+
+  const parsed = z.object({ maxTopUpAmount: z.coerce.number().int().min(MIN_TOPUP_AMOUNT) }).safeParse({
+    maxTopUpAmount: raw,
+  });
+  if (!parsed.success) return { error: `Giới hạn nạp phải ≥ ${MIN_TOPUP_AMOUNT.toLocaleString("vi-VN")}đ.` };
+
+  await setMaxTopUpAmount(parsed.data.maxTopUpAmount);
   revalidatePath("/admin/danh-muc");
   return {};
 }

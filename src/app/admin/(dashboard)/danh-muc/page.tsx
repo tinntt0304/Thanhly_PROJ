@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/admin-guard";
-import { getPricePerResult } from "@/lib/credits";
+import { getPricePerResult, getMaxTopUpAmount } from "@/lib/credits";
 import { NavItemsManager } from "@/components/NavItemsManager";
 import { AnnouncementsManager } from "@/components/AnnouncementsManager";
 import { AboutContentEditor } from "@/components/AboutContentEditor";
 import { PricingConfigForm } from "@/components/PricingConfigForm";
+import { TopUpLimitForm } from "@/components/TopUpLimitForm";
 import { UserCreditsManager } from "@/components/UserCreditsManager";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function ManageCategoriesPage() {
   await requireSuperAdmin();
 
-  const [navItems, announcements, aboutContent, pricePerResult, users] = await Promise.all([
+  const [navItems, announcements, aboutContent, pricePerResult, maxTopUpAmount, users] = await Promise.all([
     prisma.navItem.findMany({ orderBy: { order: "asc" } }),
     prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.siteContent.findUnique({ where: { key: "about_us" } }),
     getPricePerResult(),
+    getMaxTopUpAmount(),
     prisma.user.findMany({
       orderBy: { creditBalance: "desc" },
       select: { id: true, name: true, email: true, role: true, creditBalance: true },
@@ -29,8 +31,8 @@ export default async function ManageCategoriesPage() {
         <h1 className="font-heading text-lg font-bold text-text">Quản lý danh mục</h1>
         <p className="mt-1 text-sm text-neutral-700">
           Chỉ superadmin thấy trang này — quản lý menu điều hướng công khai, thông báo &amp;
-          tin tức, nội dung trang &ldquo;Về chúng tôi&rdquo;, giá tìm nhóm Facebook và số dư
-          người dùng.
+          tin tức, nội dung trang &ldquo;Về chúng tôi&rdquo;, giá tìm nhóm Facebook, giới hạn
+          nạp credit và số dư người dùng.
         </p>
       </div>
 
@@ -54,6 +56,11 @@ export default async function ManageCategoriesPage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-bold text-text">Giá tìm nhóm Facebook</h2>
         <PricingConfigForm pricePerResult={pricePerResult} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-heading text-base font-bold text-text">Giới hạn nạp credit</h2>
+        <TopUpLimitForm maxTopUpAmount={maxTopUpAmount} />
       </section>
 
       <section className="flex flex-col gap-3">

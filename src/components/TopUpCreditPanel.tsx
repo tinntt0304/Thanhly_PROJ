@@ -24,7 +24,13 @@ type PendingTopUp = {
   amount: number;
 };
 
-export function TopUpCreditPanel({ initialBalance }: { initialBalance: number }) {
+export function TopUpCreditPanel({
+  initialBalance,
+  maxTopUpAmount,
+}: {
+  initialBalance: number;
+  maxTopUpAmount: number | null;
+}) {
   const [balance, setBalance] = useState(initialBalance);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +88,22 @@ export function TopUpCreditPanel({ initialBalance }: { initialBalance: number })
             <label htmlFor="amount" className="text-sm font-medium text-text">
               Số tiền muốn nạp (VNĐ)
             </label>
-            <input id="amount" name="amount" type="number" min={10000} step={1000} placeholder="100000" required className={inputClass} />
+            <input
+              id="amount"
+              name="amount"
+              type="number"
+              min={10000}
+              max={maxTopUpAmount ?? undefined}
+              step={1000}
+              placeholder="100000"
+              required
+              className={inputClass}
+            />
+            {maxTopUpAmount !== null && (
+              <p className="text-xs text-neutral-500">
+                Tối đa {maxTopUpAmount.toLocaleString("vi-VN")}đ/lượt.
+              </p>
+            )}
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
