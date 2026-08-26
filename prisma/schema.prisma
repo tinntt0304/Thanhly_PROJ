@@ -49,6 +49,7 @@ model User {
   topUpRequests         TopUpRequest[]
   facebookGroups        FacebookGroup[]
   facebookKeywordSearch FacebookKeywordSearch[]
+  orders                Order[]
 }
 
 model Product {
@@ -78,9 +79,65 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bids Bid[]
+  bids   Bid[]
+  orders Order[]
 
   @@index([status, endTime])
+}
+
+enum OrderStatus {
+  NEW // vừa tạo, chưa tạo vận đơn GHN
+  SHIPPING // đã tạo vận đơn GHN, đang giao
+  DELIVERED // GHN báo giao thành công
+  CANCELLED // đã huỷ (đơn nội bộ hoặc đã huỷ vận đơn GHN)
+}
+
+// Đơn hàng tạo ra từ 1 sản phẩm đã "Đánh dấu đã bán" (xem product.tsx) — gắn với đơn vị
+// vận chuyển GHN (Giao Hàng Nhanh) để tạo vận đơn thật + theo dõi trạng thái giao hàng.
+// Không unique theo productId: 1 sản phẩm có thể tạo lại đơn (sửa sai) hoặc bán nhiều
+// lượt (quantity > 1) nên cho phép nhiều Order/1 Product.
+model Order {
+  id String @id @default(cuid())
+
+  seller   User   @relation(fields: [sellerId], references: [id])
+  sellerId String
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  buyerName    String
+  buyerPhone   String
+  buyerAddress String // số nhà, tên đường... — phường/quận/tỉnh tách riêng bên dưới vì GHN yêu cầu mã, không nhận text tự do cho địa chỉ người nhận
+
+  provinceId   Int
+  provinceName String
+  districtId   Int
+  districtName String
+  wardCode     String
+  wardName     String
+
+  codAmount  Int // tiền thu hộ khi giao (VNĐ) — 0 nếu người mua đã thanh toán trước
+  weightGram Int     @default(500)
+  lengthCm   Int     @default(20)
+  widthCm    Int     @default(20)
+  heightCm   Int     @default(10)
+  note       String?
+
+  shopPaysShipping Boolean @default(false) // false = người mua trả phí ship khi nhận hàng, true = shop tự trả
+
+  status OrderStatus @default(NEW)
+
+  ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
+  ghnStatus          String? // trạng thái thô GHN trả về (picking, delivering, delivered...), cập nhật khi bấm "Làm mới trạng thái"
+  shippingFee        Int?
+  expectedDeliveryAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId, status])
+  @@index([productId])
+  @@index([ghnOrderCode])
 }
 
 model Bid {

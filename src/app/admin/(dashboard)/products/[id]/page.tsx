@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { updateProduct, setProductStatus } from "@/lib/actions/products";
@@ -38,6 +39,14 @@ export default async function EditProductPage({
               <span aria-hidden="true">✓</span> Đánh dấu đã bán
             </button>
           </form>
+        )}
+        {product.status === "SOLD" && (
+          <Link
+            href={`/admin/orders/new?productId=${product.id}`}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-accent-300 bg-accent-100/50 px-3 py-1.5 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-100"
+          >
+            <span aria-hidden="true">📦</span> Tạo đơn hàng
+          </Link>
         )}
         {product.status !== "CANCELLED" && (
           <form action={markCancelled}>

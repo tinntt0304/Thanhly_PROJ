@@ -61,6 +61,13 @@ function SearchIcon() {
     </svg>
   );
 }
+function OrdersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4" />
+    </svg>
+  );
+}
 function WalletIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -123,6 +130,7 @@ export function AdminSidebar({
     { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true },
     { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon /> },
     { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon /> },
+    { href: "/admin/orders", label: "Quản lý đơn hàng", icon: <OrdersIcon /> },
     { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
   ];
 

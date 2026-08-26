@@ -123,6 +123,38 @@ bằng cách tìm `referenceCode` (nhúng trong nội dung chuyển khoản/QR) 
 `content` SePay gửi về — idempotent (gọi lại nhiều lần không cộng tiền 2 lần nhờ kiểm
 tra `status` trong 1 transaction DB).
 
+### Quản lý đơn hàng + vận chuyển GHN (Giao Hàng Nhanh)
+
+Trang `/admin/orders` (mọi tài khoản đã đăng nhập, mỗi người chỉ thấy đơn của mình —
+SUPERADMIN thấy tất cả, giống quy ước Sản phẩm). Đơn hàng tạo từ nút "Tạo đơn hàng" ở
+trang sửa 1 sản phẩm đã "Đánh dấu đã bán". Tích hợp API GHN thật để tạo vận đơn + tra cứu
+trạng thái giao hàng (không tự viết logic vận chuyển).
+
+`.env` cần thêm:
+
+- `GHN_ENV` — `"sandbox"` (mặc định, dùng `dev-online-gateway.ghn.vn`, không đụng tài
+  khoản GHN thật) hoặc `"production"` (`online-gateway.ghn.vn`, đơn tạo ra được lấy hàng
+  thật).
+- `GHN_TOKEN`, `GHN_SHOP_ID` — lấy tài khoản test ở
+  [5sao.ghn.dev](https://5sao.ghn.dev): đăng nhập → tab "Chủ cửa hàng" → "Xem" để copy
+  Token → tab "Quản lý cửa hàng" điền địa chỉ shop để lấy ShopId. Tài khoản production lấy
+  tương tự ở [khachhang.ghn.vn](https://khachhang.ghn.vn).
+- `GHN_FROM_NAME`, `GHN_FROM_PHONE`, `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`,
+  `GHN_FROM_DISTRICT_NAME`, `GHN_FROM_PROVINCE_NAME` — địa chỉ **lấy hàng** (shop/kho của
+  bạn). GHN nhận địa chỉ người **gửi** dạng tên tỉnh/quận/phường (text), khác với địa chỉ
+  người **nhận** trong mỗi đơn — bắt buộc chọn theo mã GHN (3 select phụ thuộc ở form tạo
+  đơn, gọi trực tiếp API GHN nên cũng cần `GHN_TOKEN` mới hoạt động được).
+
+Chưa điền `GHN_*` thì `/admin/orders` vẫn xem/tạo đơn được (chỉ lưu nội bộ), riêng 3 select
+địa chỉ người nhận và nút "Tạo vận đơn GHN" sẽ báo lỗi rõ ràng "chưa cấu hình", không crash
+trang — không chặn tính năng khác.
+
+Vòng đời 1 đơn: tạo đơn (nội bộ, chưa gọi GHN) → "Tạo vận đơn GHN" ở trang chi tiết đơn
+(gọi `POST shipping-order/create`, lưu `ghnOrderCode`/phí ship/dự kiến giao) → "Làm mới
+trạng thái GHN" (gọi `POST shipping-order/detail`) → "Huỷ đơn" (gọi
+`POST switch-status/cancel` nếu đã có vận đơn, rồi đánh dấu `CANCELLED` nội bộ dù GHN có
+gọi được hay không).
+
 ### Tài khoản admin
 
 Seed đọc `ADMIN_EMAIL` / `ADMIN_PASSWORD` từ `.env` (đã có giá trị mặc định để dev —
@@ -178,6 +210,10 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 - `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_HOLDER`, `SEPAY_WEBHOOK_API_KEY`
   — giống `.env` cục bộ, chỉ cần nếu dùng nạp credit qua SePay. Webhook SePay phải trỏ về
   `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/sepay`.
+- `GHN_ENV`, `GHN_TOKEN`, `GHN_SHOP_ID`, `GHN_FROM_NAME`, `GHN_FROM_PHONE`,
+  `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`, `GHN_FROM_DISTRICT_NAME`,
+  `GHN_FROM_PROVINCE_NAME` — giống `.env` cục bộ, chỉ cần nếu dùng tạo vận đơn GHN ở
+  `/admin/orders`.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 - `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback
