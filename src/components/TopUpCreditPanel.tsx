@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   createTopUpRequest,
   getTopUpRequestStatus,
@@ -35,6 +36,7 @@ export function TopUpCreditPanel({
   minTopUpAmount: number;
   maxTopUpAmount: number | null;
 }) {
+  const router = useRouter();
   const [balance, setBalance] = useState(initialBalance);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,12 +59,15 @@ export function TopUpCreditPanel({
       if (status?.status === "COMPLETED") {
         setCompleted(true);
         setBalance((b) => b + (status.creditedAmount ?? 0));
+        // Số dư ở sidebar (AdminSidebar) đọc từ layout server component — refresh để
+        // cập nhật ngay, không bắt người dùng tự tải lại trang mới thấy số dư mới.
+        router.refresh();
       } else if (status?.status === "EXPIRED") {
         setExpired(true);
       }
     }, 3000);
     return () => clearInterval(id);
-  }, [pending, completed, expired]);
+  }, [pending, completed, expired, router]);
 
   async function handleCreate(formData: FormData) {
     setCreating(true);

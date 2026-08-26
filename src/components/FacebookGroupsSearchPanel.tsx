@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import {
   searchFacebookGroups,
@@ -109,7 +110,8 @@ function GroupTable({
   );
 }
 
-function SearchTab() {
+function SearchTab({ pricePerResult, isSuperAdmin }: { pricePerResult: number; isSuperAdmin: boolean }) {
+  const router = useRouter();
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Extract<FacebookGroupsSearchResult, { ok: true }> | null>(null);
@@ -122,6 +124,10 @@ function SearchTab() {
       if (res.ok) {
         setResult(res);
         setOnlyNew(false);
+        // Số dư credit hiển thị ở sidebar (AdminSidebar) đọc từ layout server component —
+        // refresh để cập nhật ngay sau khi lượt tìm này có thể đã trừ tiền, không bắt
+        // người dùng phải tự tải lại trang mới thấy số dư mới.
+        if (res.charged > 0) router.refresh();
       } else {
         setError(res.error);
         setResult(null);
@@ -166,6 +172,12 @@ function SearchTab() {
           bạn vừa tìm trong {SEARCH_CACHE_HOURS} giờ qua sẽ tự dùng lại kết quả đã lưu thay vì gọi
           lại API.
         </p>
+        {!isSuperAdmin && (
+          <p className="text-sm font-medium text-text">
+            Giá: {pricePerResult.toLocaleString("vi-VN")}đ / kết quả trả về (chỉ tính khi gọi API
+            thật, kết quả lấy từ cache không tốn credit).
+          </p>
+        )}
 
         <form action={handleSubmit} onSubmit={handleFormSubmit} className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-[240px] flex-1 flex-col gap-1">
@@ -364,7 +376,13 @@ function SavedTab() {
   );
 }
 
-export function FacebookGroupsSearchPanel() {
+export function FacebookGroupsSearchPanel({
+  pricePerResult,
+  isSuperAdmin,
+}: {
+  pricePerResult: number;
+  isSuperAdmin: boolean;
+}) {
   const [tab, setTab] = useState<"search" | "saved">("search");
 
   return (
@@ -388,7 +406,11 @@ export function FacebookGroupsSearchPanel() {
         </button>
       </div>
 
-      {tab === "search" ? <SearchTab /> : <SavedTab />}
+      {tab === "search" ? (
+        <SearchTab pricePerResult={pricePerResult} isSuperAdmin={isSuperAdmin} />
+      ) : (
+        <SavedTab />
+      )}
     </div>
   );
 }
