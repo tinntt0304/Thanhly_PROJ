@@ -7,6 +7,7 @@ import {
   listMyCreditTransactions,
   type CreditTransactionDTO,
 } from "@/lib/actions/credits";
+import { Countdown } from "@/components/Countdown";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
@@ -22,6 +23,7 @@ type PendingTopUp = {
   referenceCode: string;
   qrUrl: string | null;
   amount: number;
+  expiresAt: string;
 };
 
 export function TopUpCreditPanel({
@@ -38,35 +40,45 @@ export function TopUpCreditPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingTopUp | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [transactions, setTransactions] = useState<CreditTransactionDTO[] | null>(null);
 
   useEffect(() => {
     listMyCreditTransactions().then(setTransactions);
   }, [balance]);
 
-  // Poll trạng thái yêu cầu nạp mỗi 3 giây cho tới khi webhook SePay xác nhận xong —
-  // setState chỉ chạy trong callback bất đồng bộ của setInterval, không đồng bộ ngay
-  // trong effect, nên không vi phạm react-hooks/set-state-in-effect.
+  // Poll trạng thái yêu cầu nạp mỗi 3 giây cho tới khi webhook SePay xác nhận xong hoặc
+  // hết hạn — setState chỉ chạy trong callback bất đồng bộ của setInterval, không đồng bộ
+  // ngay trong effect, nên không vi phạm react-hooks/set-state-in-effect.
   useEffect(() => {
-    if (!pending || completed) return;
+    if (!pending || completed || expired) return;
     const id = setInterval(async () => {
       const status = await getTopUpRequestStatus(pending.requestId);
       if (status?.status === "COMPLETED") {
         setCompleted(true);
         setBalance((b) => b + (status.creditedAmount ?? 0));
+      } else if (status?.status === "EXPIRED") {
+        setExpired(true);
       }
     }, 3000);
     return () => clearInterval(id);
-  }, [pending, completed]);
+  }, [pending, completed, expired]);
 
   async function handleCreate(formData: FormData) {
     setCreating(true);
     setError(null);
     setCompleted(false);
+    setExpired(false);
     try {
       const res = await createTopUpRequest(formData);
       if (res.ok) {
-        setPending({ requestId: res.requestId, referenceCode: res.referenceCode, qrUrl: res.qrUrl, amount: res.amount });
+        setPending({
+          requestId: res.requestId,
+          referenceCode: res.referenceCode,
+          qrUrl: res.qrUrl,
+          amount: res.amount,
+          expiresAt: res.expiresAt,
+        });
       } else {
         setError(res.error);
         setPending(null);
@@ -134,6 +146,18 @@ export function TopUpCreditPanel({
                 Nạp thêm
               </button>
             </div>
+          ) : expired ? (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <span className="text-3xl">⏱️</span>
+              <p className="text-sm font-medium text-red-600">Mã QR đã hết hạn.</p>
+              <button
+                type="button"
+                onClick={() => setPending(null)}
+                className="mt-2 rounded-md bg-accent-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600"
+              >
+                Tạo mã mới
+              </button>
+            </div>
           ) : pending.qrUrl ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -143,6 +167,9 @@ export function TopUpCreditPanel({
               </p>
               <p className="text-xs text-neutral-500">
                 Quét mã bằng app ngân hàng — hệ thống tự cộng credit trong ít phút sau khi nhận được tiền.
+              </p>
+              <p className="text-sm text-neutral-700">
+                Còn lại: <Countdown endTime={pending.expiresAt} />
               </p>
               <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-accent-500" />
@@ -155,7 +182,7 @@ export function TopUpCreditPanel({
             </p>
           )}
 
-          {!completed && (
+          {!completed && !expired && (
             <button
               type="button"
               onClick={() => setPending(null)}

@@ -11,11 +11,12 @@ import {
   setMinTopUpAmount,
   getMaxTopUpAmount,
   setMaxTopUpAmount,
+  TOPUP_QR_EXPIRY_SECONDS,
 } from "@/lib/credits";
 import { generateTopUpReferenceCode, buildTopUpQrUrl } from "@/lib/sepay";
 
 export type CreateTopUpResult =
-  | { ok: true; requestId: string; referenceCode: string; qrUrl: string | null; amount: number }
+  | { ok: true; requestId: string; referenceCode: string; qrUrl: string | null; amount: number; expiresAt: string }
   | { ok: false; error: string };
 
 export async function createTopUpRequest(formData: FormData): Promise<CreateTopUpResult> {
@@ -48,7 +49,8 @@ export async function createTopUpRequest(formData: FormData): Promise<CreateTopU
   });
 
   const qrUrl = buildTopUpQrUrl(parsed.data.amount, referenceCode);
-  return { ok: true, requestId: request.id, referenceCode, qrUrl, amount: parsed.data.amount };
+  const expiresAt = new Date(request.createdAt.getTime() + TOPUP_QR_EXPIRY_SECONDS * 1000).toISOString();
+  return { ok: true, requestId: request.id, referenceCode, qrUrl, amount: parsed.data.amount, expiresAt };
 }
 
 export type TopUpStatusResult = {
@@ -56,11 +58,24 @@ export type TopUpStatusResult = {
   creditedAmount: number | null;
 };
 
+// Trạng thái EXPIRED được SUY RA từ createdAt + TOPUP_QR_EXPIRY_SECONDS khi request vẫn
+// còn PENDING trong DB — không lưu trực tiếp, giống cách P0.3 suy ra trạng thái phiên đấu
+// giá từ endTime, tránh cần cron job. Nếu SePay xác nhận trễ (đã COMPLETED trong DB) thì
+// trạng thái thật trong DB luôn thắng, không bao giờ báo "hết hạn" cho 1 giao dịch đã
+// nhận được tiền.
 export async function getTopUpRequestStatus(requestId: string): Promise<TopUpStatusResult | null> {
   const session = await requireAdmin();
   const request = await prisma.topUpRequest.findUnique({ where: { id: requestId } });
   if (!request || request.userId !== session.user.id) return null;
-  return { status: request.status, creditedAmount: request.creditedAmount };
+
+  const isPastExpiry =
+    request.status === "PENDING" &&
+    Date.now() - request.createdAt.getTime() > TOPUP_QR_EXPIRY_SECONDS * 1000;
+
+  return {
+    status: isPastExpiry ? "EXPIRED" : request.status,
+    creditedAmount: request.creditedAmount,
+  };
 }
 
 export type MyCreditInfo = {

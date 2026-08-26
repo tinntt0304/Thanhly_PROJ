@@ -8,6 +8,10 @@ export const DEFAULT_PRICE_PER_RESULT = 200;
 
 const PRICING_KEY = "facebook_search";
 
+// Thời gian chờ quét mã QR nạp credit — cố định, không cấu hình qua UI vì gắn liền với
+// UX của 1 phiên thanh toán (khác các mức tiền vốn là quyết định kinh doanh).
+export const TOPUP_QR_EXPIRY_SECONDS = 120;
+
 export async function getPricePerResult(): Promise<number> {
   const config = await prisma.pricingConfig.findUnique({ where: { key: PRICING_KEY } });
   return config?.pricePerResult ?? DEFAULT_PRICE_PER_RESULT;
