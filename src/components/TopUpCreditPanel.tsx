@@ -96,7 +96,6 @@ export function TopUpCreditPanel({
               type="number"
               min={minTopUpAmount}
               max={maxTopUpAmount ?? undefined}
-              step={1000}
               placeholder="100000"
               required
               className={inputClass}
