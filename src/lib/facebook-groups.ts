@@ -14,6 +14,12 @@ export const DEFAULT_MAX_ITEMS = 20;
 // kiệm credit Apify cho các lượt tìm trùng từ khóa gần nhau.
 export const SEARCH_CACHE_HOURS = 12;
 
+// Khoảng cách tối thiểu giữa 2 lượt gọi Apify THẬT của cùng 1 tài khoản — chặn spam/DoS:
+// không có giới hạn này thì 1 script gọi searchFacebookGroups liên tục vẫn được server xử
+// lý y hệt client thật, có thể đốt credit Apify của cả sàn hoặc khiến Apify rate-limit
+// luôn token, làm tính năng sập cho tất cả người dùng. Không áp dụng cho superadmin.
+export const SEARCH_RATE_LIMIT_SECONDS = 20;
+
 // Đặt ở đây (không phải file "use server") vì module Server Actions chỉ được phép
 // export async function — export thêm 1 hằng số thường sẽ làm Next.js build lỗi
 // "module has no exports at all".

@@ -43,6 +43,23 @@ export async function createTopUpRequest(formData: FormData): Promise<CreateTopU
     };
   }
 
+  // Chặn spam tạo hàng loạt TopUpRequest (mỗi request là 1 dòng DB, không có giới hạn gì
+  // trước đây — 1 script có thể tạo vô số dòng/giây): chỉ cho phép tạo mã QR mới nếu
+  // không còn yêu cầu PENDING nào của tài khoản này còn hiệu lực (chưa hết hạn theo
+  // TOPUP_QR_EXPIRY_SECONDS). Không cần chặt chẽ tuyệt đối (không dùng transaction khoá
+  // dòng) vì hậu quả tệ nhất chỉ là vài dòng dư trong lúc double-click, không phải lỗ
+  // hổng bảo mật — mục tiêu là chặn vòng lặp script, không phải chặn 1 double-click.
+  const pendingCutoff = new Date(Date.now() - TOPUP_QR_EXPIRY_SECONDS * 1000);
+  const stillPending = await prisma.topUpRequest.findFirst({
+    where: { userId: session.user.id, status: "PENDING", createdAt: { gt: pendingCutoff } },
+  });
+  if (stillPending) {
+    return {
+      ok: false,
+      error: "Bạn đang có 1 yêu cầu nạp credit chưa hoàn tất — vui lòng quét mã đó hoặc đợi hết hạn trước khi tạo mã mới.",
+    };
+  }
+
   const referenceCode = generateTopUpReferenceCode();
   const request = await prisma.topUpRequest.create({
     data: { userId: session.user.id, amount: parsed.data.amount, referenceCode },
@@ -51,6 +68,17 @@ export async function createTopUpRequest(formData: FormData): Promise<CreateTopU
   const qrUrl = buildTopUpQrUrl(parsed.data.amount, referenceCode);
   const expiresAt = new Date(request.createdAt.getTime() + TOPUP_QR_EXPIRY_SECONDS * 1000).toISOString();
   return { ok: true, requestId: request.id, referenceCode, qrUrl, amount: parsed.data.amount, expiresAt };
+}
+
+// Người dùng chủ động huỷ (nút "Huỷ, nhập số tiền khác") — đánh dấu EXPIRED ngay thay vì
+// để PENDING treo tới khi hết hạn tự nhiên, nếu không request này sẽ chặn nhầm việc tạo
+// mã QR mới của chính họ (do giới hạn "chỉ 1 PENDING/lần" ở createTopUpRequest).
+export async function cancelTopUpRequest(requestId: string): Promise<void> {
+  const session = await requireAdmin();
+  await prisma.topUpRequest.updateMany({
+    where: { id: requestId, userId: session.user.id, status: "PENDING" },
+    data: { status: "EXPIRED" },
+  });
 }
 
 export type TopUpStatusResult = {

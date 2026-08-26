@@ -38,6 +38,10 @@ model User {
 
   creditBalance Int @default(0) // VNĐ — trừ khi tìm nhóm Facebook (chỉ gọi Apify thật), cộng khi nạp qua SePay
 
+  // Mốc thời gian lượt gọi Apify thật gần nhất — dùng để chặn spam (chống DoS/tốn credit
+  // Apify): 1 tài khoản chỉ được gọi API thật cách nhau tối thiểu SEARCH_RATE_LIMIT_SECONDS.
+  lastSearchAt DateTime?
+
   createdAt DateTime @default(now())
 
   products              Product[]
@@ -280,4 +284,14 @@ model PricingConfig {
   minTopUpAmount Int? // VNĐ — giới hạn tối thiểu 1 lượt nạp credit; null = dùng mặc định DEFAULT_MIN_TOPUP_AMOUNT
   maxTopUpAmount Int? // VNĐ — giới hạn tối đa 1 lượt nạp credit; null = không giới hạn
   updatedAt      DateTime @updatedAt
+}
+
+// Bộ đếm rate-limit chống spam cho các hành động KHÔNG gắn với 1 user cụ thể (đăng ký,
+// đăng nhập — chưa có/chưa xác thực được userId), khoá theo địa chỉ IP (và email với đăng
+// nhập). key tự do, vd. "register:1.2.3.4" hay "login-email:a@b.com". Không có FK vì đây
+// chỉ là bộ đếm tạm thời, không phải dữ liệu nghiệp vụ — hàng cũ có thể dọn định kỳ.
+model RateLimitHit {
+  key         String   @id
+  windowStart DateTime @default(now())
+  count       Int      @default(1)
 }

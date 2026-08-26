@@ -7,6 +7,7 @@ import {
   runFacebookGroupsSearch,
   MAX_ITEMS_LIMIT,
   SEARCH_CACHE_HOURS,
+  SEARCH_RATE_LIMIT_SECONDS,
   SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupItem,
 } from "@/lib/facebook-groups";
@@ -120,6 +121,29 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
   // 1 lượt gọi Apify duy nhất cho TẤT CẢ từ khóa cần tìm mới (actor nhận mảng từ khóa),
   // thay vì gọi riêng từng từ khóa — giảm số lần gọi API.
   if (keywordsToSearch.length > 0) {
+    // Chặn spam gọi Apify thật: chỉ cho phép nếu lượt gọi thật gần nhất của tài khoản
+    // này (nếu có) đã cách đây đủ SEARCH_RATE_LIMIT_SECONDS. Dùng updateMany (UPDATE ...
+    // WHERE) thay vì đọc rồi ghi riêng lẻ để atomic — 2 request gần như đồng thời từ
+    // cùng 1 tài khoản (vd. script bỏ qua UI) không thể cùng "lọt qua" điều kiện, vì
+    // Postgres khoá dòng và request thứ 2 luôn thấy lastSearchAt đã được request thứ
+    // nhất cập nhật trước khi tự kiểm tra điều kiện.
+    if (!isSuperAdmin) {
+      const cooldownCutoff = new Date(Date.now() - SEARCH_RATE_LIMIT_SECONDS * 1000);
+      const claimed = await prisma.user.updateMany({
+        where: {
+          id: session.user.id,
+          OR: [{ lastSearchAt: null }, { lastSearchAt: { lt: cooldownCutoff } }],
+        },
+        data: { lastSearchAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        return {
+          ok: false,
+          error: `Vui lòng đợi ít nhất ${SEARCH_RATE_LIMIT_SECONDS} giây giữa các lượt tìm để tránh gọi API quá nhanh.`,
+        };
+      }
+    }
+
     // Chặn trước khi gọi Apify nếu chắc chắn không đủ credit cho số kết quả tối đa có
     // thể trả về — tránh tốn credit Apify thật cho 1 lượt tìm mà người dùng không trả
     // nổi. Superadmin (chủ sàn) không bị tính phí.

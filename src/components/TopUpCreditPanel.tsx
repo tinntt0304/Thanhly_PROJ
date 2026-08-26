@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createTopUpRequest,
+  cancelTopUpRequest,
   getTopUpRequestStatus,
   listMyCreditTransactions,
   type CreditTransactionDTO,
@@ -190,7 +191,12 @@ export function TopUpCreditPanel({
           {!completed && !expired && (
             <button
               type="button"
-              onClick={() => setPending(null)}
+              onClick={() => {
+                // Đánh dấu huỷ ở server (không chỉ ẩn ở client) — nếu không request PENDING
+                // này vẫn còn trong DB và sẽ chặn nhầm lần tạo mã QR tiếp theo của chính họ.
+                cancelTopUpRequest(pending.requestId).catch(() => {});
+                setPending(null);
+              }}
               className="text-sm text-neutral-500 underline"
             >
               Huỷ, nhập số tiền khác
