@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/admin-guard";
-import { getPricePerResult, getMaxTopUpAmount } from "@/lib/credits";
+import { getPricePerResult, getMinTopUpAmount, getMaxTopUpAmount } from "@/lib/credits";
 import { NavItemsManager } from "@/components/NavItemsManager";
 import { AnnouncementsManager } from "@/components/AnnouncementsManager";
 import { AboutContentEditor } from "@/components/AboutContentEditor";
@@ -13,17 +13,19 @@ export const dynamic = "force-dynamic";
 export default async function ManageCategoriesPage() {
   await requireSuperAdmin();
 
-  const [navItems, announcements, aboutContent, pricePerResult, maxTopUpAmount, users] = await Promise.all([
-    prisma.navItem.findMany({ orderBy: { order: "asc" } }),
-    prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.siteContent.findUnique({ where: { key: "about_us" } }),
-    getPricePerResult(),
-    getMaxTopUpAmount(),
-    prisma.user.findMany({
-      orderBy: { creditBalance: "desc" },
-      select: { id: true, name: true, email: true, role: true, creditBalance: true },
-    }),
-  ]);
+  const [navItems, announcements, aboutContent, pricePerResult, minTopUpAmount, maxTopUpAmount, users] =
+    await Promise.all([
+      prisma.navItem.findMany({ orderBy: { order: "asc" } }),
+      prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.siteContent.findUnique({ where: { key: "about_us" } }),
+      getPricePerResult(),
+      getMinTopUpAmount(),
+      getMaxTopUpAmount(),
+      prisma.user.findMany({
+        orderBy: { creditBalance: "desc" },
+        select: { id: true, name: true, email: true, role: true, creditBalance: true },
+      }),
+    ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -60,7 +62,7 @@ export default async function ManageCategoriesPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-bold text-text">Giới hạn nạp credit</h2>
-        <TopUpLimitForm maxTopUpAmount={maxTopUpAmount} />
+        <TopUpLimitForm minTopUpAmount={minTopUpAmount} maxTopUpAmount={maxTopUpAmount} />
       </section>
 
       <section className="flex flex-col gap-3">

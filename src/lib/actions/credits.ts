@@ -4,10 +4,15 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireSuperAdmin } from "@/lib/admin-guard";
-import { getPricePerResult, setPricePerResult, getMaxTopUpAmount, setMaxTopUpAmount } from "@/lib/credits";
+import {
+  getPricePerResult,
+  setPricePerResult,
+  getMinTopUpAmount,
+  setMinTopUpAmount,
+  getMaxTopUpAmount,
+  setMaxTopUpAmount,
+} from "@/lib/credits";
 import { generateTopUpReferenceCode, buildTopUpQrUrl } from "@/lib/sepay";
-
-const MIN_TOPUP_AMOUNT = 10_000;
 
 export type CreateTopUpResult =
   | { ok: true; requestId: string; referenceCode: string; qrUrl: string | null; amount: number }
@@ -16,14 +21,20 @@ export type CreateTopUpResult =
 export async function createTopUpRequest(formData: FormData): Promise<CreateTopUpResult> {
   const session = await requireAdmin();
 
+  const [minTopUpAmount, maxTopUpAmount] = await Promise.all([getMinTopUpAmount(), getMaxTopUpAmount()]);
+
   const parsed = z
-    .object({ amount: z.coerce.number().int().min(MIN_TOPUP_AMOUNT, `Số tiền nạp tối thiểu ${MIN_TOPUP_AMOUNT.toLocaleString("vi-VN")}đ.`) })
+    .object({
+      amount: z.coerce
+        .number()
+        .int()
+        .min(minTopUpAmount, `Số tiền nạp tối thiểu ${minTopUpAmount.toLocaleString("vi-VN")}đ.`),
+    })
     .safeParse({ amount: formData.get("amount") });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Số tiền không hợp lệ." };
   }
 
-  const maxTopUpAmount = await getMaxTopUpAmount();
   if (maxTopUpAmount !== null && parsed.data.amount > maxTopUpAmount) {
     return {
       ok: false,
@@ -52,16 +63,22 @@ export async function getTopUpRequestStatus(requestId: string): Promise<TopUpSta
   return { status: request.status, creditedAmount: request.creditedAmount };
 }
 
-export type MyCreditInfo = { balance: number; pricePerResult: number; maxTopUpAmount: number | null };
+export type MyCreditInfo = {
+  balance: number;
+  pricePerResult: number;
+  minTopUpAmount: number;
+  maxTopUpAmount: number | null;
+};
 
 export async function getMyCreditInfo(): Promise<MyCreditInfo> {
   const session = await requireAdmin();
-  const [user, pricePerResult, maxTopUpAmount] = await Promise.all([
+  const [user, pricePerResult, minTopUpAmount, maxTopUpAmount] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.user.id }, select: { creditBalance: true } }),
     getPricePerResult(),
+    getMinTopUpAmount(),
     getMaxTopUpAmount(),
   ]);
-  return { balance: user?.creditBalance ?? 0, pricePerResult, maxTopUpAmount };
+  return { balance: user?.creditBalance ?? 0, pricePerResult, minTopUpAmount, maxTopUpAmount };
 }
 
 export type CreditTransactionDTO = {
@@ -110,28 +127,35 @@ export async function updatePricePerResult(
   return {};
 }
 
-export type MaxTopUpFormState = { error?: string };
+export type TopUpLimitsFormState = { error?: string };
 
-export async function updateMaxTopUpAmount(
-  _prevState: MaxTopUpFormState | undefined,
+export async function updateTopUpLimits(
+  _prevState: TopUpLimitsFormState | undefined,
   formData: FormData
-): Promise<MaxTopUpFormState> {
+): Promise<TopUpLimitsFormState> {
   await requireSuperAdmin();
 
-  // Ô để trống -> không giới hạn (null); có nhập thì phải là số nguyên dương.
-  const raw = formData.get("maxTopUpAmount");
-  if (!raw || raw === "") {
-    await setMaxTopUpAmount(null);
-    revalidatePath("/admin/danh-muc");
-    return {};
+  const minParsed = z.object({ minTopUpAmount: z.coerce.number().int().min(1) }).safeParse({
+    minTopUpAmount: formData.get("minTopUpAmount"),
+  });
+  if (!minParsed.success) return { error: "Số tiền nạp tối thiểu không hợp lệ." };
+
+  // Ô tối đa để trống -> không giới hạn (null); có nhập thì phải là số nguyên dương.
+  const maxRaw = formData.get("maxTopUpAmount");
+  let maxTopUpAmount: number | null = null;
+  if (maxRaw && maxRaw !== "") {
+    const maxParsed = z.object({ maxTopUpAmount: z.coerce.number().int().min(1) }).safeParse({
+      maxTopUpAmount: maxRaw,
+    });
+    if (!maxParsed.success) return { error: "Số tiền nạp tối đa không hợp lệ." };
+    maxTopUpAmount = maxParsed.data.maxTopUpAmount;
   }
 
-  const parsed = z.object({ maxTopUpAmount: z.coerce.number().int().min(MIN_TOPUP_AMOUNT) }).safeParse({
-    maxTopUpAmount: raw,
-  });
-  if (!parsed.success) return { error: `Giới hạn nạp phải ≥ ${MIN_TOPUP_AMOUNT.toLocaleString("vi-VN")}đ.` };
+  if (maxTopUpAmount !== null && maxTopUpAmount < minParsed.data.minTopUpAmount) {
+    return { error: "Số tiền nạp tối đa phải ≥ số tiền nạp tối thiểu." };
+  }
 
-  await setMaxTopUpAmount(parsed.data.maxTopUpAmount);
+  await Promise.all([setMinTopUpAmount(minParsed.data.minTopUpAmount), setMaxTopUpAmount(maxTopUpAmount)]);
   revalidatePath("/admin/danh-muc");
   return {};
 }

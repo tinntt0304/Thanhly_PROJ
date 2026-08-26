@@ -21,6 +21,23 @@ export async function setPricePerResult(pricePerResult: number): Promise<void> {
   });
 }
 
+// Mức tối thiểu ban đầu — đủ để tránh giao dịch quá nhỏ so với phí xử lý, superadmin
+// chỉnh lại bất cứ lúc nào ở /admin/danh-muc, đây chỉ là giá trị khởi tạo.
+export const DEFAULT_MIN_TOPUP_AMOUNT = 10_000;
+
+export async function getMinTopUpAmount(): Promise<number> {
+  const config = await prisma.pricingConfig.findUnique({ where: { key: PRICING_KEY } });
+  return config?.minTopUpAmount ?? DEFAULT_MIN_TOPUP_AMOUNT;
+}
+
+export async function setMinTopUpAmount(minTopUpAmount: number): Promise<void> {
+  await prisma.pricingConfig.upsert({
+    where: { key: PRICING_KEY },
+    update: { minTopUpAmount },
+    create: { key: PRICING_KEY, pricePerResult: DEFAULT_PRICE_PER_RESULT, minTopUpAmount },
+  });
+}
+
 // null = không giới hạn — mặc định chưa đặt giới hạn nào cho tới khi superadmin cấu
 // hình ở /admin/danh-muc, tránh áp một con số tùy tiện không có căn cứ kinh doanh.
 export async function getMaxTopUpAmount(): Promise<number | null> {

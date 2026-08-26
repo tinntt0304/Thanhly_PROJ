@@ -26,9 +26,11 @@ type PendingTopUp = {
 
 export function TopUpCreditPanel({
   initialBalance,
+  minTopUpAmount,
   maxTopUpAmount,
 }: {
   initialBalance: number;
+  minTopUpAmount: number;
   maxTopUpAmount: number | null;
 }) {
   const [balance, setBalance] = useState(initialBalance);
@@ -92,18 +94,17 @@ export function TopUpCreditPanel({
               id="amount"
               name="amount"
               type="number"
-              min={10000}
+              min={minTopUpAmount}
               max={maxTopUpAmount ?? undefined}
               step={1000}
               placeholder="100000"
               required
               className={inputClass}
             />
-            {maxTopUpAmount !== null && (
-              <p className="text-xs text-neutral-500">
-                Tối đa {maxTopUpAmount.toLocaleString("vi-VN")}đ/lượt.
-              </p>
-            )}
+            <p className="text-xs text-neutral-500">
+              Tối thiểu {minTopUpAmount.toLocaleString("vi-VN")}đ
+              {maxTopUpAmount !== null && ` — tối đa ${maxTopUpAmount.toLocaleString("vi-VN")}đ`}/lượt.
+            </p>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
