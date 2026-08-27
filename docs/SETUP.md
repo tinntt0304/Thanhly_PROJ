@@ -155,6 +155,18 @@ trạng thái GHN" (gọi `POST shipping-order/detail`) → "Huỷ đơn" (gọi
 `POST switch-status/cancel` nếu đã có vận đơn, rồi đánh dấu `CANCELLED` nội bộ dù GHN có
 gọi được hay không).
 
+**Webhook trạng thái vận đơn (`/api/webhooks/ghn`)** — thay cho việc phải tự bấm "Làm mới
+trạng thái GHN": GHN tự gọi endpoint này mỗi khi vận đơn đổi trạng thái (tài liệu:
+`api.ghn.vn/home/docs/detail?id=47`). GHN không tự cấu hình được qua dashboard như SePay —
+cần liên hệ GHN (qua form đối tác/tài khoản quản lý) để đăng ký Client ID + URL webhook +
+môi trường (sandbox/production). Trỏ về
+`https://<domain-production>/api/webhooks/ghn`.
+
+⚠️ GHN không có cơ chế ký/xác thực request nào (không header token, không HMAC) — để giảm
+rủi ro giả mạo, có thể đặt thêm `GHN_WEBHOOK_SECRET` (tuỳ chọn) trong `.env`, rồi đưa URL
+kèm query `?key=<secret>` cho GHN thay vì URL trần. Chưa đặt biến này thì endpoint vẫn hoạt
+động, chỉ là không xác thực được nguồn gọi.
+
 ### Tài khoản admin
 
 Seed đọc `ADMIN_EMAIL` / `ADMIN_PASSWORD` từ `.env` (đã có giá trị mặc định để dev —
@@ -214,6 +226,9 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
   `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`, `GHN_FROM_DISTRICT_NAME`,
   `GHN_FROM_PROVINCE_NAME` — giống `.env` cục bộ, chỉ cần nếu dùng tạo vận đơn GHN ở
   `/admin/orders`.
+- `GHN_WEBHOOK_SECRET` — tuỳ chọn, xác thực webhook trạng thái vận đơn (GHN không có cơ
+  chế ký request). Webhook phải trỏ về `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/ghn`
+  (kèm `?key=<giá trị này>` nếu có đặt).
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 - `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback

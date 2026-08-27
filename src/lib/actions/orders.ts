@@ -18,7 +18,7 @@ import {
   type GhnDistrict,
   type GhnWard,
 } from "@/lib/ghn";
-import { ORDERS_PAGE_SIZE } from "@/lib/orders";
+import { ORDERS_PAGE_SIZE, deriveOrderStatusFromGhn } from "@/lib/orders";
 
 // ===== Tra cứu tỉnh/quận/phường GHN — dùng cho AddressPicker ở form tạo đơn =====
 // Chỉ cần đăng nhập (không cần quyền đặc biệt), bọc lại thành server action vì
@@ -256,7 +256,7 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
       where: { id: orderId },
       data: {
         ghnStatus: detail.status,
-        status: detail.status === "delivered" ? "DELIVERED" : order.status,
+        status: deriveOrderStatusFromGhn(detail.status, order.status),
       },
     });
   } catch (e) {
