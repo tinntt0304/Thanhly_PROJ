@@ -360,7 +360,11 @@ export async function getShippingQuote(orderId: string): Promise<ShippingQuoteRe
   try {
     const services = await getAvailableServices(order.districtId);
     const insuranceValue = Math.min(order.codAmount, 5_000_000);
-    const quotes = await Promise.all(
+    // Promise.all thay vì allSettled ở đây SAI: mỗi gói GHN áp điều kiện cân nặng/kích thước
+    // riêng (vd "Hàng nặng" từ chối kiện nhẹ với lỗi "Cân nặng không hợp lệ") — 1 gói không
+    // hợp với đơn này không có nghĩa TẤT CẢ gói đều hỏng. Chỉ báo lỗi khi không còn gói nào
+    // tính được giá; gói lỗi bị bỏ qua lặng lẽ (đúng bản chất: gói đó vốn không áp dụng được).
+    const settled = await Promise.allSettled(
       services.map(async (s) => ({
         ...s,
         fee: await getShippingFee({
@@ -375,6 +379,14 @@ export async function getShippingQuote(orderId: string): Promise<ShippingQuoteRe
         }),
       }))
     );
+    const quotes = settled
+      .filter((r): r is PromiseFulfilledResult<ShippingQuote> => r.status === "fulfilled")
+      .map((r) => r.value);
+    if (quotes.length === 0) {
+      const firstError = settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
+      const message = firstError instanceof Error ? firstError.message : "Không lấy được giá vận chuyển GHN.";
+      return { ok: false, error: message };
+    }
     quotes.sort((a, b) => a.fee - b.fee);
     return { ok: true, quotes };
   } catch (e) {
