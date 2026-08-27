@@ -21,7 +21,16 @@ import {
   type GhnWard,
   type GhnService,
 } from "@/lib/ghn";
-import { ORDERS_PAGE_SIZE, deriveOrderStatusFromGhn } from "@/lib/orders";
+import {
+  ORDERS_PAGE_SIZE,
+  deriveOrderStatusFromGhn,
+  ORDER_LIST_TABS,
+  SHIPPING_GHN_STATUSES,
+  RETURNING_GHN_STATUSES,
+  ISSUE_GHN_STATUSES,
+  type OrderListTab,
+} from "@/lib/orders";
+import type { Prisma } from "@/generated/prisma/client";
 
 // ===== Tra cứu tỉnh/quận/phường GHN — dùng cho AddressPicker ở form tạo đơn =====
 // Chỉ cần đăng nhập (không cần quyền đặc biệt), bọc lại thành server action vì
@@ -153,15 +162,51 @@ export async function createOrder(
   redirect(`/admin/orders/${order.id}`);
 }
 
+// Where clause riêng cho từng tab — theo tinh thần tab trạng thái nhiều nấc của GHN
+// Dashboard, xem giải thích đầy đủ ở ORDER_LIST_TABS (src/lib/orders.ts).
+function buildTabWhere(tab: OrderListTab): Prisma.OrderWhereInput {
+  switch (tab) {
+    case "NOT_SHIPPED":
+      return { ghnOrderCode: null, status: { not: "CANCELLED" } };
+    case "SHIPPING":
+      return { ghnStatus: { in: SHIPPING_GHN_STATUSES } };
+    case "RETURNING":
+      return { ghnStatus: { in: RETURNING_GHN_STATUSES } };
+    case "ISSUE":
+      return { ghnStatus: { in: ISSUE_GHN_STATUSES } };
+    case "DELIVERED":
+      return { status: "DELIVERED" };
+    case "CANCELLED":
+      return { status: "CANCELLED" };
+    case "ALL":
+    default:
+      return {};
+  }
+}
+
 export type OrderListItem = Awaited<ReturnType<typeof listOrders>>["items"][number];
 
-export async function listOrders(page: number = 1) {
+export async function listOrders(
+  page: number = 1,
+  tab: OrderListTab = "ALL",
+  dateFrom?: string,
+  dateTo?: string
+) {
   const session = await requireAdmin();
   const isSuperAdmin = session.user.role === "SUPERADMIN";
   const safePage = Math.max(1, Math.trunc(page) || 1);
 
-  const where = isSuperAdmin ? undefined : { sellerId: session.user.id };
-  const [items, totalCount] = await Promise.all([
+  const baseWhere: Prisma.OrderWhereInput = isSuperAdmin ? {} : { sellerId: session.user.id };
+
+  const createdAtFilter: Prisma.DateTimeFilter = {};
+  if (dateFrom) createdAtFilter.gte = new Date(`${dateFrom}T00:00:00`);
+  if (dateTo) createdAtFilter.lte = new Date(`${dateTo}T23:59:59.999`);
+  const createdAtWhere: Prisma.OrderWhereInput =
+    dateFrom || dateTo ? { createdAt: createdAtFilter } : {};
+
+  const where: Prisma.OrderWhereInput = { ...baseWhere, ...createdAtWhere, ...buildTabWhere(tab) };
+
+  const [items, totalCount, tabCountEntries] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -170,9 +215,21 @@ export async function listOrders(page: number = 1) {
       include: { product: { select: { title: true } }, seller: { select: { name: true } } },
     }),
     prisma.order.count({ where }),
+    Promise.all(
+      ORDER_LIST_TABS.map(async (t) => [
+        t.key,
+        await prisma.order.count({ where: { ...baseWhere, ...createdAtWhere, ...buildTabWhere(t.key) } }),
+      ] as const)
+    ),
   ]);
 
-  return { items, totalCount, page: safePage, pageSize: ORDERS_PAGE_SIZE };
+  return {
+    items,
+    totalCount,
+    page: safePage,
+    pageSize: ORDERS_PAGE_SIZE,
+    tabCounts: Object.fromEntries(tabCountEntries) as Record<OrderListTab, number>,
+  };
 }
 
 export async function getOrder(orderId: string) {
