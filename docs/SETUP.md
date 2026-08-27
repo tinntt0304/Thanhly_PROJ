@@ -144,16 +144,24 @@ trạng thái giao hàng (không tự viết logic vận chuyển).
   bạn). GHN nhận địa chỉ người **gửi** dạng tên tỉnh/quận/phường (text), khác với địa chỉ
   người **nhận** trong mỗi đơn — bắt buộc chọn theo mã GHN (3 select phụ thuộc ở form tạo
   đơn, gọi trực tiếp API GHN nên cũng cần `GHN_TOKEN` mới hoạt động được).
+- `GHN_FROM_DISTRICT_ID` — **ID số** của quận/huyện lấy hàng (khác `GHN_FROM_DISTRICT_NAME`
+  ở trên vốn là text) — 2 API "danh sách gói vận chuyển khả dụng" và "tính phí" bắt buộc
+  nhận dạng ID, không nhận tên. Lấy ID bằng cách gọi thử API GHN
+  `master-data/district?province_id=<id tỉnh>` hoặc xem trực tiếp trong trang quản lý shop
+  GHN. Chưa điền thì phần chọn gói/xem giá ở bước "Tạo vận đơn GHN" báo lỗi rõ ràng, không
+  chặn phần tạo vận đơn theo cách cũ nếu tự truyền được `serviceId`/`serviceTypeId` khác.
 
 Chưa điền `GHN_*` thì `/admin/orders` vẫn xem/tạo đơn được (chỉ lưu nội bộ), riêng 3 select
 địa chỉ người nhận và nút "Tạo vận đơn GHN" sẽ báo lỗi rõ ràng "chưa cấu hình", không crash
 trang — không chặn tính năng khác.
 
-Vòng đời 1 đơn: tạo đơn (nội bộ, chưa gọi GHN) → "Tạo vận đơn GHN" ở trang chi tiết đơn
-(gọi `POST shipping-order/create`, lưu `ghnOrderCode`/phí ship/dự kiến giao) → "Làm mới
-trạng thái GHN" (gọi `POST shipping-order/detail`) → "Huỷ đơn" (gọi
-`POST switch-status/cancel` nếu đã có vận đơn, rồi đánh dấu `CANCELLED` nội bộ dù GHN có
-gọi được hay không).
+Vòng đời 1 đơn: tạo đơn (nội bộ, chưa gọi GHN) → trang chi tiết đơn tự động gọi
+`POST shipping-order/available-services` + `POST shipping-order/fee` cho từng gói khả dụng
+trên tuyến giao, hiện danh sách gói kèm giá để chọn → "Tạo vận đơn GHN" (gọi
+`POST shipping-order/create` với `service_id`/`service_type_id` đã chọn, lưu
+`ghnOrderCode`/phí ship/dự kiến giao) → "Làm mới trạng thái GHN" (gọi
+`POST shipping-order/detail`) → "Huỷ đơn" (gọi `POST switch-status/cancel` nếu đã có vận
+đơn, rồi đánh dấu `CANCELLED` nội bộ dù GHN có gọi được hay không).
 
 **Webhook trạng thái vận đơn (`/api/webhooks/ghn`)** — thay cho việc phải tự bấm "Làm mới
 trạng thái GHN": GHN tự gọi endpoint này mỗi khi vận đơn đổi trạng thái (tài liệu:
@@ -224,8 +232,8 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
   `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/sepay`.
 - `GHN_ENV`, `GHN_TOKEN`, `GHN_SHOP_ID`, `GHN_FROM_NAME`, `GHN_FROM_PHONE`,
   `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`, `GHN_FROM_DISTRICT_NAME`,
-  `GHN_FROM_PROVINCE_NAME` — giống `.env` cục bộ, chỉ cần nếu dùng tạo vận đơn GHN ở
-  `/admin/orders`.
+  `GHN_FROM_PROVINCE_NAME`, `GHN_FROM_DISTRICT_ID` — giống `.env` cục bộ, chỉ cần nếu dùng
+  tạo vận đơn GHN ở `/admin/orders`.
 - `GHN_WEBHOOK_SECRET` — tuỳ chọn, xác thực webhook trạng thái vận đơn (GHN không có cơ
   chế ký request). Webhook phải trỏ về `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/ghn`
   (kèm `?key=<giá trị này>` nếu có đặt).

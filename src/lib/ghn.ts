@@ -22,6 +22,18 @@ function assertConfigured() {
   }
 }
 
+// API "available services" và "calculate fee" cần from_district dạng ID (khác
+// shipping-order/create chỉ cần tên) — tách riêng thành biến môi trường của nó thay vì
+// suy ra từ GHN_FROM_DISTRICT_NAME (tránh tra cứu tên mơ hồ, nhiều quận trùng tên khác
+// tỉnh) để việc chọn gói/giá vận chuyển hoạt động.
+function assertHasFromDistrictId(): number {
+  const id = Number(process.env.GHN_FROM_DISTRICT_ID);
+  if (!process.env.GHN_FROM_DISTRICT_ID || Number.isNaN(id)) {
+    throw new Error("Chưa cấu hình GHN_FROM_DISTRICT_ID — liên hệ quản trị viên để hoàn tất thiết lập.");
+  }
+  return id;
+}
+
 // Province/District/Ward chỉ cần Token, không cần ShopId — tách riêng khỏi
 // assertConfigured() (dùng cho các action cần cả ShopId: tạo/huỷ vận đơn).
 function assertHasToken() {
@@ -73,10 +85,53 @@ export const REQUIRED_NOTE_OPTIONS = [
 ] as const;
 export type RequiredNote = (typeof REQUIRED_NOTE_OPTIONS)[number]["value"];
 
-// Dịch vụ giao hàng tiêu chuẩn (E-commerce) — cố định, không cho chọn để tránh phải gọi
-// thêm API "available services" (cần district gửi+nhận) chỉ để chọn 1 trong số ít lựa
-// chọn hầu như luôn giống nhau cho hàng thanh lý/đấu giá thông thường.
-const SERVICE_TYPE_ID = 2;
+export type GhnService = { serviceId: number; serviceTypeId: number; shortName: string };
+
+// GHN trả về các gói dịch vụ khả dụng cho 1 tuyến từ_quận -> đến_quận (không phải toàn bộ
+// gói GHN có, chỉ những gói thật sự phục vụ được tuyến này) — người bán chọn 1 trong số
+// này trước khi tạo vận đơn, thay vì cố định 1 loại như trước.
+export async function getAvailableServices(toDistrictId: number): Promise<GhnService[]> {
+  assertConfigured();
+  const fromDistrictId = assertHasFromDistrictId();
+  const raw = await ghnFetch<{ service_id: number; service_type_id: number; short_name: string }[]>(
+    `${SHIPPING_BASE[env()]}/shipping-order/available-services`,
+    { shop_id: Number(process.env.GHN_SHOP_ID), from_district: fromDistrictId, to_district: toDistrictId },
+    false
+  );
+  return raw.map((s) => ({ serviceId: s.service_id, serviceTypeId: s.service_type_id, shortName: s.short_name }));
+}
+
+export type ShippingFeeInput = {
+  toDistrictId: number;
+  toWardCode: string;
+  serviceId: number;
+  weightGram: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  insuranceValue: number;
+};
+
+export async function getShippingFee(input: ShippingFeeInput): Promise<number> {
+  assertConfigured();
+  const fromDistrictId = assertHasFromDistrictId();
+  const data = await ghnFetch<{ total: number }>(
+    `${SHIPPING_BASE[env()]}/shipping-order/fee`,
+    {
+      from_district_id: fromDistrictId,
+      to_district_id: input.toDistrictId,
+      to_ward_code: input.toWardCode,
+      service_id: input.serviceId,
+      weight: input.weightGram,
+      length: input.lengthCm,
+      width: input.widthCm,
+      height: input.heightCm,
+      insurance_value: input.insuranceValue || undefined,
+    },
+    false
+  );
+  return data.total;
+}
 
 export type CreateGhnOrderInput = {
   toName: string;
@@ -95,6 +150,8 @@ export type CreateGhnOrderInput = {
   paymentTypeId: 1 | 2; // 1 = shop trả phí ship, 2 = người mua trả
   clientOrderCode: string; // gắn Order.id nội bộ để đối soát 2 chiều
   items: { name: string; quantity: number }[];
+  serviceId: number;
+  serviceTypeId: number;
 };
 
 export type CreateGhnOrderResult = {
@@ -133,7 +190,8 @@ export async function createGhnOrder(input: CreateGhnOrderInput): Promise<Create
       length: input.lengthCm,
       width: input.widthCm,
       height: input.heightCm,
-      service_type_id: SERVICE_TYPE_ID,
+      service_id: input.serviceId,
+      service_type_id: input.serviceTypeId,
       payment_type_id: input.paymentTypeId,
       required_note: input.requiredNote,
       cod_amount: input.codAmount || undefined,

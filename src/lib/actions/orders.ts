@@ -9,6 +9,8 @@ import {
   getProvinces as ghnGetProvinces,
   getDistricts as ghnGetDistricts,
   getWards as ghnGetWards,
+  getAvailableServices,
+  getShippingFee,
   createGhnOrder,
   getGhnOrderDetail,
   cancelGhnOrder,
@@ -17,6 +19,7 @@ import {
   type GhnProvince,
   type GhnDistrict,
   type GhnWard,
+  type GhnService,
 } from "@/lib/ghn";
 import { ORDERS_PAGE_SIZE, deriveOrderStatusFromGhn } from "@/lib/orders";
 
@@ -183,9 +186,56 @@ export async function getOrder(orderId: string) {
   return order;
 }
 
+export type ShippingQuote = GhnService & { fee: number };
+export type ShippingQuoteResult = { ok: true; quotes: ShippingQuote[] } | { ok: false; error: string };
+
+// Tự động tính phí cho từng gói GHN khả dụng trên tuyến giao của đơn này — dùng luôn địa
+// chỉ/cân nặng đã lưu trên Order (đã đủ ngay từ lúc tạo đơn), không cần người dùng bấm gì
+// thêm trước khi thấy giá.
+export async function getShippingQuote(orderId: string): Promise<ShippingQuoteResult> {
+  const session = await requireAdmin();
+  try {
+    await assertOwnsOrder(session.user.id, session.user.role, orderId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không có quyền." };
+  }
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
+
+  try {
+    const services = await getAvailableServices(order.districtId);
+    const insuranceValue = Math.min(order.codAmount, 5_000_000);
+    const quotes = await Promise.all(
+      services.map(async (s) => ({
+        ...s,
+        fee: await getShippingFee({
+          toDistrictId: order.districtId,
+          toWardCode: order.wardCode,
+          serviceId: s.serviceId,
+          weightGram: order.weightGram,
+          lengthCm: order.lengthCm,
+          widthCm: order.widthCm,
+          heightCm: order.heightCm,
+          insuranceValue,
+        }),
+      }))
+    );
+    quotes.sort((a, b) => a.fee - b.fee);
+    return { ok: true, quotes };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không lấy được giá vận chuyển GHN." };
+  }
+}
+
 export type GhnActionResult = { ok: true } | { ok: false; error: string };
 
-export async function createGhnShipment(orderId: string, requiredNote: RequiredNote): Promise<GhnActionResult> {
+export async function createGhnShipment(
+  orderId: string,
+  requiredNote: RequiredNote,
+  serviceId: number,
+  serviceTypeId: number
+): Promise<GhnActionResult> {
   const session = await requireAdmin();
   try {
     await assertOwnsOrder(session.user.id, session.user.role, orderId);
@@ -194,6 +244,9 @@ export async function createGhnShipment(orderId: string, requiredNote: RequiredN
   }
   if (!REQUIRED_NOTE_OPTIONS.some((o) => o.value === requiredNote)) {
     return { ok: false, error: "Tuỳ chọn xem hàng không hợp lệ." };
+  }
+  if (!Number.isInteger(serviceId) || !Number.isInteger(serviceTypeId)) {
+    return { ok: false, error: "Chưa chọn gói vận chuyển." };
   }
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { product: true } });
@@ -219,6 +272,8 @@ export async function createGhnShipment(orderId: string, requiredNote: RequiredN
       paymentTypeId: order.shopPaysShipping ? 1 : 2,
       clientOrderCode: order.id,
       items: [{ name: order.product.title, quantity: 1 }],
+      serviceId,
+      serviceTypeId,
     });
 
     await prisma.order.update({
