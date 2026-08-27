@@ -220,6 +220,53 @@ export async function cancelGhnOrder(orderCode: string): Promise<void> {
   await ghnFetch<unknown>(`${SHIPPING_BASE[env()]}/switch-status/cancel`, { order_codes: [orderCode] }, true);
 }
 
+export type UpdateGhnOrderInput = {
+  orderCode: string;
+  toName: string;
+  toPhone: string;
+  toAddress: string;
+  toWardCode: string;
+  toDistrictId: number;
+  weightGram: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  codAmount: number;
+  insuranceValue: number;
+  content: string;
+  paymentTypeId: 1 | 2;
+  note?: string;
+};
+
+// GHN tài liệu không nêu rõ đến trạng thái nào thì hết cho sửa (chỉ ghi chung chung "chỉ
+// khả dụng khi trạng thái vận chuyển cho phép") — không đoán/chặn trước ở phía mình, cứ gọi
+// và để GHN tự trả lỗi thật nếu đơn đã qua giai đoạn không cho sửa nữa, hiện đúng lỗi đó ra
+// cho người dùng (đúng quy ước safeGhnCall của dự án — không che lỗi thật).
+export async function updateGhnOrder(input: UpdateGhnOrderInput): Promise<void> {
+  assertConfigured();
+  await ghnFetch<unknown>(
+    `${SHIPPING_BASE[env()]}/shipping-order/update`,
+    {
+      order_code: input.orderCode,
+      to_name: input.toName,
+      to_phone: input.toPhone,
+      to_address: input.toAddress,
+      to_ward_code: input.toWardCode,
+      to_district_id: input.toDistrictId,
+      weight: input.weightGram,
+      length: input.lengthCm,
+      width: input.widthCm,
+      height: input.heightCm,
+      cod_amount: input.codAmount || undefined,
+      insurance_value: input.insuranceValue || undefined,
+      content: input.content,
+      payment_type_id: input.paymentTypeId,
+      note: input.note || undefined,
+    },
+    true
+  );
+}
+
 // Nhãn tiếng Việt cho các trạng thái GHN thường gặp — trạng thái lạ (hiếm/mới thêm) vẫn
 // hiển thị được bằng cách rơi về chính giá trị thô, không throw lỗi.
 export const GHN_STATUS_LABEL: Record<string, string> = {

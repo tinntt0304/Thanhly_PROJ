@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getOrder } from "@/lib/actions/orders";
+import { getOrder, updateOrder } from "@/lib/actions/orders";
 import { ORDER_STATUS_LABEL } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 import { OrderActions } from "@/components/OrderActions";
+import { OrderForm } from "@/components/OrderForm";
 
 export default async function OrderDetailPage({ params }: PageProps<"/admin/orders/[id]">) {
   const { id } = await params;
   const order = await getOrder(id);
   if (!order) notFound();
+
+  const boundUpdate = updateOrder.bind(null, order.id);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -18,26 +21,48 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         <span className="text-sm text-neutral-700">Trạng thái: {ORDER_STATUS_LABEL[order.status]}</span>
       </div>
 
-      <div className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-4 text-sm">
-        <p>
-          Sản phẩm:{" "}
-          <Link href={`/admin/products/${order.product.id}`} className="font-medium text-accent-600 hover:underline">
-            {order.product.title}
-          </Link>
-        </p>
-        <p>
-          Người nhận: <span className="font-medium text-text">{order.buyerName}</span> — {order.buyerPhone}
-        </p>
-        <p>
-          Địa chỉ: {order.buyerAddress}, {order.wardName}, {order.districtName}, {order.provinceName}
-        </p>
-        <p>Tiền thu hộ (COD): {formatVND(order.codAmount)}</p>
-        <p>
-          Kích thước: {order.weightGram}g — {order.lengthCm}×{order.widthCm}×{order.heightCm}cm
-        </p>
-        <p>Người trả phí ship: {order.shopPaysShipping ? "Shop" : "Người mua"}</p>
-        {order.note && <p>Ghi chú: {order.note}</p>}
-        <p className="text-neutral-500">Tạo lúc: {formatDateTime(order.createdAt)}</p>
+      <p className="text-sm text-neutral-600">
+        Sản phẩm:{" "}
+        <Link href={`/admin/products/${order.product.id}`} className="font-medium text-accent-600 hover:underline">
+          {order.product.title}
+        </Link>{" "}
+        · Tạo lúc: {formatDateTime(order.createdAt)}
+      </p>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
+        <h2 className="font-heading text-sm font-bold text-text">Thông tin đơn hàng</h2>
+        {order.status === "CANCELLED" ? (
+          <p className="text-sm text-neutral-600">Đơn đã huỷ, không sửa được nữa.</p>
+        ) : (
+          <>
+            <p className="text-xs text-neutral-500">
+              Sửa xong bấm &ldquo;Lưu thay đổi&rdquo; — nếu đơn đã có vận đơn GHN, hệ thống tự
+              đồng bộ thay đổi sang GHN; GHN có thể từ chối nếu vận đơn đã qua giai đoạn cho
+              phép sửa (đã lấy hàng trở đi), lúc đó sẽ hiện đúng lỗi từ GHN.
+            </p>
+            <OrderForm
+              action={boundUpdate}
+              submitLabel="Lưu thay đổi"
+              pendingLabel="Đang lưu..."
+              defaultBuyerName={order.buyerName}
+              defaultBuyerPhone={order.buyerPhone}
+              defaultBuyerAddress={order.buyerAddress}
+              defaultProvinceId={order.provinceId}
+              defaultProvinceName={order.provinceName}
+              defaultDistrictId={order.districtId}
+              defaultDistrictName={order.districtName}
+              defaultWardCode={order.wardCode}
+              defaultWardName={order.wardName}
+              defaultCodAmount={order.codAmount}
+              defaultWeightGram={order.weightGram}
+              defaultLengthCm={order.lengthCm}
+              defaultWidthCm={order.widthCm}
+              defaultHeightCm={order.heightCm}
+              defaultNote={order.note ?? undefined}
+              defaultShopPaysShipping={order.shopPaysShipping}
+            />
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-4 text-sm">

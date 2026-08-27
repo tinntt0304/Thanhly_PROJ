@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-guard";
 import { listOrders } from "@/lib/actions/orders";
-import { ORDER_STATUS_LABEL, ORDER_LIST_TABS, type OrderListTab } from "@/lib/orders";
+import { ORDER_LIST_TABS, type OrderListTab } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 
@@ -148,10 +148,13 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    {ORDER_STATUS_LABEL[order.status]}
-                    {order.ghnStatus && (
-                      <span className="block text-xs text-neutral-500">{ghnStatusLabel(order.ghnStatus)}</span>
-                    )}
+                    {order.ghnOrderCode
+                      ? order.ghnStatus
+                        ? ghnStatusLabel(order.ghnStatus)
+                        : "Đã tạo vận đơn — chưa cập nhật"
+                      : order.status === "CANCELLED"
+                        ? "Đã huỷ"
+                        : "Chưa tạo vận đơn"}
                   </td>
                 </tr>
               ))}

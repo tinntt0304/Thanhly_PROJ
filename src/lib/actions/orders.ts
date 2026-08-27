@@ -12,6 +12,7 @@ import {
   getAvailableServices,
   getShippingFee,
   createGhnOrder,
+  updateGhnOrder,
   getGhnOrderDetail,
   cancelGhnOrder,
   REQUIRED_NOTE_OPTIONS,
@@ -97,7 +98,9 @@ const orderSchema = z.object({
   shopPaysShipping: z.coerce.boolean(),
 });
 
-export type OrderFormState = { error?: string };
+// success chỉ dùng ở updateOrder (createOrder redirect luôn khi xong, không cần) — gộp
+// chung 1 type để OrderForm.tsx dùng lại được cho cả 2 action, không cần 2 kiểu tách rời.
+export type OrderFormState = { error?: string; success?: boolean };
 
 export async function createOrder(
   productId: string,
@@ -160,6 +163,100 @@ export async function createOrder(
 
   revalidatePath("/admin/orders");
   redirect(`/admin/orders/${order.id}`);
+}
+
+// Sửa thông tin đơn đã tạo (tên/SĐT/địa chỉ người nhận, COD, cân nặng/kích thước, ghi
+// chú...). GHN không nêu rõ tới trạng thái nào thì hết cho sửa — cứ gọi shipping-order/update
+// nếu đơn đã có vận đơn và để GHN tự trả lỗi thật nếu không cho sửa nữa (không đoán trước),
+// CHỈ lưu vào DB nội bộ sau khi GHN xác nhận cập nhật thành công để 2 bên luôn khớp nhau.
+export async function updateOrder(
+  orderId: string,
+  _prevState: OrderFormState | undefined,
+  formData: FormData
+): Promise<OrderFormState> {
+  const session = await requireAdmin();
+  try {
+    await assertOwnsOrder(session.user.id, session.user.role, orderId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Không có quyền." };
+  }
+
+  const existing = await prisma.order.findUnique({ where: { id: orderId }, include: { product: true } });
+  if (!existing) return { error: "Không tìm thấy đơn hàng." };
+  if (existing.status === "CANCELLED") return { error: "Đơn đã huỷ, không sửa được nữa." };
+
+  const parsed = orderSchema.safeParse({
+    buyerName: formData.get("buyerName"),
+    buyerPhone: formData.get("buyerPhone"),
+    buyerAddress: formData.get("buyerAddress"),
+    provinceId: formData.get("provinceId"),
+    provinceName: formData.get("provinceName"),
+    districtId: formData.get("districtId"),
+    districtName: formData.get("districtName"),
+    wardCode: formData.get("wardCode"),
+    wardName: formData.get("wardName"),
+    codAmount: formData.get("codAmount"),
+    weightGram: formData.get("weightGram"),
+    lengthCm: formData.get("lengthCm"),
+    widthCm: formData.get("widthCm"),
+    heightCm: formData.get("heightCm"),
+    note: formData.get("note"),
+    shopPaysShipping: formData.get("shopPaysShipping") === "on",
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const data = parsed.data;
+
+  if (existing.ghnOrderCode) {
+    try {
+      await updateGhnOrder({
+        orderCode: existing.ghnOrderCode,
+        toName: data.buyerName,
+        toPhone: data.buyerPhone,
+        toAddress: data.buyerAddress,
+        toWardCode: data.wardCode,
+        toDistrictId: data.districtId,
+        weightGram: data.weightGram,
+        lengthCm: data.lengthCm,
+        widthCm: data.widthCm,
+        heightCm: data.heightCm,
+        codAmount: data.codAmount,
+        insuranceValue: Math.min(data.codAmount, 5_000_000),
+        content: existing.product.title,
+        paymentTypeId: data.shopPaysShipping ? 1 : 2,
+        note: data.note,
+      });
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "GHN từ chối cập nhật đơn (có thể đã qua giai đoạn cho sửa)." };
+    }
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      buyerName: data.buyerName,
+      buyerPhone: data.buyerPhone,
+      buyerAddress: data.buyerAddress,
+      provinceId: data.provinceId,
+      provinceName: data.provinceName,
+      districtId: data.districtId,
+      districtName: data.districtName,
+      wardCode: data.wardCode,
+      wardName: data.wardName,
+      codAmount: data.codAmount,
+      weightGram: data.weightGram,
+      lengthCm: data.lengthCm,
+      widthCm: data.widthCm,
+      heightCm: data.heightCm,
+      note: data.note || null,
+      shopPaysShipping: data.shopPaysShipping,
+    },
+  });
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  return { success: true };
 }
 
 // Where clause riêng cho từng tab — theo tinh thần tab trạng thái nhiều nấc của GHN

@@ -9,16 +9,51 @@ const initialState: OrderFormState = {};
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
 
+// Dùng chung cho cả tạo đơn mới (/admin/orders/new) và sửa đơn đã tạo (/admin/orders/[id])
+// — mỗi trường đều có label + textbox riêng (GHN cho sửa hầu hết các trường này qua
+// shipping-order/update khi đơn còn ở giai đoạn cho phép, xem updateOrder ở actions/orders.ts).
 export function OrderForm({
   action,
+  submitLabel = "Tạo đơn hàng",
+  pendingLabel = "Đang tạo...",
+  savedMessage = "Đã lưu thay đổi.",
   defaultBuyerName,
   defaultBuyerPhone,
+  defaultBuyerAddress,
+  defaultProvinceId,
+  defaultProvinceName,
+  defaultDistrictId,
+  defaultDistrictName,
+  defaultWardCode,
+  defaultWardName,
   defaultCodAmount,
+  defaultWeightGram = 500,
+  defaultLengthCm = 20,
+  defaultWidthCm = 20,
+  defaultHeightCm = 10,
+  defaultNote,
+  defaultShopPaysShipping = false,
 }: {
   action: (prevState: OrderFormState | undefined, formData: FormData) => Promise<OrderFormState>;
+  submitLabel?: string;
+  pendingLabel?: string;
+  savedMessage?: string;
   defaultBuyerName?: string;
   defaultBuyerPhone?: string;
+  defaultBuyerAddress?: string;
+  defaultProvinceId?: number;
+  defaultProvinceName?: string;
+  defaultDistrictId?: number;
+  defaultDistrictName?: string;
+  defaultWardCode?: string;
+  defaultWardName?: string;
   defaultCodAmount?: number;
+  defaultWeightGram?: number;
+  defaultLengthCm?: number;
+  defaultWidthCm?: number;
+  defaultHeightCm?: number;
+  defaultNote?: string;
+  defaultShopPaysShipping?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
@@ -55,10 +90,23 @@ export function OrderForm({
         <label htmlFor="buyerAddress" className="text-sm font-medium text-text">
           Địa chỉ (số nhà, tên đường...)
         </label>
-        <input id="buyerAddress" name="buyerAddress" required className={inputClass} />
+        <input
+          id="buyerAddress"
+          name="buyerAddress"
+          defaultValue={defaultBuyerAddress}
+          required
+          className={inputClass}
+        />
       </div>
 
-      <AddressPicker />
+      <AddressPicker
+        initialProvinceId={defaultProvinceId}
+        initialProvinceName={defaultProvinceName}
+        initialDistrictId={defaultDistrictId}
+        initialDistrictName={defaultDistrictName}
+        initialWardCode={defaultWardCode}
+        initialWardName={defaultWardName}
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
@@ -76,7 +124,12 @@ export function OrderForm({
           />
         </div>
         <label className="flex items-center gap-2 pb-2 text-sm text-neutral-700 sm:pt-6">
-          <input type="checkbox" name="shopPaysShipping" className="h-4 w-4 rounded border-neutral-300" />
+          <input
+            type="checkbox"
+            name="shopPaysShipping"
+            defaultChecked={defaultShopPaysShipping}
+            className="h-4 w-4 rounded border-neutral-300"
+          />
           Shop tự trả phí ship (mặc định người mua trả khi nhận hàng)
         </label>
       </div>
@@ -86,25 +139,57 @@ export function OrderForm({
           <label htmlFor="weightGram" className="text-sm font-medium text-text">
             Cân nặng (g)
           </label>
-          <input id="weightGram" name="weightGram" type="number" min={1} defaultValue={500} required className={inputClass} />
+          <input
+            id="weightGram"
+            name="weightGram"
+            type="number"
+            min={1}
+            defaultValue={defaultWeightGram}
+            required
+            className={inputClass}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="lengthCm" className="text-sm font-medium text-text">
             Dài (cm)
           </label>
-          <input id="lengthCm" name="lengthCm" type="number" min={1} defaultValue={20} required className={inputClass} />
+          <input
+            id="lengthCm"
+            name="lengthCm"
+            type="number"
+            min={1}
+            defaultValue={defaultLengthCm}
+            required
+            className={inputClass}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="widthCm" className="text-sm font-medium text-text">
             Rộng (cm)
           </label>
-          <input id="widthCm" name="widthCm" type="number" min={1} defaultValue={20} required className={inputClass} />
+          <input
+            id="widthCm"
+            name="widthCm"
+            type="number"
+            min={1}
+            defaultValue={defaultWidthCm}
+            required
+            className={inputClass}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="heightCm" className="text-sm font-medium text-text">
             Cao (cm)
           </label>
-          <input id="heightCm" name="heightCm" type="number" min={1} defaultValue={10} required className={inputClass} />
+          <input
+            id="heightCm"
+            name="heightCm"
+            type="number"
+            min={1}
+            defaultValue={defaultHeightCm}
+            required
+            className={inputClass}
+          />
         </div>
       </div>
 
@@ -112,17 +197,18 @@ export function OrderForm({
         <label htmlFor="note" className="text-sm font-medium text-text">
           Ghi chú (không bắt buộc)
         </label>
-        <textarea id="note" name="note" rows={2} className={inputClass} />
+        <textarea id="note" name="note" rows={2} defaultValue={defaultNote} className={inputClass} />
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state.success && <p className="text-sm text-accent-2-700">{savedMessage}</p>}
 
       <button
         type="submit"
         disabled={pending}
         className="self-start rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
       >
-        {pending ? "Đang tạo..." : "Tạo đơn hàng"}
+        {pending ? pendingLabel : submitLabel}
       </button>
     </form>
   );
