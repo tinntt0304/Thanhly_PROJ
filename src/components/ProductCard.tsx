@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { Product } from "@/generated/prisma/client";
+import type { HomeCardProduct } from "@/lib/auction";
 import { formatVND, getAuctionState } from "@/lib/auction";
+import { isOptimizableProductImage } from "@/lib/image-url";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { TagBadges } from "@/components/TagBadges";
@@ -10,7 +11,7 @@ export function ProductCard({
   product,
   bidCount,
 }: {
-  product: Product;
+  product: HomeCardProduct;
   bidCount: number;
 }) {
   const state = getAuctionState(product, bidCount > 0);
@@ -31,7 +32,7 @@ export function ProductCard({
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover transition group-hover:scale-[1.02]"
-            unoptimized
+            unoptimized={!isOptimizableProductImage(product.images[0])}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-neutral-500">

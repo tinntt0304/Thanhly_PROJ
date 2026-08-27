@@ -138,6 +138,8 @@ model Order {
   @@index([sellerId, status])
   @@index([productId])
   @@index([ghnOrderCode])
+  @@index([ghnStatus]) // tab SHIPPING/RETURNING/ISSUE ở /admin/orders lọc theo ghnStatus IN (...)
+  @@index([createdAt]) // tab list sắp xếp + lọc theo khoảng ngày tạo
 }
 
 model Bid {

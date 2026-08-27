@@ -187,48 +187,73 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
       countsByKeyword.set(cacheKey(keyword), { resultCount: 0, newCount: 0 });
     }
 
-    for (const item of liveItems) {
-      if (!item.id) continue;
-      const matchedKeyword = item.query ?? keywordsToSearch[0];
-      const counts = countsByKeyword.get(cacheKey(matchedKeyword));
-      if (counts) counts.resultCount += 1;
+    // Trước đây tra + ghi từng nhóm TUẦN TỰ (findUnique rồi upsert riêng cho mỗi kết quả)
+    // — tới 2 round-trip DB/kết quả, với maxItems=100 có thể thành 200+ query nối đuôi
+    // nhau, đây là điểm chậm rõ nhất khi dùng tính năng tìm nhóm. Đổi sang: 1 findMany lấy
+    // hết nhóm đã lưu trước đó, rồi upsert song song (Promise.all) — Prisma dịch upsert
+    // trên Postgres thành 1 câu INSERT ... ON CONFLICT DO UPDATE nguyên tử nên chạy song
+    // song cho CÙNG 1 khoá vẫn an toàn, không đụng độ.
+    const itemsWithId = liveItems.filter((item): item is FacebookGroupItem & { id: string } => !!item.id);
+    const existingByFbId = new Map(
+      (
+        await prisma.facebookGroup.findMany({
+          where: { userId: session.user.id, fbId: { in: [...new Set(itemsWithId.map((i) => i.id))] } },
+        })
+      ).map((g) => [g.fbId, g])
+    );
 
-      const existing = await prisma.facebookGroup.findUnique({
-        where: { fbId_userId: { fbId: item.id, userId: session.user.id } },
-      });
-      const isNew = !existing;
-      if (isNew && counts) counts.newCount += 1;
+    // Gộp TẤT CẢ từ khóa khớp trong chính lượt tìm này theo từng fbId trước khi ghi DB —
+    // 1 nhóm khớp nhiều từ khóa (multi-keyword) chỉ upsert đúng 1 lần với keywords[] đã
+    // gộp đủ, tránh 2 lệnh upsert cùng fbId chạy song song ghi đè keywords[] của nhau (SET
+    // nguyên mảng, không cộng dồn ở tầng SQL) — chỉ giữ lại từ khóa của lệnh chạy sau.
+    const byFbId = new Map<string, { item: FacebookGroupItem; keywords: Set<string> }>();
+    for (const item of itemsWithId) {
+      const matchedKeyword = cacheKey(item.query ?? keywordsToSearch[0]);
+      const counts = countsByKeyword.get(matchedKeyword);
+      if (counts) {
+        counts.resultCount += 1;
+        if (!existingByFbId.has(item.id)) counts.newCount += 1;
+      }
 
-      // Lưu từ khóa dạng đã chuẩn hoá (lowercase) trong keywords[] — khớp nhất quán với
-      // cacheKey() dùng để tra cứu lại nhóm theo từ khóa cache ở dưới, tránh trường hợp
-      // gõ khác hoa/thường giữa 2 lần tìm khiến không tìm lại được nhóm đã lưu.
-      const mergedKeywords = new Set(existing?.keywords ?? []);
-      mergedKeywords.add(cacheKey(matchedKeyword));
+      const entry = byFbId.get(item.id);
+      if (entry) {
+        entry.keywords.add(matchedKeyword);
+      } else {
+        const merged = new Set(existingByFbId.get(item.id)?.keywords ?? []);
+        merged.add(matchedKeyword);
+        byFbId.set(item.id, { item, keywords: merged });
+      }
+    }
 
-      const saved = await prisma.facebookGroup.upsert({
-        where: { fbId_userId: { fbId: item.id, userId: session.user.id } },
-        update: {
-          name: item.name,
-          url: item.url,
-          visibility: item.visibility,
-          memberCount: item.memberCount,
-          postsPerDay: item.postsPerDay,
-          description: item.description,
-          keywords: [...mergedKeywords],
-        },
-        create: {
-          userId: session.user.id,
-          fbId: item.id,
-          name: item.name,
-          url: item.url,
-          visibility: item.visibility,
-          memberCount: item.memberCount,
-          postsPerDay: item.postsPerDay,
-          description: item.description,
-          keywords: [...mergedKeywords],
-        },
-      });
+    const savedGroups = await Promise.all(
+      [...byFbId.entries()].map(([fbId, { item, keywords }]) =>
+        prisma.facebookGroup.upsert({
+          where: { fbId_userId: { fbId, userId: session.user.id } },
+          update: {
+            name: item.name,
+            url: item.url,
+            visibility: item.visibility,
+            memberCount: item.memberCount,
+            postsPerDay: item.postsPerDay,
+            description: item.description,
+            keywords: [...keywords],
+          },
+          create: {
+            userId: session.user.id,
+            fbId,
+            name: item.name,
+            url: item.url,
+            visibility: item.visibility,
+            memberCount: item.memberCount,
+            postsPerDay: item.postsPerDay,
+            description: item.description,
+            keywords: [...keywords],
+          },
+        })
+      )
+    );
 
+    for (const saved of savedGroups) {
       resultItems.set(saved.fbId, {
         fbId: saved.fbId,
         name: saved.name,
@@ -238,7 +263,7 @@ export async function searchFacebookGroups(formData: FormData): Promise<Facebook
         postsPerDay: saved.postsPerDay,
         description: saved.description,
         matchedKeywords: saved.keywords,
-        isNew,
+        isNew: !existingByFbId.has(saved.fbId),
         fromCache: false,
       });
     }

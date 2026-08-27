@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { isOptimizableProductImage } from "@/lib/image-url";
 
 export function ProductGallery({ images, title }: { images: string[]; title: string }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -11,7 +12,15 @@ export function ProductGallery({ images, title }: { images: string[]; title: str
     <div className="flex flex-col gap-2">
       <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-100">
         {activeSrc ? (
-          <Image src={activeSrc} alt={title} fill className="object-cover" unoptimized priority />
+          <Image
+            src={activeSrc}
+            alt={title}
+            fill
+            sizes="(max-width: 768px) 100vw, 600px"
+            className="object-cover"
+            unoptimized={!isOptimizableProductImage(activeSrc)}
+            priority
+          />
         ) : null}
       </div>
       {images.length > 1 && (
@@ -27,7 +36,14 @@ export function ProductGallery({ images, title }: { images: string[]; title: str
                 i === activeIndex ? "ring-accent-500" : "ring-transparent hover:ring-neutral-300"
               }`}
             >
-              <Image src={src} alt="" fill className="object-cover" unoptimized />
+              <Image
+                src={src}
+                alt=""
+                fill
+                sizes="64px"
+                className="object-cover"
+                unoptimized={!isOptimizableProductImage(src)}
+              />
             </button>
           ))}
         </div>

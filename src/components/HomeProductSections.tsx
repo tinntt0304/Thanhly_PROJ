@@ -3,10 +3,9 @@
 import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { matchesSearch } from "@/lib/search";
-import type { AuctionState } from "@/lib/auction";
-import type { Product } from "@/generated/prisma/client";
+import type { AuctionState, HomeCardProduct } from "@/lib/auction";
 
-type HomeProduct = { product: Product; bidCount: number; state: AuctionState };
+type HomeProduct = { product: HomeCardProduct; bidCount: number; state: AuctionState };
 
 function ProductGrid({
   items,

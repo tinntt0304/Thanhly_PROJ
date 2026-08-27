@@ -22,8 +22,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ShareButtons } from "@/components/ShareButtons";
 import { getSiteUrl } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
-
 // cache() dedupe cùng 1 lượt fetch giữa generateMetadata() và component trang bên dưới
 // trong cùng 1 request, tránh query Prisma 2 lần cho mỗi lượt xem trang sản phẩm.
 const getProduct = cache((id: string) =>

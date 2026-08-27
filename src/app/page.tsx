@@ -7,8 +7,10 @@ import { getAuctionState } from "@/lib/auction";
 import { ChatWidget } from "@/components/ChatWidget";
 import type { Review } from "@/lib/reviews";
 
-export const dynamic = "force-dynamic";
-
+// KHÔNG filter theo status ở đây dù chỉ ACTIVE mới cần cho phần "đang thanh lý" — phần
+// "đã kết thúc" (ProductGrid thứ 2 ở HomeProductSections) cố ý hiển thị CẢ sản phẩm
+// SOLD/CANCELLED làm minh bạch lịch sử giao dịch, nên vẫn cần lấy mọi trạng thái. Chỉ bớt
+// field không dùng tới ở card (description, attributes JSON...) qua `select`.
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q : "";
@@ -16,7 +18,16 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const [trustProfile, products] = await Promise.all([
     prisma.trustProfile.findFirst(),
     prisma.product.findMany({
-      include: { _count: { select: { bids: true } } },
+      select: {
+        id: true,
+        title: true,
+        images: true,
+        tags: true,
+        currentPrice: true,
+        endTime: true,
+        status: true,
+        _count: { select: { bids: true } },
+      },
     }),
   ]);
 

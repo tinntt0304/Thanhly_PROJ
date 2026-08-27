@@ -1,5 +1,12 @@
 import type { Bid, Product, ProductStatus } from "@/generated/prisma/client";
 
+// Đủ field cho ProductCard/HomeProductSections — trang chủ chỉ `select` đúng ngần này,
+// không kéo cả `description`/`attributes` JSON không dùng tới ở dạng thẻ nhỏ.
+export type HomeCardProduct = Pick<
+  Product,
+  "id" | "title" | "images" | "tags" | "currentPrice" | "endTime" | "status"
+>;
+
 export type AuctionState =
   | "BIDDING" // đang mở, còn trong thời gian đấu giá
   | "ENDED_AWAITING_CONTACT" // hết giờ, có người thắng, chờ người bán liên hệ
