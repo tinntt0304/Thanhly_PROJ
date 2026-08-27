@@ -6,6 +6,8 @@ import type { GhnProvince, GhnDistrict, GhnWard } from "@/lib/ghn";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
+const lockedInputClass =
+  "rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-500 cursor-not-allowed";
 
 // 3 select phụ thuộc (Tỉnh/Thành -> Quận/Huyện -> Phường/Xã) lấy trực tiếp từ GHN — bắt
 // buộc vì GHN chỉ nhận địa chỉ người nhận dạng mã (district_id, ward_code), không nhận
@@ -18,6 +20,7 @@ export function AddressPicker({
   initialDistrictName,
   initialWardCode,
   initialWardName,
+  locked = false,
 }: {
   initialProvinceId?: number;
   initialProvinceName?: string;
@@ -25,6 +28,7 @@ export function AddressPicker({
   initialDistrictName?: string;
   initialWardCode?: string;
   initialWardName?: string;
+  locked?: boolean;
 }) {
   const [provinces, setProvinces] = useState<GhnProvince[]>([]);
   const [districts, setDistricts] = useState<GhnDistrict[]>([]);
@@ -87,7 +91,8 @@ export function AddressPicker({
               setLoadingDistricts(!!id);
             }}
             required
-            className={inputClass}
+            disabled={locked}
+            className={locked ? lockedInputClass : inputClass}
           >
             <option value="">{loadingProvinces ? "Đang tải..." : "-- Chọn --"}</option>
             {provinces.map((p) => (
@@ -113,8 +118,8 @@ export function AddressPicker({
               setLoadingWards(!!id);
             }}
             required
-            disabled={!provinceId}
-            className={inputClass}
+            disabled={locked || !provinceId}
+            className={locked ? lockedInputClass : inputClass}
           >
             <option value="">{loadingDistricts ? "Đang tải..." : "-- Chọn --"}</option>
             {districts.map((d) => (
@@ -136,8 +141,8 @@ export function AddressPicker({
               setWardName(w?.WardName ?? "");
             }}
             required
-            disabled={!districtId}
-            className={inputClass}
+            disabled={locked || !districtId}
+            className={locked ? lockedInputClass : inputClass}
           >
             <option value="">{loadingWards ? "Đang tải..." : "-- Chọn --"}</option>
             {wards.map((w) => (

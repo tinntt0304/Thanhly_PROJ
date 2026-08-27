@@ -48,3 +48,54 @@ export const ISSUE_GHN_STATUSES = ["delivery_fail", "exception", "damage", "lost
 export function deriveOrderStatusFromGhn(ghnStatus: string, currentStatus: OrderStatus): OrderStatus {
   return ghnStatus === "delivered" ? "DELIVERED" : currentStatus;
 }
+
+// GHN có 1 trang tài liệu riêng "Update fields according to order status" (docs id 117)
+// nhưng trang đó render bằng JS, không lấy được nội dung bảng thật để chép chính xác —
+// quy tắc tô xám dưới đây dựa trên 2 mốc GHN xác nhận rõ ràng ở chỗ khác:
+// 1) Từ "picked" (đã lấy hàng) trở đi, shipper đã cầm kiện hàng vật lý thật — thông tin
+//    người nhận/địa chỉ và kích thước-cân nặng gắn với đúng kiện đó không còn sửa được nữa.
+// 2) Tiền thu hộ (COD)/ghi chú vẫn sửa được xa hơn (GHN FAQ xác nhận COD sửa được tới hết
+//    giai đoạn lưu kho/trung chuyển/phân loại/giao thất bại/chờ trả hàng), chỉ khoá khi đơn
+//    đã bước vào "đang giao" (đang giao tận tay, không sửa được số tiền thu giữa chừng) trở
+//    đi, hoặc đã rẽ nhánh hoàn/sự cố/huỷ.
+// Đây chỉ là rào UI (gợi ý, tô xám) — an toàn cuối cùng vẫn là lỗi thật GHN trả về khi gọi
+// shipping-order/update (xem updateGhnOrder ở ghn.ts), không phải rào này.
+const GHN_RECIPIENT_LOCKED_STATUSES = [
+  "picked",
+  "storing",
+  "transporting",
+  "sorting",
+  "delivering",
+  "money_collect_delivering",
+  "delivered",
+  "delivery_fail",
+  "waiting_to_return",
+  "return",
+  "returned",
+  "return_fail",
+  "exception",
+  "damage",
+  "lost",
+  "cancel",
+];
+const GHN_COD_LOCKED_STATUSES = [
+  "delivering",
+  "money_collect_delivering",
+  "delivered",
+  "return",
+  "returned",
+  "return_fail",
+  "exception",
+  "damage",
+  "lost",
+  "cancel",
+];
+
+export type OrderFieldLocks = { recipient: boolean; cod: boolean };
+
+export function getOrderFieldLocks(ghnStatus: string | null): OrderFieldLocks {
+  return {
+    recipient: !!ghnStatus && GHN_RECIPIENT_LOCKED_STATUSES.includes(ghnStatus),
+    cod: !!ghnStatus && GHN_COD_LOCKED_STATUSES.includes(ghnStatus),
+  };
+}

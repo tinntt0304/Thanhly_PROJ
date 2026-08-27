@@ -8,6 +8,8 @@ const initialState: OrderFormState = {};
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
+const lockedInputClass =
+  "rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-500 cursor-not-allowed";
 
 // Dùng chung cho cả tạo đơn mới (/admin/orders/new) và sửa đơn đã tạo (/admin/orders/[id])
 // — mỗi trường đều có label + textbox riêng (GHN cho sửa hầu hết các trường này qua
@@ -33,6 +35,8 @@ export function OrderForm({
   defaultHeightCm = 10,
   defaultNote,
   defaultShopPaysShipping = false,
+  recipientLocked = false,
+  codLocked = false,
 }: {
   action: (prevState: OrderFormState | undefined, formData: FormData) => Promise<OrderFormState>;
   submitLabel?: string;
@@ -54,11 +58,21 @@ export function OrderForm({
   defaultHeightCm?: number;
   defaultNote?: string;
   defaultShopPaysShipping?: boolean;
+  // GHN đã lấy hàng thật (recipientLocked) / đã bắt đầu giao-hoàn-huỷ (codLocked) — tô xám
+  // các trường GHN không còn cho sửa nữa, xem getOrderFieldLocks (src/lib/orders.ts).
+  recipientLocked?: boolean;
+  codLocked?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
+      {recipientLocked && (
+        <p className="rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-600">
+          Vận đơn GHN đã lấy hàng — không sửa được thông tin người nhận, địa chỉ và kích
+          thước/cân nặng nữa.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="buyerName" className="text-sm font-medium text-text">
@@ -69,7 +83,8 @@ export function OrderForm({
             name="buyerName"
             defaultValue={defaultBuyerName}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -81,7 +96,8 @@ export function OrderForm({
             name="buyerPhone"
             defaultValue={defaultBuyerPhone}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
       </div>
@@ -95,7 +111,8 @@ export function OrderForm({
           name="buyerAddress"
           defaultValue={defaultBuyerAddress}
           required
-          className={inputClass}
+          readOnly={recipientLocked}
+          className={recipientLocked ? lockedInputClass : inputClass}
         />
       </div>
 
@@ -106,8 +123,15 @@ export function OrderForm({
         initialDistrictName={defaultDistrictName}
         initialWardCode={defaultWardCode}
         initialWardName={defaultWardName}
+        locked={recipientLocked}
       />
 
+      {codLocked && (
+        <p className="rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-600">
+          Đơn đã bắt đầu giao/hoàn/huỷ — không sửa được tiền thu hộ, bên trả phí ship và
+          ghi chú nữa.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="codAmount" className="text-sm font-medium text-text">
@@ -120,17 +144,24 @@ export function OrderForm({
             min={0}
             defaultValue={defaultCodAmount ?? 0}
             required
-            className={inputClass}
+            readOnly={codLocked}
+            className={codLocked ? lockedInputClass : inputClass}
           />
         </div>
-        <label className="flex items-center gap-2 pb-2 text-sm text-neutral-700 sm:pt-6">
+        <label
+          className={`flex items-center gap-2 pb-2 text-sm sm:pt-6 ${codLocked ? "text-neutral-400" : "text-neutral-700"}`}
+        >
           <input
             type="checkbox"
-            name="shopPaysShipping"
+            name={codLocked ? undefined : "shopPaysShipping"}
             defaultChecked={defaultShopPaysShipping}
-            className="h-4 w-4 rounded border-neutral-300"
+            disabled={codLocked}
+            className="h-4 w-4 rounded border-neutral-300 disabled:cursor-not-allowed"
           />
           Shop tự trả phí ship (mặc định người mua trả khi nhận hàng)
+          {codLocked && defaultShopPaysShipping && (
+            <input type="hidden" name="shopPaysShipping" value="on" />
+          )}
         </label>
       </div>
 
@@ -146,7 +177,8 @@ export function OrderForm({
             min={1}
             defaultValue={defaultWeightGram}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -160,7 +192,8 @@ export function OrderForm({
             min={1}
             defaultValue={defaultLengthCm}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -174,7 +207,8 @@ export function OrderForm({
             min={1}
             defaultValue={defaultWidthCm}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -188,7 +222,8 @@ export function OrderForm({
             min={1}
             defaultValue={defaultHeightCm}
             required
-            className={inputClass}
+            readOnly={recipientLocked}
+            className={recipientLocked ? lockedInputClass : inputClass}
           />
         </div>
       </div>
@@ -197,7 +232,14 @@ export function OrderForm({
         <label htmlFor="note" className="text-sm font-medium text-text">
           Ghi chú (không bắt buộc)
         </label>
-        <textarea id="note" name="note" rows={2} defaultValue={defaultNote} className={inputClass} />
+        <textarea
+          id="note"
+          name="note"
+          rows={2}
+          defaultValue={defaultNote}
+          readOnly={codLocked}
+          className={codLocked ? lockedInputClass : inputClass}
+        />
       </div>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

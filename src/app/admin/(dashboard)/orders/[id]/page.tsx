@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrder, updateOrder } from "@/lib/actions/orders";
-import { ORDER_STATUS_LABEL } from "@/lib/orders";
+import { ORDER_STATUS_LABEL, getOrderFieldLocks } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 import { OrderActions } from "@/components/OrderActions";
@@ -13,6 +13,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
   if (!order) notFound();
 
   const boundUpdate = updateOrder.bind(null, order.id);
+  const locks = getOrderFieldLocks(order.ghnStatus);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -60,6 +61,8 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
               defaultHeightCm={order.heightCm}
               defaultNote={order.note ?? undefined}
               defaultShopPaysShipping={order.shopPaysShipping}
+              recipientLocked={locks.recipient}
+              codLocked={locks.cod}
             />
           </>
         )}
