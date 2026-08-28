@@ -36,6 +36,12 @@ model User {
   phone        String?
   role         UserRole @default(SELLER)
 
+  // Bắt buộc xác minh email bằng OTP trước khi đăng nhập được (xem EmailOtp, verifyOtpAction
+  // ở lib/actions/auth.ts) — chặn đăng ký bằng email rác/email người khác. Tài khoản có sẵn
+  // trước khi thêm tính năng này được backfill true (migration 20260828..._add_email_otp),
+  // chỉ tài khoản đăng ký MỚI mới bắt đầu ở false.
+  emailVerified Boolean @default(false)
+
   creditBalance Int @default(0) // VNĐ — trừ khi tìm nhóm Facebook (chỉ gọi Apify thật), cộng khi nạp qua SePay
 
   // Mốc thời gian lượt gọi Apify thật gần nhất — dùng để chặn spam (chống DoS/tốn credit
@@ -51,6 +57,21 @@ model User {
   facebookKeywordSearch FacebookKeywordSearch[]
   orders                Order[]
   phoneReports          PhoneReport[]
+  emailOtp              EmailOtp?
+}
+
+// 1 OTP đang hiệu lực/user (unique userId — tạo OTP mới thì ghi đè, không cộng dồn nhiều
+// hàng). codeHash thay vì lưu thẳng mã: DB rò rỉ (backup lộ, truy vấn lỗi log ra...) không
+// lộ luôn mã 6 số đang dùng được. attempts đếm số lần verify sai để khoá sau
+// MAX_OTP_ATTEMPTS lần (chống dò 6 số bằng brute-force), reset về 0 mỗi lần gửi OTP mới.
+model EmailOtp {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model Product {

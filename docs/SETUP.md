@@ -175,6 +175,31 @@ rủi ro giả mạo, có thể đặt thêm `GHN_WEBHOOK_SECRET` (tuỳ chọn)
 kèm query `?key=<secret>` cho GHN thay vì URL trần. Chưa đặt biến này thì endpoint vẫn hoạt
 động, chỉ là không xác thực được nguồn gọi.
 
+### Xác minh email khi đăng ký (OTP qua Resend)
+
+Đăng ký tài khoản mới ở `/admin/register` không đăng nhập ngay nữa — tạo tài khoản
+(`emailVerified: false`) → gửi mã OTP 6 số qua email → chuyển tới `/admin/verify-otp` →
+nhập đúng mã mới xác minh xong, tự chuyển sang `/admin/login` để đăng nhập. Đăng nhập khi
+tài khoản chưa xác minh sẽ tự gửi lại mã mới và chuyển tới trang xác minh thay vì báo sai
+mật khẩu. Tài khoản có sẵn trước tính năng này (kể cả tài khoản seed ở `ADMIN_EMAIL`) được
+backfill `emailVerified = true` khi chạy migration, không cần xác minh lại.
+
+`.env` cần thêm:
+
+- `RESEND_API_KEY` — lấy ở [resend.com/api-keys](https://resend.com/api-keys).
+- `RESEND_FROM_EMAIL` — địa chỉ gửi đi. Mặc định `onboarding@resend.dev` (không cần verify
+  domain riêng) nhưng ở chế độ này **Resend chỉ cho gửi tới đúng email dùng đăng ký tài
+  khoản Resend hoặc địa chỉ test của Resend** (vd. `delivered@resend.dev`) — gửi cho email
+  thật của người dùng đăng ký sẽ bị Resend từ chối (lỗi 422). Cần xác minh 1 domain riêng ở
+  [resend.com/domains](https://resend.com/domains) (thêm bản ghi DNS theo hướng dẫn của
+  Resend) rồi đổi biến này sang địa chỉ thuộc domain đó (vd. `no-reply@tenmien.com`) mới
+  gửi được cho **bất kỳ** email nào — bắt buộc phải làm bước này trước khi cho phép đăng ký
+  công khai trên production.
+
+Chưa điền `RESEND_API_KEY` thì đăng ký tài khoản mới sẽ báo lỗi "gửi email xác minh thất
+bại" (tài khoản vừa tạo tự động bị xoá lại để người dùng thử đăng ký lại được, không để lại
+tài khoản "mồ côi" không xác minh được) — không ảnh hưởng đăng nhập của tài khoản có sẵn.
+
 ### Tài khoản admin
 
 Seed đọc `ADMIN_EMAIL` / `ADMIN_PASSWORD` từ `.env` (đã có giá trị mặc định để dev —
@@ -187,8 +212,8 @@ mật khẩu (script dùng `upsert`, chạy lại an toàn).
 npm run dev
 ```
 
-- Trang công khai: http://localhost:3000
-- Đăng nhập người bán: http://localhost:3000/admin/login
+- Trang công khai: https://thanhly-dau-gia-hifen.vercel.app/
+- Đăng nhập người bán: https://thanhly-dau-gia-hifen.vercel.app/admin/login
 
 ## Build production
 
