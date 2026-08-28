@@ -22,7 +22,6 @@ import {
   type GhnDistrict,
   type GhnWard,
   type GhnService,
-  type GhnReturnRate,
 } from "@/lib/ghn";
 import {
   ORDERS_PAGE_SIZE,
@@ -31,7 +30,9 @@ import {
   SHIPPING_GHN_STATUSES,
   RETURNING_GHN_STATUSES,
   ISSUE_GHN_STATUSES,
+  combinePhoneRisk,
   type OrderListTab,
+  type PhoneRiskDisplay,
 } from "@/lib/orders";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -71,14 +72,63 @@ export async function getGhnWards(
   return safeGhnCall(() => ghnGetWards(districtId));
 }
 
-// Tra cứu mức độ an toàn giao hàng theo SĐT người nhận (tính năng "cảnh báo bom hàng" của
-// GHN) — chỉ để hiện gợi ý (badge) dưới ô SĐT ở OrderForm, không chặn tạo/sửa đơn nếu tra
-// cứu lỗi, vì đây là API nội bộ GHN chưa công bố, không đảm bảo luôn khả dụng.
-export async function checkPhoneReturnRate(
-  phone: string
-): Promise<{ ok: true; data: GhnReturnRate } | { ok: false; error: string }> {
-  await requireAdmin();
-  return safeGhnCall(() => getReturnRate(phone));
+export type PhoneRiskResult =
+  | { ok: true; data: (PhoneRiskDisplay & { hasReportedByMe: boolean }) | null }
+  | { ok: false; error: string };
+
+// Tra cứu mức độ an toàn giao hàng theo SĐT người nhận — gộp tỉ lệ hoàn hàng GHN ("cảnh báo
+// bom hàng", API nội bộ GHN chưa công bố) với số lượt seller tự báo xấu SĐT này (xem
+// combinePhoneRisk, reportBadPhone bên dưới). Chỉ để hiện gợi ý (badge) dưới ô SĐT ở
+// OrderForm, không chặn tạo/sửa đơn nếu tra cứu GHN lỗi.
+export async function checkPhoneReturnRate(phone: string): Promise<PhoneRiskResult> {
+  const session = await requireAdmin();
+  const trimmed = phone.trim();
+  if (!trimmed) return { ok: true, data: null };
+
+  const [ghnResult, reportCount, myReport] = await Promise.all([
+    safeGhnCall(() => getReturnRate(trimmed)),
+    prisma.phoneReport.count({ where: { phone: trimmed } }),
+    prisma.phoneReport.findUnique({
+      where: { phone_reporterId: { phone: trimmed, reporterId: session.user.id } },
+    }),
+  ]);
+
+  const combined = combinePhoneRisk(ghnResult.ok ? ghnResult.data : null, reportCount);
+  if (!combined) {
+    return ghnResult.ok ? { ok: true, data: null } : { ok: false, error: ghnResult.error };
+  }
+  return { ok: true, data: { ...combined, hasReportedByMe: !!myReport } };
+}
+
+// Seller tự báo 1 SĐT là xấu (bùng hàng, khó giao...) — mỗi seller chỉ tính 1 lượt/SĐT
+// (upsert theo @@unique([phone, reporterId]) ở schema), báo lại chỉ cập nhật lý do chứ
+// không đẩy số đếm ảo lên. Trả về ngay mức cảnh báo mới nhất để OrderForm cập nhật badge
+// không cần tải lại trang.
+export async function reportBadPhone(
+  phone: string,
+  reason?: string
+): Promise<{ ok: true; data: PhoneRiskDisplay & { hasReportedByMe: true } } | { ok: false; error: string }> {
+  const session = await requireAdmin();
+  const trimmed = phone.trim();
+  if (!trimmed) return { ok: false, error: "Chưa có số điện thoại để báo xấu." };
+
+  try {
+    await prisma.phoneReport.upsert({
+      where: { phone_reporterId: { phone: trimmed, reporterId: session.user.id } },
+      update: { reason: reason?.trim() || null },
+      create: { phone: trimmed, reporterId: session.user.id, reason: reason?.trim() || null },
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Báo xấu SĐT thất bại." };
+  }
+
+  const [ghnResult, reportCount] = await Promise.all([
+    safeGhnCall(() => getReturnRate(trimmed)),
+    prisma.phoneReport.count({ where: { phone: trimmed } }),
+  ]);
+  // reportCount >= 1 chắc chắn sau upsert ở trên nên combinePhoneRisk không bao giờ trả null.
+  const combined = combinePhoneRisk(ghnResult.ok ? ghnResult.data : null, reportCount)!;
+  return { ok: true, data: { ...combined, hasReportedByMe: true } };
 }
 
 // SELLER chỉ thao tác được đơn của chính mình — SUPERADMIN thấy và sửa được tất cả,

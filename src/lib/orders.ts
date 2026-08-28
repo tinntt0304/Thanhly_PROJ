@@ -1,5 +1,5 @@
 import type { OrderStatus } from "@/generated/prisma/client";
-import { ghnStatusLabel } from "@/lib/ghn";
+import { ghnStatusLabel, type GhnReturnRate } from "@/lib/ghn";
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   NEW: "Mới tạo",
@@ -113,5 +113,57 @@ export function getOrderFieldLocks(ghnStatus: string | null): OrderFieldLocks {
   return {
     recipient: !!ghnStatus && GHN_RECIPIENT_LOCKED_STATUSES.includes(ghnStatus),
     cod: !!ghnStatus && GHN_COD_LOCKED_STATUSES.includes(ghnStatus),
+  };
+}
+
+// Mức cảnh báo SĐT hiển thị ở OrderForm — gộp tỉ lệ hoàn hàng GHN (etl/return-rate, xem
+// getReturnRate ở ghn.ts) với số lượt seller tự báo xấu SĐT (PhoneReport). Tỉ lệ hoàn của
+// GHN có thể chưa phản ánh đúng thực tế (theo phản hồi người dùng) — báo xấu cho phép cộng
+// đồng seller tự nâng mức cảnh báo lên mà không cần chờ GHN cập nhật lại tỉ lệ của họ.
+const RETURN_RATE_LEVEL_ORDER = ["level_1", "level_2", "level_3", "level_4"];
+export const RETURN_RATE_LEVEL_LABEL: Record<string, string> = {
+  level_1: "An toàn",
+  level_2: "Rủi ro thấp",
+  level_3: "Rủi ro cao",
+  level_4: "Nguy hiểm",
+};
+
+// Ngưỡng suy ra mức cảnh báo tối thiểu từ riêng số lượt báo xấu (không cần dữ liệu GHN):
+// 1-2 lượt -> ít nhất "Rủi ro thấp", 3-4 lượt -> ít nhất "Rủi ro cao", >=5 lượt -> "Nguy hiểm".
+function levelFromReportCount(reportCount: number): string | null {
+  if (reportCount >= 5) return "level_4";
+  if (reportCount >= 3) return "level_3";
+  if (reportCount >= 1) return "level_2";
+  return null;
+}
+
+export type PhoneRiskDisplay = {
+  levelCode: string;
+  level: string;
+  rate: number | null; // tỉ lệ hoàn % theo GHN — null nếu không lấy được từ GHN (dùng riêng dữ liệu báo xấu)
+  reportCount: number;
+};
+
+// null nếu không có cả dữ liệu GHN lẫn lượt báo xấu nào — không có gì để hiển thị.
+export function combinePhoneRisk(ghn: GhnReturnRate | null, reportCount: number): PhoneRiskDisplay | null {
+  const reportLevel = levelFromReportCount(reportCount);
+  if (!ghn && !reportLevel) return null;
+  if (!ghn) {
+    return { levelCode: reportLevel!, level: RETURN_RATE_LEVEL_LABEL[reportLevel!], rate: null, reportCount };
+  }
+  if (!reportLevel) {
+    return { levelCode: ghn.levelCode, level: ghn.level, rate: ghn.rate, reportCount };
+  }
+  // Lấy mức nặng hơn giữa 2 nguồn — báo xấu chỉ có thể ĐẨY cảnh báo lên, không bao giờ hạ
+  // xuống dưới mức GHN tự báo.
+  const worseCode =
+    RETURN_RATE_LEVEL_ORDER.indexOf(reportLevel) > RETURN_RATE_LEVEL_ORDER.indexOf(ghn.levelCode)
+      ? reportLevel
+      : ghn.levelCode;
+  return {
+    levelCode: worseCode,
+    level: RETURN_RATE_LEVEL_LABEL[worseCode] ?? ghn.level,
+    rate: ghn.rate,
+    reportCount,
   };
 }

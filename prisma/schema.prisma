@@ -50,6 +50,7 @@ model User {
   facebookGroups        FacebookGroup[]
   facebookKeywordSearch FacebookKeywordSearch[]
   orders                Order[]
+  phoneReports          PhoneReport[]
 }
 
 model Product {
@@ -343,6 +344,24 @@ model PricingConfig {
   minTopUpAmount Int? // VNĐ — giới hạn tối thiểu 1 lượt nạp credit; null = dùng mặc định DEFAULT_MIN_TOPUP_AMOUNT
   maxTopUpAmount Int? // VNĐ — giới hạn tối đa 1 lượt nạp credit; null = không giới hạn
   updatedAt      DateTime @updatedAt
+}
+
+// Báo xấu SĐT người nhận (bùng hàng, khó giao...) — do bất kỳ seller nào tự bấm ở form đơn
+// hàng, tính CHUNG toàn sàn (không riêng theo từng seller) vì mục đích là cảnh báo chéo giữa
+// các seller khác nhau về cùng 1 khách. unique theo (phone, reporterId) để 1 người không báo
+// trùng nhiều lần đẩy tỉ lệ ảo — xem combinePhoneRisk (src/lib/orders.ts) cách gộp số lượt
+// báo xấu này với tỉ lệ hoàn hàng GHN (etl/return-rate) thành 1 mức cảnh báo hiển thị.
+model PhoneReport {
+  id         String @id @default(cuid())
+  phone      String
+  reporter   User   @relation(fields: [reporterId], references: [id])
+  reporterId String
+  reason     String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([phone, reporterId])
+  @@index([phone])
 }
 
 // Bộ đếm rate-limit chống spam cho các hành động KHÔNG gắn với 1 user cụ thể (đăng ký,

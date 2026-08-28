@@ -1,14 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { checkPhoneReturnRate, type OrderFormState } from "@/lib/actions/orders";
-import type { GhnReturnRate } from "@/lib/ghn";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { checkPhoneReturnRate, reportBadPhone, type OrderFormState } from "@/lib/actions/orders";
+import type { PhoneRiskDisplay } from "@/lib/orders";
 import { AddressPicker } from "@/components/AddressPicker";
 
 const initialState: OrderFormState = {};
 
-// Màu badge theo 4 mức GHN công bố cho tính năng "cảnh báo bom hàng" — level lạ (GHN thêm
-// mới) vẫn hiện được, chỉ rơi về màu trung tính thay vì lỗi.
+// Màu badge theo 4 mức cảnh báo (gộp tỉ lệ hoàn GHN + lượt báo xấu nội bộ, xem
+// combinePhoneRisk ở lib/orders.ts) — level lạ vẫn hiện được, chỉ rơi về màu trung tính.
 const RETURN_RATE_STYLE: Record<string, string> = {
   level_1: "bg-accent-2-100 text-accent-2-700",
   level_2: "bg-yellow-100 text-yellow-800",
@@ -16,10 +16,11 @@ const RETURN_RATE_STYLE: Record<string, string> = {
   level_4: "bg-red-100 text-red-700",
 };
 
+type PhoneRiskData = PhoneRiskDisplay & { hasReportedByMe: boolean };
 type PhoneCheckState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "ok"; data: GhnReturnRate }
+  | { kind: "ok"; data: PhoneRiskData | null }
   | { kind: "error" };
 
 const inputClass =
@@ -85,6 +86,8 @@ export function OrderForm({
     defaultBuyerPhone?.trim() ? { kind: "loading" } : { kind: "idle" }
   );
   const [lastCheckedPhone, setLastCheckedPhone] = useState<string | null>(defaultBuyerPhone?.trim() || null);
+  const [reportPending, setReportPending] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   function checkPhone(rawPhone: string) {
     const phone = rawPhone.trim();
@@ -107,6 +110,24 @@ export function OrderForm({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Seller tự báo SĐT này là xấu — cộng đồng seller có thể đẩy mức cảnh báo lên nhanh hơn
+  // là chờ GHN tự cập nhật lại tỉ lệ hoàn của họ (xem reportBadPhone ở actions/orders.ts).
+  async function handleReportBadPhone() {
+    const phone = phoneInputRef.current?.value.trim();
+    if (!phone) return;
+    const reason = window.prompt("Lý do báo xấu SĐT này (không bắt buộc):");
+    if (reason === null) return; // bấm Huỷ trên hộp thoại
+    setReportPending(true);
+    const res = await reportBadPhone(phone, reason || undefined);
+    setReportPending(false);
+    if (res.ok) {
+      setLastCheckedPhone(phone);
+      setPhoneCheck({ kind: "ok", data: res.data });
+    } else {
+      window.alert(res.error);
+    }
+  }
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
@@ -135,6 +156,7 @@ export function OrderForm({
             SĐT người nhận
           </label>
           <input
+            ref={phoneInputRef}
             id="buyerPhone"
             name="buyerPhone"
             defaultValue={defaultBuyerPhone}
@@ -143,18 +165,35 @@ export function OrderForm({
             onBlur={(e) => checkPhone(e.target.value)}
             className={recipientLocked ? lockedInputClass : inputClass}
           />
-          {phoneCheck.kind === "loading" && (
-            <span className="text-xs text-neutral-500">Đang kiểm tra mức độ an toàn...</span>
-          )}
-          {phoneCheck.kind === "ok" && (
-            <span
-              className={`self-start rounded-full px-2 py-0.5 text-xs font-medium ${
-                RETURN_RATE_STYLE[phoneCheck.data.levelCode] ?? "bg-neutral-100 text-neutral-700"
-              }`}
+          <div className="flex flex-wrap items-center gap-2">
+            {phoneCheck.kind === "loading" && (
+              <span className="text-xs text-neutral-500">Đang kiểm tra mức độ an toàn...</span>
+            )}
+            {phoneCheck.kind === "ok" && phoneCheck.data && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  RETURN_RATE_STYLE[phoneCheck.data.levelCode] ?? "bg-neutral-100 text-neutral-700"
+                }`}
+              >
+                {phoneCheck.data.level}
+                {phoneCheck.data.rate !== null && ` (tỷ lệ hoàn ${phoneCheck.data.rate}%)`}
+                {phoneCheck.data.reportCount > 0 &&
+                  ` · ${phoneCheck.data.reportCount} lượt báo xấu`}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleReportBadPhone}
+              disabled={reportPending || (phoneCheck.kind === "ok" && phoneCheck.data?.hasReportedByMe)}
+              className="text-xs font-medium text-red-600 underline decoration-dotted hover:text-red-700 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:no-underline"
             >
-              {phoneCheck.data.level} (tỷ lệ hoàn {phoneCheck.data.rate}%)
-            </span>
-          )}
+              {phoneCheck.kind === "ok" && phoneCheck.data?.hasReportedByMe
+                ? "Đã báo xấu SĐT này"
+                : reportPending
+                  ? "Đang gửi báo xấu..."
+                  : "Báo xấu SĐT"}
+            </button>
+          </div>
         </div>
       </div>
 
