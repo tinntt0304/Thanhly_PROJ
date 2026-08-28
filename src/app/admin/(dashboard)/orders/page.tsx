@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-guard";
 import { listOrders } from "@/lib/actions/orders";
-import { ORDER_LIST_TABS, type OrderListTab } from "@/lib/orders";
-import { ghnStatusLabel } from "@/lib/ghn";
+import { ORDER_LIST_TABS, orderDisplayStatusLabel, type OrderListTab } from "@/lib/orders";
 import { formatVND, formatDateTime } from "@/lib/auction";
 
 export const dynamic = "force-dynamic";
@@ -147,15 +146,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
                       <span className="block text-xs text-neutral-500">Phí ship: {formatVND(order.shippingFee)}</span>
                     )}
                   </td>
-                  <td className="px-4 py-2">
-                    {order.ghnOrderCode
-                      ? order.ghnStatus
-                        ? ghnStatusLabel(order.ghnStatus)
-                        : "Đã tạo vận đơn — chưa cập nhật"
-                      : order.status === "CANCELLED"
-                        ? "Đã huỷ"
-                        : "Chưa tạo vận đơn"}
-                  </td>
+                  <td className="px-4 py-2">{orderDisplayStatusLabel(order)}</td>
                 </tr>
               ))}
             </tbody>

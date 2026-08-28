@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrder, updateOrder } from "@/lib/actions/orders";
-import { ORDER_STATUS_LABEL, getOrderFieldLocks } from "@/lib/orders";
+import { orderDisplayStatusLabel, getOrderFieldLocks } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 import { OrderActions } from "@/components/OrderActions";
@@ -19,7 +19,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-lg font-bold text-text">Đơn hàng</h1>
-        <span className="text-sm text-neutral-700">Trạng thái: {ORDER_STATUS_LABEL[order.status]}</span>
+        <span className="text-sm text-neutral-700">Trạng thái: {orderDisplayStatusLabel(order)}</span>
       </div>
 
       <p className="text-sm text-neutral-600">

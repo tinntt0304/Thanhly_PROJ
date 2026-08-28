@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@/generated/prisma/client";
+import { ghnStatusLabel } from "@/lib/ghn";
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   NEW: "Mới tạo",
@@ -47,6 +48,21 @@ export const ISSUE_GHN_STATUSES = ["delivery_fail", "exception", "damage", "lost
 // nội bộ hiện tại (đơn có thể đang SHIPPING hoặc đã CANCELLED thủ công từ trước).
 export function deriveOrderStatusFromGhn(ghnStatus: string, currentStatus: OrderStatus): OrderStatus {
   return ghnStatus === "delivered" ? "DELIVERED" : currentStatus;
+}
+
+// Nhãn trạng thái hiển thị cho người dùng — ưu tiên trạng thái GHN thật (đã tạo vận đơn) thay
+// vì OrderStatus nội bộ, vì OrderStatus chỉ có 4 mức (NEW/SHIPPING/DELIVERED/CANCELLED) nên
+// không phản ánh được các trạng thái GHN như "Thất lạc"/"Đang hoàn hàng" — dùng chung giữa
+// trang danh sách (/admin/orders) và trang chi tiết đơn để tránh lệch nhau.
+export function orderDisplayStatusLabel(order: {
+  status: OrderStatus;
+  ghnOrderCode: string | null;
+  ghnStatus: string | null;
+}): string {
+  if (order.ghnOrderCode) {
+    return order.ghnStatus ? ghnStatusLabel(order.ghnStatus) : "Đã tạo vận đơn — chưa cập nhật";
+  }
+  return order.status === "CANCELLED" ? "Đã huỷ" : "Chưa tạo vận đơn";
 }
 
 // GHN có 1 trang tài liệu riêng "Update fields according to order status" (docs id 117)
