@@ -4,6 +4,7 @@ import { getPricePerResult, getMinTopUpAmount, getMaxTopUpAmount } from "@/lib/c
 import { NavItemsManager } from "@/components/NavItemsManager";
 import { AnnouncementsManager } from "@/components/AnnouncementsManager";
 import { AboutContentEditor } from "@/components/AboutContentEditor";
+import { BannerUploader } from "@/components/BannerUploader";
 import { PricingConfigForm } from "@/components/PricingConfigForm";
 import { TopUpLimitForm } from "@/components/TopUpLimitForm";
 import { UserCreditsManager } from "@/components/UserCreditsManager";
@@ -13,11 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function ManageCategoriesPage() {
   await requireSuperAdmin();
 
-  const [navItems, announcements, aboutContent, pricePerResult, minTopUpAmount, maxTopUpAmount, users] =
+  const [navItems, announcements, aboutContent, banner, pricePerResult, minTopUpAmount, maxTopUpAmount, users] =
     await Promise.all([
       prisma.navItem.findMany({ orderBy: { order: "asc" } }),
       prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.siteContent.findUnique({ where: { key: "about_us" } }),
+      // "home_banner_image" — phải khớp BANNER_KEY ở lib/actions/site-content.ts (không
+      // import được hằng số từ file "use server", chỉ export được async function).
+      prisma.siteContent.findUnique({ where: { key: "home_banner_image" } }),
       getPricePerResult(),
       getMinTopUpAmount(),
       getMaxTopUpAmount(),
@@ -53,6 +57,11 @@ export default async function ManageCategoriesPage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-bold text-text">Trang &ldquo;Về chúng tôi&rdquo;</h2>
         <AboutContentEditor content={aboutContent?.content ?? ""} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-heading text-base font-bold text-text">Banner trang chủ</h2>
+        <BannerUploader currentUrl={banner?.content ?? null} />
       </section>
 
       <section className="flex flex-col gap-3">

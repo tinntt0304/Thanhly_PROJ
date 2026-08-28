@@ -2,10 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 import { MAX_IMAGE_BYTES } from "@/lib/product-limits";
 
 export const PRODUCT_IMAGES_BUCKET = "product-images";
+export const SITE_BANNER_BUCKET = "site-banners";
 const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
-let bucketEnsured = false;
+const ensuredBuckets = new Set<string>();
 
 // Dùng service role key: chỉ gọi từ Server Actions đã qua requireAdmin(), không bao giờ
 // lộ ra client. Bypass RLS nên không cần cấu hình policy riêng cho bucket.
@@ -26,23 +27,24 @@ function getSupabaseAdmin() {
 
 // Gọi (rẻ, cache trong tiến trình) trước lần upload đầu tiên để tự tạo bucket nếu
 // project Supabase chưa có sẵn — người vận hành không cần bước setup thủ công riêng.
-async function ensureProductImagesBucket(supabase: ReturnType<typeof createClient>) {
-  if (bucketEnsured) return;
+// Theo dõi riêng từng bucket (Set) vì giờ có 2 bucket khác nhau (ảnh sản phẩm + banner).
+async function ensureBucket(supabase: ReturnType<typeof createClient>, bucket: string) {
+  if (ensuredBuckets.has(bucket)) return;
 
   const { data: buckets, error: listError } = await supabase.storage.listBuckets();
   if (listError) throw new Error(`Không đọc được danh sách bucket: ${listError.message}`);
 
-  if (!buckets.some((b) => b.name === PRODUCT_IMAGES_BUCKET)) {
-    const { error: createError } = await supabase.storage.createBucket(PRODUCT_IMAGES_BUCKET, {
+  if (!buckets.some((b) => b.name === bucket)) {
+    const { error: createError } = await supabase.storage.createBucket(bucket, {
       public: true,
       fileSizeLimit: MAX_IMAGE_BYTES,
     });
     if (createError) throw new Error(`Không tạo được bucket ảnh: ${createError.message}`);
   }
-  bucketEnsured = true;
+  ensuredBuckets.add(bucket);
 }
 
-export async function uploadProductImage(file: File): Promise<string> {
+async function uploadImage(file: File, bucket: string): Promise<string> {
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error(`Ảnh "${file.name}" vượt quá 5MB.`);
   }
@@ -51,17 +53,27 @@ export async function uploadProductImage(file: File): Promise<string> {
   }
 
   const supabase = getSupabaseAdmin();
-  await ensureProductImagesBucket(supabase);
+  await ensureBucket(supabase, bucket);
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `${crypto.randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, buffer, {
+  const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
     contentType: file.type || "image/jpeg",
     upsert: false,
   });
   if (error) throw new Error(`Upload ảnh "${file.name}" thất bại: ${error.message}`);
 
-  const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
+}
+
+export async function uploadProductImage(file: File): Promise<string> {
+  return uploadImage(file, PRODUCT_IMAGES_BUCKET);
+}
+
+// Banner trang chủ (/admin/danh-muc) — bucket riêng với ảnh sản phẩm để dễ quản lý/dọn dẹp
+// độc lập, dù dùng chung logic validate + upload.
+export async function uploadBannerImage(file: File): Promise<string> {
+  return uploadImage(file, SITE_BANNER_BUCKET);
 }

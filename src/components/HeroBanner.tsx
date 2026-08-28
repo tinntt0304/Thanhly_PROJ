@@ -1,6 +1,30 @@
-export function HeroBanner({ defaultQuery = "" }: { defaultQuery?: string }) {
+import Image from "next/image";
+import { isOptimizableProductImage } from "@/lib/image-url";
+
+export function HeroBanner({
+  defaultQuery = "",
+  bannerImageUrl,
+}: {
+  defaultQuery?: string;
+  bannerImageUrl?: string | null;
+}) {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-neutral-900 via-accent-700 to-accent-500">
+      {bannerImageUrl && (
+        <>
+          <Image
+            src={bannerImageUrl}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+            unoptimized={!isOptimizableProductImage(bannerImageUrl)}
+          />
+          {/* Phủ tối để chữ + ô tìm kiếm luôn đọc được dù ảnh banner sáng màu */}
+          <div aria-hidden="true" className="absolute inset-0 bg-black/40" />
+        </>
+      )}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -left-16 -top-24 h-72 w-72 rounded-full bg-accent-2-500/30 blur-3xl"
