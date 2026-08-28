@@ -14,7 +14,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/ad
           <h1 className="font-heading text-lg font-bold text-text">Đặt lại mật khẩu</h1>
           <p className="mt-1 text-sm text-neutral-700">
             Nếu <span className="font-medium text-text">{email}</span> có tài khoản, mã xác minh gồm 6 số đã được
-            gửi tới email này. Nhập mã cùng mật khẩu mới bên dưới. Mã có hiệu lực trong 10 phút.
+            gửi tới email này (hiệu lực 10 phút). Nhập mật khẩu mới trước, sau đó nhập mã để hoàn tất.
           </p>
         </div>
         <ResetPasswordForm email={email} />
