@@ -134,7 +134,16 @@ export async function resendOtpAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Thiếu email." };
 
-  if (!(await checkRateLimit(`otp-issue-email:${email}`, 3, 600))) {
+  // Rate-limit theo email CHẶN spam 1 hộp thư cụ thể, nhưng không chặn được 1 script gọi
+  // thẳng action này (bỏ qua cooldown 2 phút chỉ có ở UI) với hàng loạt email KHÁC NHAU —
+  // thêm rate-limit theo IP để chặn khối lượng gửi tổng cộng từ 1 nguồn, giới hạn thật sự
+  // nằm ở server chứ không phải đếm ngược phía client.
+  const ip = await getClientIp();
+  const [ipOk, emailOk] = await Promise.all([
+    checkRateLimit(`otp-resend-ip:${ip}`, 10, 600),
+    checkRateLimit(`otp-issue-email:${email}`, 3, 600),
+  ]);
+  if (!ipOk || !emailOk) {
     return { error: TOO_MANY_ATTEMPTS_ERROR };
   }
 
@@ -185,7 +194,14 @@ export async function resendResetOtpAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Thiếu email." };
 
-  if (!(await checkRateLimit(`otp-issue-email:${email}`, 3, 600))) {
+  // Cùng lý do với resendOtpAction: rate-limit theo email không chặn được việc gọi thẳng
+  // action này với hàng loạt email khác nhau từ 1 nguồn — thêm rate-limit theo IP.
+  const ip = await getClientIp();
+  const [ipOk, emailOk] = await Promise.all([
+    checkRateLimit(`otp-resend-ip:${ip}`, 10, 600),
+    checkRateLimit(`otp-issue-email:${email}`, 3, 600),
+  ]);
+  if (!ipOk || !emailOk) {
     return { error: TOO_MANY_ATTEMPTS_ERROR };
   }
 
