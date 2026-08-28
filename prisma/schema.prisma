@@ -337,6 +337,17 @@ model TopUpRequest {
   @@index([userId, status])
 }
 
+// Banner trang chủ dạng slideshow (nhiều ảnh, tự chuyển) — singleton theo key cố định
+// "home_banner", superadmin quản lý ở /admin/danh-muc. Trước đây lưu 1 URL duy nhất vào
+// SiteContent (key "home_banner_image", nay bỏ, xem migration 20260828010000) — tách bảng
+// riêng để có kiểu dữ liệu rõ ràng cho mảng ảnh + thời gian chuyển slide.
+model HomeBannerConfig {
+  key             String   @id
+  images          String[] @default([])
+  intervalSeconds Int      @default(5) // số giây giữa mỗi lần tự chuyển slide
+  updatedAt       DateTime @updatedAt
+}
+
 // Cấu hình giá bán lại — singleton theo key, superadmin chỉnh ở /admin/danh-muc.
 model PricingConfig {
   key            String   @id

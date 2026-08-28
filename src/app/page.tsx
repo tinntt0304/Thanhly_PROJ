@@ -15,11 +15,11 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q : "";
 
-  const [trustProfile, banner, products] = await Promise.all([
+  const [trustProfile, bannerConfig, products] = await Promise.all([
     prisma.trustProfile.findFirst(),
-    // "home_banner_image" — phải khớp BANNER_KEY ở lib/actions/site-content.ts (không
-    // import được hằng số từ file "use server", chỉ export được async function).
-    prisma.siteContent.findUnique({ where: { key: "home_banner_image" } }),
+    // "home_banner" — phải khớp HOME_BANNER_KEY ở lib/actions/site-content.ts (không import
+    // được hằng số từ file "use server", chỉ export được async function).
+    prisma.homeBannerConfig.findUnique({ where: { key: "home_banner" } }),
     prisma.product.findMany({
       select: {
         id: true,
@@ -43,7 +43,11 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   return (
     <main className="flex-1">
       <SiteHeader />
-      <HeroBanner defaultQuery={query} bannerImageUrl={banner?.content} />
+      <HeroBanner
+        defaultQuery={query}
+        bannerImages={bannerConfig?.images ?? []}
+        bannerIntervalSeconds={bannerConfig?.intervalSeconds ?? 5}
+      />
 
       {trustProfile && (
         <TrustBanner

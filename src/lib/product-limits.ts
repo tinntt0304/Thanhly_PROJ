@@ -2,3 +2,4 @@
 // để component client không phải import "@supabase/supabase-js" chỉ để lấy 2 con số.
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB / ảnh
 export const MAX_IMAGES_PER_PRODUCT = 8;
+export const MAX_BANNER_IMAGES = 8; // banner trang chủ dạng slideshow (/admin/danh-muc)

@@ -77,3 +77,16 @@ export async function uploadProductImage(file: File): Promise<string> {
 export async function uploadBannerImage(file: File): Promise<string> {
   return uploadImage(file, SITE_BANNER_BUCKET);
 }
+
+// Xoá file vật lý khỏi bucket khi bấm xoá 1 ảnh banner trong slideshow — best-effort (xem
+// removeBannerImage ở actions/site-content.ts), URL lạ không thuộc bucket này thì bỏ qua an
+// toàn thay vì lỗi (vd. dữ liệu banner cũ nhập tay không qua flow upload chuẩn).
+export async function deleteBannerImage(url: string): Promise<void> {
+  const marker = `/storage/v1/object/public/${SITE_BANNER_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return;
+  const path = url.slice(idx + marker.length);
+
+  const supabase = getSupabaseAdmin();
+  await supabase.storage.from(SITE_BANNER_BUCKET).remove([path]);
+}

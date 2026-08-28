@@ -14,14 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function ManageCategoriesPage() {
   await requireSuperAdmin();
 
-  const [navItems, announcements, aboutContent, banner, pricePerResult, minTopUpAmount, maxTopUpAmount, users] =
+  const [navItems, announcements, aboutContent, bannerConfig, pricePerResult, minTopUpAmount, maxTopUpAmount, users] =
     await Promise.all([
       prisma.navItem.findMany({ orderBy: { order: "asc" } }),
       prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.siteContent.findUnique({ where: { key: "about_us" } }),
-      // "home_banner_image" — phải khớp BANNER_KEY ở lib/actions/site-content.ts (không
+      // "home_banner" — phải khớp HOME_BANNER_KEY ở lib/actions/site-content.ts (không
       // import được hằng số từ file "use server", chỉ export được async function).
-      prisma.siteContent.findUnique({ where: { key: "home_banner_image" } }),
+      prisma.homeBannerConfig.findUnique({ where: { key: "home_banner" } }),
       getPricePerResult(),
       getMinTopUpAmount(),
       getMaxTopUpAmount(),
@@ -61,7 +61,10 @@ export default async function ManageCategoriesPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-heading text-base font-bold text-text">Banner trang chủ</h2>
-        <BannerUploader currentUrl={banner?.content ?? null} />
+        <BannerUploader
+          currentImages={bannerConfig?.images ?? []}
+          currentIntervalSeconds={bannerConfig?.intervalSeconds ?? 5}
+        />
       </section>
 
       <section className="flex flex-col gap-3">
