@@ -21,7 +21,7 @@ export function HeroBanner({
         className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-gold-400/30 blur-3xl"
       />
 
-      <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center sm:py-20">
+      <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-20 text-center sm:py-32">
         <h1 className="font-heading text-2xl font-bold text-white sm:text-4xl">
           Tìm sản phẩm thanh lý mẹ &amp; bé, thú cưng
         </h1>

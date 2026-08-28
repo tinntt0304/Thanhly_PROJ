@@ -1,11 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { TrustBanner } from "@/components/TrustBanner";
 import { HomeProductSections } from "@/components/HomeProductSections";
 import { SiteHeader } from "@/components/SiteHeader";
 import { HeroBanner } from "@/components/HeroBanner";
 import { getAuctionState } from "@/lib/auction";
 import { ChatWidget } from "@/components/ChatWidget";
-import type { Review } from "@/lib/reviews";
 
 // KHÔNG filter theo status ở đây dù chỉ ACTIVE mới cần cho phần "đang thanh lý" — phần
 // "đã kết thúc" (ProductGrid thứ 2 ở HomeProductSections) cố ý hiển thị CẢ sản phẩm
@@ -15,8 +13,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q : "";
 
-  const [trustProfile, bannerConfig, products] = await Promise.all([
-    prisma.trustProfile.findFirst(),
+  const [bannerConfig, products] = await Promise.all([
     // "home_banner" — phải khớp HOME_BANNER_KEY ở lib/actions/site-content.ts (không import
     // được hằng số từ file "use server", chỉ export được async function).
     prisma.homeBannerConfig.findUnique({ where: { key: "home_banner" } }),
@@ -48,14 +45,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         bannerImages={bannerConfig?.images ?? []}
         bannerIntervalSeconds={bannerConfig?.intervalSeconds ?? 5}
       />
-
-      {trustProfile && (
-        <TrustBanner
-          avgRating={trustProfile.avgRating}
-          soldCount={trustProfile.soldCount}
-          reviews={(trustProfile.reviews as Review[]) ?? []}
-        />
-      )}
 
       <section className="mx-auto max-w-5xl px-4 py-8">
         {products.length === 0 ? (
