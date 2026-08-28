@@ -15,12 +15,14 @@ import {
   updateGhnOrder,
   getGhnOrderDetail,
   cancelGhnOrder,
+  getReturnRate,
   REQUIRED_NOTE_OPTIONS,
   type RequiredNote,
   type GhnProvince,
   type GhnDistrict,
   type GhnWard,
   type GhnService,
+  type GhnReturnRate,
 } from "@/lib/ghn";
 import {
   ORDERS_PAGE_SIZE,
@@ -67,6 +69,16 @@ export async function getGhnWards(
 ): Promise<{ ok: true; data: GhnWard[] } | { ok: false; error: string }> {
   await requireAdmin();
   return safeGhnCall(() => ghnGetWards(districtId));
+}
+
+// Tra cứu mức độ an toàn giao hàng theo SĐT người nhận (tính năng "cảnh báo bom hàng" của
+// GHN) — chỉ để hiện gợi ý (badge) dưới ô SĐT ở OrderForm, không chặn tạo/sửa đơn nếu tra
+// cứu lỗi, vì đây là API nội bộ GHN chưa công bố, không đảm bảo luôn khả dụng.
+export async function checkPhoneReturnRate(
+  phone: string
+): Promise<{ ok: true; data: GhnReturnRate } | { ok: false; error: string }> {
+  await requireAdmin();
+  return safeGhnCall(() => getReturnRate(phone));
 }
 
 // SELLER chỉ thao tác được đơn của chính mình — SUPERADMIN thấy và sửa được tất cả,

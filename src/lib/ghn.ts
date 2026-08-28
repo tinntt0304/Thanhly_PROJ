@@ -11,6 +11,10 @@ const MASTER_DATA_BASE = {
   sandbox: "https://dev-online-gateway.ghn.vn/shiip/public-api/master-data",
   production: "https://online-gateway.ghn.vn/shiip/public-api/master-data",
 };
+const ETL_BASE = {
+  sandbox: "https://dev-online-gateway.ghn.vn/shiip/public-api/etl",
+  production: "https://online-gateway.ghn.vn/shiip/public-api/etl",
+};
 
 function env() {
   return process.env.GHN_ENV === "production" ? "production" : "sandbox";
@@ -293,4 +297,24 @@ export const GHN_STATUS_LABEL: Record<string, string> = {
 
 export function ghnStatusLabel(status: string): string {
   return GHN_STATUS_LABEL[status] ?? status;
+}
+
+export type GhnReturnRate = { level: string; levelCode: string; rate: number };
+
+// API "cảnh báo bom hàng" đứng sau tính năng cùng tên trên app/web GHN — KHÔNG nằm trong
+// tài liệu API đối tác chính thức (api.ghn.vn), là API nội bộ nên có thể đổi/ngừng bất kỳ
+// lúc nào không báo trước. Vì vậy chỉ dùng như gợi ý tham khảo (badge, không chặn tạo đơn) —
+// xem checkPhoneReturnRate ở actions/orders.ts. 4 mức GHN công bố: level_1 An toàn (hoàn
+// <25%), level_2 Rủi ro thấp (25–49.99%), level_3 Rủi ro cao (50–74.99%), level_4 Nguy hiểm
+// (>=75%).
+export async function getReturnRate(phone: string): Promise<GhnReturnRate> {
+  assertConfigured();
+  const res = await fetch(`${ETL_BASE[env()]}/return-rate?phone=${encodeURIComponent(phone)}`, {
+    headers: { Token: process.env.GHN_TOKEN!, ShopId: process.env.GHN_SHOP_ID! },
+  });
+  const json = await res.json();
+  if (!res.ok || json.code !== 200) {
+    throw new Error(json.message || json.code_message || "Không lấy được mức độ an toàn từ GHN.");
+  }
+  return { level: json.data.level, levelCode: json.data.level_code, rate: json.data.rate };
 }

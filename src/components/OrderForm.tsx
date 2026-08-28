@@ -1,10 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
-import type { OrderFormState } from "@/lib/actions/orders";
+import { useActionState, useEffect, useState } from "react";
+import { checkPhoneReturnRate, type OrderFormState } from "@/lib/actions/orders";
+import type { GhnReturnRate } from "@/lib/ghn";
 import { AddressPicker } from "@/components/AddressPicker";
 
 const initialState: OrderFormState = {};
+
+// Màu badge theo 4 mức GHN công bố cho tính năng "cảnh báo bom hàng" — level lạ (GHN thêm
+// mới) vẫn hiện được, chỉ rơi về màu trung tính thay vì lỗi.
+const RETURN_RATE_STYLE: Record<string, string> = {
+  level_1: "bg-accent-2-100 text-accent-2-700",
+  level_2: "bg-yellow-100 text-yellow-800",
+  level_3: "bg-orange-100 text-orange-800",
+  level_4: "bg-red-100 text-red-700",
+};
+
+type PhoneCheckState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ok"; data: GhnReturnRate }
+  | { kind: "error" };
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
@@ -65,6 +81,33 @@ export function OrderForm({
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
+  const [phoneCheck, setPhoneCheck] = useState<PhoneCheckState>(
+    defaultBuyerPhone?.trim() ? { kind: "loading" } : { kind: "idle" }
+  );
+  const [lastCheckedPhone, setLastCheckedPhone] = useState<string | null>(defaultBuyerPhone?.trim() || null);
+
+  function checkPhone(rawPhone: string) {
+    const phone = rawPhone.trim();
+    if (!phone || phone === lastCheckedPhone) return;
+    setLastCheckedPhone(phone);
+    setPhoneCheck({ kind: "loading" });
+    checkPhoneReturnRate(phone).then((res) => {
+      setPhoneCheck(res.ok ? { kind: "ok", data: res.data } : { kind: "error" });
+    });
+  }
+
+  // Kiểm tra ngay khi vào trang nếu đã có sẵn SĐT (trang sửa đơn) — trang tạo mới thì chỉ
+  // kiểm khi người dùng rời khỏi ô SĐT (onBlur bên dưới). Không gọi checkPhone() (setState
+  // đồng bộ ở đầu hàm) trực tiếp trong effect — chỉ .then() mới được set state trong effect.
+  useEffect(() => {
+    const phone = defaultBuyerPhone?.trim();
+    if (!phone) return;
+    checkPhoneReturnRate(phone).then((res) => {
+      setPhoneCheck(res.ok ? { kind: "ok", data: res.data } : { kind: "error" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       {recipientLocked && (
@@ -97,8 +140,21 @@ export function OrderForm({
             defaultValue={defaultBuyerPhone}
             required
             readOnly={recipientLocked}
+            onBlur={(e) => checkPhone(e.target.value)}
             className={recipientLocked ? lockedInputClass : inputClass}
           />
+          {phoneCheck.kind === "loading" && (
+            <span className="text-xs text-neutral-500">Đang kiểm tra mức độ an toàn...</span>
+          )}
+          {phoneCheck.kind === "ok" && (
+            <span
+              className={`self-start rounded-full px-2 py-0.5 text-xs font-medium ${
+                RETURN_RATE_STYLE[phoneCheck.data.levelCode] ?? "bg-neutral-100 text-neutral-700"
+              }`}
+            >
+              {phoneCheck.data.level} (tỷ lệ hoàn {phoneCheck.data.rate}%)
+            </span>
+          )}
         </div>
       </div>
 
