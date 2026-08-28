@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { loginAction, type LoginFormState } from "@/lib/actions/auth";
 
@@ -20,9 +21,14 @@ export function LoginForm() {
         <input id="email" name="email" type="email" required className={inputClass} />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium text-text">
-          Mật khẩu
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor="password" className="text-sm font-medium text-text">
+            Mật khẩu
+          </label>
+          <Link href="/admin/forgot-password" className="text-xs text-accent-600 underline">
+            Quên mật khẩu?
+          </Link>
+        </div>
         <input id="password" name="password" type="password" required className={inputClass} />
       </div>
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

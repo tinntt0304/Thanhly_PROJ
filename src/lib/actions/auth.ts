@@ -8,7 +8,7 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { sendOtpEmail } from "@/lib/email";
+import { sendOtpEmail, type OtpEmailPurpose } from "@/lib/email";
 import { generateOtpCode, hashOtpCode, MAX_OTP_ATTEMPTS, OTP_EXPIRY_MINUTES } from "@/lib/otp";
 
 export type LoginFormState = { error?: string };
@@ -19,7 +19,11 @@ const TOO_MANY_ATTEMPTS_ERROR = "Bạn đã thử quá nhiều lần, vui lòng 
 // userId (@@unique) nên gửi lại luôn ghi đè mã cũ + đặt lại attempts về 0, không cộng dồn
 // nhiều hàng OTP cho 1 user. Bọc try/catch ở ĐÂY (không phải nơi gọi) để cả 2 chỗ gọi đều
 // trả lỗi rõ ràng thay vì để throw xuyên Server Action (quy ước safeGhnCall, xem ghn.ts).
-async function issueAndSendOtp(userId: string, email: string): Promise<{ ok: true } | { ok: false; error: string }> {
+async function issueAndSendOtp(
+  userId: string,
+  email: string,
+  purpose: OtpEmailPurpose = "verify"
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const code = generateOtpCode();
     await prisma.emailOtp.upsert({
@@ -27,7 +31,7 @@ async function issueAndSendOtp(userId: string, email: string): Promise<{ ok: tru
       update: { codeHash: hashOtpCode(code), expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000), attempts: 0 },
       create: { userId, codeHash: hashOtpCode(code), expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000) },
     });
-    await sendOtpEmail(email, code);
+    await sendOtpEmail(email, code, purpose);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gửi email xác minh thất bại." };
@@ -144,6 +148,115 @@ export async function resendOtpAction(
   const result = await issueAndSendOtp(user.id, user.email);
   if (!result.ok) return { error: result.error };
   return { success: true };
+}
+
+// ===== Quên mật khẩu — cùng cơ chế OTP với xác minh đăng ký, khác ở chỗ: không yêu cầu tài
+// khoản đang ở trạng thái nào (kể cả đã xác minh rồi), và không gate theo emailVerified. =====
+
+export type ForgotPasswordState = Record<string, never>;
+
+// Luôn chuyển hướng sang trang nhập OTP dù email có tồn tại hay không (không tiết lộ email
+// nào đã đăng ký) — chỉ thật sự gửi email khi tìm thấy tài khoản khớp và chưa vượt rate-limit.
+export async function forgotPasswordAction(
+  _prevState: ForgotPasswordState | undefined,
+  formData: FormData
+): Promise<ForgotPasswordState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (email) {
+    const ip = await getClientIp();
+    const [ipOk, emailOk] = await Promise.all([
+      checkRateLimit(`forgot-password-ip:${ip}`, 10, 600),
+      checkRateLimit(`otp-issue-email:${email}`, 3, 600),
+    ]);
+    if (ipOk && emailOk) {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user) await issueAndSendOtp(user.id, user.email, "reset");
+    }
+  }
+  redirect(`/admin/reset-password?email=${encodeURIComponent(email)}`);
+}
+
+// Gửi lại mã cho luồng quên mật khẩu — khác resendOtpAction ở chỗ KHÔNG bỏ qua tài khoản đã
+// emailVerified (ngược lại, đa số tài khoản request quên mật khẩu đã verified sẵn).
+export async function resendResetOtpAction(
+  _prevState: ResendOtpState | undefined,
+  formData: FormData
+): Promise<ResendOtpState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) return { error: "Thiếu email." };
+
+  if (!(await checkRateLimit(`otp-issue-email:${email}`, 3, 600))) {
+    return { error: TOO_MANY_ATTEMPTS_ERROR };
+  }
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return { success: true };
+
+  const result = await issueAndSendOtp(user.id, user.email, "reset");
+  if (!result.ok) return { error: result.error };
+  return { success: true };
+}
+
+export type ResetPasswordState = { error?: string };
+
+const resetPasswordSchema = z
+  .object({
+    email: z.string().trim().email(),
+    code: z.string().trim().length(6, "Thiếu mã xác minh"),
+    newPassword: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Mật khẩu nhập lại không khớp",
+    path: ["confirmPassword"],
+  });
+
+export async function resetPasswordAction(
+  _prevState: ResetPasswordState | undefined,
+  formData: FormData
+): Promise<ResetPasswordState> {
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`otp-verify-ip:${ip}`, 20, 600))) {
+    return { error: TOO_MANY_ATTEMPTS_ERROR };
+  }
+
+  const parsed = resetPasswordSchema.safeParse({
+    email: formData.get("email"),
+    code: formData.get("code"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const { code, newPassword } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+
+  // Gộp chung 1 thông báo cho "email không tồn tại" và "chưa từng yêu cầu mã/mã hết hạn" —
+  // tách riêng 2 trường hợp này sẽ lộ email nào có tài khoản (dò được bằng cách gọi thẳng
+  // action này với email bất kỳ mà không qua forgotPasswordAction).
+  const user = await prisma.user.findUnique({ where: { email }, include: { emailOtp: true } });
+  if (!user || !user.emailOtp || user.emailOtp.expiresAt < new Date()) {
+    return { error: "Mã đã hết hạn hoặc không hợp lệ, bấm \"Gửi lại mã\" để nhận mã mới." };
+  }
+  if (user.emailOtp.attempts >= MAX_OTP_ATTEMPTS) {
+    return { error: "Bạn đã nhập sai quá nhiều lần, bấm \"Gửi lại mã\" để nhận mã mới." };
+  }
+  if (hashOtpCode(code) !== user.emailOtp.codeHash) {
+    await prisma.emailOtp.update({ where: { userId: user.id }, data: { attempts: { increment: 1 } } });
+    return { error: "Mã xác minh không đúng." };
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.$transaction([
+    // Đặt lại mật khẩu thành công qua OTP email tức là đã chứng minh sở hữu email — tiện
+    // thể đánh dấu luôn emailVerified=true (tài khoản trước đó lỡ chưa xác minh sẽ không
+    // còn bị chặn ở bước đăng nhập nữa).
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash, emailVerified: true } }),
+    prisma.emailOtp.delete({ where: { userId: user.id } }),
+  ]);
+
+  redirect("/admin/login?reset=1");
 }
 
 export type RegisterFormState = { error?: string };

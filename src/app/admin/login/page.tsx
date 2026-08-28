@@ -3,7 +3,7 @@ import { LoginForm } from "@/components/LoginForm";
 import { Logo } from "@/components/Logo";
 
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
-  const { verified } = await searchParams;
+  const { verified, reset } = await searchParams;
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
@@ -13,6 +13,11 @@ export default async function AdminLoginPage({ searchParams }: PageProps<"/admin
         {verified === "1" && (
           <p className="rounded-md bg-accent-2-100 px-3 py-2 text-sm text-accent-2-700">
             Xác minh email thành công — mời bạn đăng nhập.
+          </p>
+        )}
+        {reset === "1" && (
+          <p className="rounded-md bg-accent-2-100 px-3 py-2 text-sm text-accent-2-700">
+            Đặt lại mật khẩu thành công — mời bạn đăng nhập bằng mật khẩu mới.
           </p>
         )}
         <LoginForm />

@@ -15,9 +15,20 @@ function assertConfigured() {
   }
 }
 
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
+// "verify" (xác minh tài khoản mới đăng ký) và "reset" (đặt lại mật khẩu) dùng chung 1 cơ
+// chế OTP (EmailOtp) nhưng nội dung email khác nhau để người nhận hiểu đúng ngữ cảnh, tránh
+// tưởng nhầm đây là mã xác minh đăng ký trong khi thật ra họ đang đặt lại mật khẩu.
+export type OtpEmailPurpose = "verify" | "reset";
+
+const OTP_EMAIL_COPY: Record<OtpEmailPurpose, { subject: string; heading: string }> = {
+  verify: { subject: "là mã xác minh tài khoản hifen của bạn", heading: "Xác minh tài khoản hifen" },
+  reset: { subject: "là mã đặt lại mật khẩu hifen của bạn", heading: "Đặt lại mật khẩu hifen" },
+};
+
+export async function sendOtpEmail(to: string, code: string, purpose: OtpEmailPurpose = "verify"): Promise<void> {
   assertConfigured();
   const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const copy = OTP_EMAIL_COPY[purpose];
 
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
@@ -28,10 +39,10 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     body: JSON.stringify({
       from: `hifen <${from}>`,
       to,
-      subject: `${code} là mã xác minh tài khoản hifen của bạn`,
+      subject: `${code} ${copy.subject}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #111;">Xác minh tài khoản hifen</h2>
+          <h2 style="color: #111;">${copy.heading}</h2>
           <p>Mã xác minh của bạn là:</p>
           <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #c2410c;">${code}</p>
           <p style="color: #555; font-size: 14px;">Mã có hiệu lực trong 10 phút. Nếu bạn không yêu cầu mã này, hãy bỏ qua email.</p>

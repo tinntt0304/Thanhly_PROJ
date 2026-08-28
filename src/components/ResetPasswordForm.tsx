@@ -2,34 +2,70 @@
 
 import { useState } from "react";
 import { useActionState } from "react";
-import { verifyOtpAction, resendOtpAction, type OtpFormState, type ResendOtpState } from "@/lib/actions/auth";
+import {
+  resetPasswordAction,
+  resendResetOtpAction,
+  type ResetPasswordState,
+  type ResendOtpState,
+} from "@/lib/actions/auth";
 import { OTP_LENGTH, OtpDigitInputs, formatCooldown, useResendCooldown } from "@/components/OtpDigitInputs";
 
-const initialVerifyState: OtpFormState = {};
+const initialResetState: ResetPasswordState = {};
 const initialResendState: ResendOtpState = {};
 
-export function OtpVerifyForm({ email }: { email: string }) {
-  const [verifyState, verifyFormAction, verifyPending] = useActionState(verifyOtpAction, initialVerifyState);
-  const [resendState, resendFormAction, resendPending] = useActionState(resendOtpAction, initialResendState);
+const inputClass =
+  "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
+
+export function ResetPasswordForm({ email }: { email: string }) {
+  const [resetState, resetFormAction, resetPending] = useActionState(resetPasswordAction, initialResetState);
+  const [resendState, resendFormAction, resendPending] = useActionState(resendResetOtpAction, initialResendState);
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [cooldown, resetCooldown] = useResendCooldown();
 
   return (
     <div className="flex w-full max-w-sm flex-col gap-4">
-      <form action={verifyFormAction} className="flex flex-col gap-3">
+      <form action={resetFormAction} className="flex flex-col gap-3">
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="code" value={digits.join("")} />
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-text">Mã xác minh (6 số)</label>
           <OtpDigitInputs digits={digits} onChange={setDigits} />
         </div>
-        {verifyState.error && <p className="text-sm text-red-600">{verifyState.error}</p>}
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="newPassword" className="text-sm font-medium text-text">
+            Mật khẩu mới
+          </label>
+          <input
+            id="newPassword"
+            name="newPassword"
+            type="password"
+            minLength={6}
+            required
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-text">
+            Nhập lại mật khẩu mới
+          </label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            minLength={6}
+            required
+            className={inputClass}
+          />
+        </div>
+
+        {resetState.error && <p className="text-sm text-red-600">{resetState.error}</p>}
         <button
           type="submit"
-          disabled={verifyPending || digits.join("").length !== OTP_LENGTH}
+          disabled={resetPending || digits.join("").length !== OTP_LENGTH}
           className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
         >
-          {verifyPending ? "Đang xác minh..." : "Xác minh"}
+          {resetPending ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
         </button>
       </form>
 
