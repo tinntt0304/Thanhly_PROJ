@@ -36,7 +36,11 @@ export function BannerSlideshow({
           fill
           priority={i === 0}
           sizes="100vw"
-          className={`object-cover transition-opacity duration-1000 ${i === index ? "opacity-100" : "opacity-0"}`}
+          // object-top thay vì mặc định (giữa ảnh): khung hiển thị của HeroBanner thấp/rộng
+          // hơn hẳn tỉ lệ ảnh gốc admin hay upload (banner dạng poster ~2:1), object-cover mặc
+          // định cắt đều cả trên lẫn dưới — cắt mất phần đầu ảnh sát mép header, nhìn như header
+          // đè lên banner. Neo lên đỉnh để phần trên ảnh luôn còn nguyên, chỉ cắt bớt phía dưới.
+          className={`object-cover object-top transition-opacity duration-1000 ${i === index ? "opacity-100" : "opacity-0"}`}
           unoptimized={!isOptimizableProductImage(src)}
         />
       ))}
