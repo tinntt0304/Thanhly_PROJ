@@ -1,6 +1,3 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { matchesSearch } from "@/lib/search";
 import type { AuctionState, HomeCardProduct } from "@/lib/auction";
@@ -26,6 +23,9 @@ function ProductGrid({
   );
 }
 
+// Không còn state/tương tác client (ô tìm kiếm thật nằm ở HeroBanner — submit GET /?q=...,
+// đổi initialQuery qua URL) nên để component này chạy như Server Component, không cần "use
+// client" — bớt JS gửi xuống trình duyệt.
 export function HomeProductSections({
   products,
   initialQuery = "",
@@ -33,54 +33,21 @@ export function HomeProductSections({
   products: HomeProduct[];
   initialQuery?: string;
 }) {
-  const [query, setQuery] = useState(initialQuery);
+  const query = initialQuery;
+  const filtered = products.filter((p) => matchesSearch(p.product.title, query));
 
-  const filtered = useMemo(
-    () => products.filter((p) => matchesSearch(p.product.title, query)),
-    [products, query]
-  );
+  const activeProducts = filtered
+    .filter((p) => p.state === "BIDDING")
+    .sort((a, b) => a.product.endTime.getTime() - b.product.endTime.getTime());
 
-  const activeProducts = useMemo(
-    () =>
-      filtered
-        .filter((p) => p.state === "BIDDING")
-        .sort((a, b) => a.product.endTime.getTime() - b.product.endTime.getTime()),
-    [filtered]
-  );
-
-  const endedProducts = useMemo(
-    () =>
-      filtered
-        .filter((p) => p.state !== "BIDDING")
-        .sort((a, b) => b.product.endTime.getTime() - a.product.endTime.getTime()),
-    [filtered]
-  );
+  const endedProducts = filtered
+    .filter((p) => p.state !== "BIDDING")
+    .sort((a, b) => b.product.endTime.getTime() - a.product.endTime.getTime());
 
   const isSearching = query.trim() !== "";
 
   return (
     <>
-      <div className="relative mb-6">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm sản phẩm theo tên..."
-          aria-label="Tìm sản phẩm"
-          className="w-full rounded-md border border-neutral-300 bg-surface px-4 py-2.5 pl-10 text-sm text-text placeholder:text-neutral-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-        />
-        <svg
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-        </svg>
-      </div>
-
       {isSearching && filtered.length === 0 ? (
         <p className="text-sm text-neutral-700">
           Không tìm thấy sản phẩm nào khớp với &ldquo;{query.trim()}&rdquo;.
