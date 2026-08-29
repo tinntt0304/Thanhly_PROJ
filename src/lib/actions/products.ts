@@ -233,3 +233,41 @@ export async function setProductStatus(productId: string, status: ProductStatus)
   revalidatePath(`/products/${productId}`);
   revalidatePath(`/admin/products/${productId}`);
 }
+
+export type BulkEndTimeResult = { ok: true; count: number } | { ok: false; error: string };
+
+// Chọn nhiều sản phẩm ở /admin, đặt chung 1 thời gian kết thúc — dùng cho trường hợp gộp
+// nhiều sản phẩm vào cùng 1 đợt đấu giá kết thúc đồng loạt. SELLER phải sở hữu TẤT CẢ sản
+// phẩm đã chọn mới cho áp dụng (từ chối toàn bộ nếu có 1 sản phẩm không thuộc về mình, không
+// âm thầm bỏ qua — tránh hiểu lầm "đã áp dụng hết" trong khi thật ra thiếu vài sản phẩm).
+export async function bulkSetEndTime(productIds: string[], endTime: string): Promise<BulkEndTimeResult> {
+  const session = await requireAdmin();
+
+  if (productIds.length === 0) return { ok: false, error: "Chưa chọn sản phẩm nào." };
+
+  const parsedTime = new Date(endTime);
+  if (Number.isNaN(parsedTime.getTime())) return { ok: false, error: "Thời gian không hợp lệ." };
+  if (parsedTime.getTime() <= Date.now()) {
+    return { ok: false, error: "Thời gian kết thúc phải ở tương lai." };
+  }
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, sellerId: true },
+  });
+  if (products.length !== productIds.length) {
+    return { ok: false, error: "Có sản phẩm không tồn tại, thử tải lại trang." };
+  }
+  if (session.user.role !== "SUPERADMIN" && products.some((p) => p.sellerId !== session.user.id)) {
+    return { ok: false, error: "Bạn không có quyền sửa 1 hoặc nhiều sản phẩm đã chọn." };
+  }
+
+  const result = await prisma.product.updateMany({
+    where: { id: { in: productIds } },
+    data: { endTime: parsedTime },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  return { ok: true, count: result.count };
+}
