@@ -3,6 +3,7 @@ import { MAX_IMAGE_BYTES } from "@/lib/product-limits";
 
 export const PRODUCT_IMAGES_BUCKET = "product-images";
 export const SITE_BANNER_BUCKET = "site-banners";
+export const IMAGE_LIBRARY_BUCKET = "image-library";
 const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
@@ -44,7 +45,7 @@ async function ensureBucket(supabase: ReturnType<typeof createClient>, bucket: s
   ensuredBuckets.add(bucket);
 }
 
-async function uploadImage(file: File, bucket: string): Promise<string> {
+async function uploadImage(file: File, bucket: string, pathPrefix = ""): Promise<string> {
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error(`Ảnh "${file.name}" vượt quá 5MB.`);
   }
@@ -55,7 +56,7 @@ async function uploadImage(file: File, bucket: string): Promise<string> {
   const supabase = getSupabaseAdmin();
   await ensureBucket(supabase, bucket);
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${crypto.randomUUID()}.${ext}`;
+  const path = `${pathPrefix}${crypto.randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
@@ -89,4 +90,53 @@ export async function deleteBannerImage(url: string): Promise<void> {
 
   const supabase = getSupabaseAdmin();
   await supabase.storage.from(SITE_BANNER_BUCKET).remove([path]);
+}
+
+// Thư viện ảnh (/admin/thu-vien-anh) — tải trước ảnh lên lấy link để dán vào cột "Ảnh" khi
+// import Excel hàng loạt, không cần đăng từng sản phẩm mới upload được. Bucket riêng với ảnh
+// sản phẩm thật (product-images) vì đây chỉ là nơi chuẩn bị link, chưa gắn với Product nào —
+// tách theo thư mục con {userId}/ để mỗi seller chỉ thấy ảnh của chính mình (superadmin xem
+// được tất cả, xem listLibraryImages).
+export async function uploadLibraryImage(file: File, userId: string): Promise<string> {
+  return uploadImage(file, IMAGE_LIBRARY_BUCKET, `${userId}/`);
+}
+
+export type LibraryImage = { url: string; name: string; createdAt: string };
+
+async function listUserLibraryImages(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  limit: number
+): Promise<LibraryImage[]> {
+  const { data, error } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).list(userId, {
+    limit,
+    sortBy: { column: "created_at", order: "desc" },
+  });
+  if (error) throw new Error(`Không đọc được thư viện ảnh: ${error.message}`);
+
+  return (data ?? [])
+    .filter((f) => f.id) // bỏ file giả Supabase trả về đại diện cho thư mục rỗng (id null)
+    .map((f) => ({
+      name: f.name,
+      createdAt: f.created_at ?? new Date().toISOString(),
+      url: supabase.storage.from(IMAGE_LIBRARY_BUCKET).getPublicUrl(`${userId}/${f.name}`).data.publicUrl,
+    }));
+}
+
+// userId=null (chỉ superadmin gọi, xem requireAdmin ở actions/image-library.ts): gộp ảnh của
+// MỌI seller — Supabase Storage không hỗ trợ list đệ quy toàn bucket trong 1 lần gọi, phải
+// liệt kê thư mục gốc lấy danh sách userId đã từng upload rồi list() từng thư mục con.
+export async function listLibraryImages(userId: string | null, limit = 200): Promise<LibraryImage[]> {
+  const supabase = getSupabaseAdmin();
+  await ensureBucket(supabase, IMAGE_LIBRARY_BUCKET);
+
+  if (userId) return listUserLibraryImages(supabase, userId, limit);
+
+  const { data: entries, error: rootError } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).list("", { limit: 1000 });
+  if (rootError) throw new Error(`Không đọc được thư viện ảnh: ${rootError.message}`);
+
+  const perUser = await Promise.all(
+    (entries ?? []).filter((f) => f.id === null).map((f) => listUserLibraryImages(supabase, f.name, limit))
+  );
+  return perUser.flat().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }

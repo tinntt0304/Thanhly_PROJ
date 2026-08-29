@@ -33,6 +33,15 @@ function ImportIcon() {
     </svg>
   );
 }
+function GalleryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+      <rect x="3" y="3" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="8.5" cy="8.5" r="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
 function MenuIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -138,6 +147,7 @@ export function AdminSidebar({
     { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true },
     { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon /> },
     { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon /> },
+    { href: "/admin/thu-vien-anh", label: "Thư viện ảnh", icon: <GalleryIcon /> },
     { href: "/admin/orders", label: "Quản lý đơn hàng", icon: <OrdersIcon /> },
     { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
   ];
