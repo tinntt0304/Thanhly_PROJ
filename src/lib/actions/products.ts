@@ -223,10 +223,20 @@ export async function setProductStatus(productId: string, status: ProductStatus)
   const session = await requireAdmin();
   await assertOwnsProduct(session.user.id, session.user.role, productId);
 
-  await prisma.product.update({
-    where: { id: productId },
-    data: { status },
-  });
+  // "Mở lại" (ACTIVE) reset currentPrice về startPrice — bắt đầu lại từ giá gốc thay vì giữ
+  // giá cũ (vd. mức giá người thắng đã bùng kèo). KHÔNG xoá lịch sử Bid cũ (quyết định có
+  // chủ đích): cột "người trả giá cao nhất" ở danh sách vẫn hiện được người trả giá cũ nếu
+  // có, chấp nhận đánh đổi này để giữ dữ liệu tham khảo/đối soát.
+  if (status === "ACTIVE") {
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { startPrice: true } });
+    if (!product) throw new Error("Không tìm thấy sản phẩm.");
+    await prisma.product.update({
+      where: { id: productId },
+      data: { status, currentPrice: product.startPrice },
+    });
+  } else {
+    await prisma.product.update({ where: { id: productId }, data: { status } });
+  }
 
   revalidatePath("/");
   revalidatePath("/admin");
