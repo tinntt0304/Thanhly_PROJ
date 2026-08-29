@@ -1,10 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 import { MAX_IMAGE_BYTES } from "@/lib/product-limits";
 
 export const PRODUCT_IMAGES_BUCKET = "product-images";
 export const SITE_BANNER_BUCKET = "site-banners";
 export const IMAGE_LIBRARY_BUCKET = "image-library";
 const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+// Nén ảnh trước khi lưu Supabase Storage — người dùng thường upload thẳng ảnh gốc từ điện
+// thoại/máy ảnh (vài MB, kích thước lớn hơn nhiều so với chỗ hiển thị thực tế trên web),
+// tốn dung lượng lưu trữ vô ích. Giới hạn cạnh dài nhất + quy hết về WEBP (nén tốt hơn hẳn
+// JPEG/PNG cùng chất lượng nhìn, mọi trình duyệt hiện đại đều đọc được).
+const MAX_IMAGE_DIMENSION = 1920;
+const WEBP_QUALITY = 80;
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
 const ensuredBuckets = new Set<string>();
@@ -45,6 +53,31 @@ async function ensureBucket(supabase: ReturnType<typeof createClient>, bucket: s
   ensuredBuckets.add(bucket);
 }
 
+// GIF giữ nguyên không nén — sharp mặc định chỉ đọc/ghi được frame đầu tiên của GIF động,
+// nén sẽ làm mất hoạt ảnh; định dạng này hiếm gặp trong ảnh sản phẩm/banner nên không đáng
+// đánh đổi. JPEG/PNG/WEBP quy hết về WEBP sau khi giới hạn kích thước.
+async function compressImage(
+  buffer: Buffer,
+  contentType: string
+): Promise<{ buffer: Buffer; contentType: string; ext: string }> {
+  if (contentType === "image/gif") {
+    return { buffer, contentType, ext: "gif" };
+  }
+
+  const outputBuffer = await sharp(buffer)
+    .rotate() // đọc EXIF orientation rồi tự xoay đúng chiều trước khi bỏ metadata, tránh ảnh bị lật
+    .resize({
+      width: MAX_IMAGE_DIMENSION,
+      height: MAX_IMAGE_DIMENSION,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: WEBP_QUALITY })
+    .toBuffer();
+
+  return { buffer: outputBuffer, contentType: "image/webp", ext: "webp" };
+}
+
 async function uploadImage(file: File, bucket: string, pathPrefix = ""): Promise<string> {
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error(`Ảnh "${file.name}" vượt quá 5MB.`);
@@ -55,12 +88,24 @@ async function uploadImage(file: File, bucket: string, pathPrefix = ""): Promise
 
   const supabase = getSupabaseAdmin();
   await ensureBucket(supabase, bucket);
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${pathPrefix}${crypto.randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-    contentType: file.type || "image/jpeg",
+  const rawBuffer = Buffer.from(await file.arrayBuffer());
+  let uploadBuffer: Buffer<ArrayBufferLike> = rawBuffer;
+  let contentType = file.type || "image/jpeg";
+  let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  try {
+    const compressed = await compressImage(rawBuffer, contentType);
+    uploadBuffer = compressed.buffer;
+    contentType = compressed.contentType;
+    ext = compressed.ext;
+  } catch {
+    // Nén lỗi (file ảnh hỏng, hoặc định dạng lạ dù đúng content-type khai báo) — vẫn upload
+    // bản gốc thay vì chặn hẳn thao tác, không để bước tối ưu phụ chặn luồng chính.
+  }
+
+  const path = `${pathPrefix}${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, uploadBuffer, {
+    contentType,
     upsert: false,
   });
   if (error) throw new Error(`Upload ảnh "${file.name}" thất bại: ${error.message}`);
