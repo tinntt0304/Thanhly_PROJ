@@ -185,3 +185,22 @@ export async function listLibraryImages(userId: string | null, limit = 200): Pro
   );
   return perUser.flat().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
+
+// Lấy path "{userId}/{filename}" từ URL public — dùng để (a) xoá đúng file trong bucket và
+// (b) đối chiếu userId sở hữu trước khi cho xoá (xem removeLibraryImage ở
+// actions/image-library.ts). Trả về null nếu URL lạ, không thuộc bucket này.
+export function parseLibraryImagePath(url: string): { path: string; userId: string } | null {
+  const marker = `/storage/v1/object/public/${IMAGE_LIBRARY_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  const path = url.slice(idx + marker.length);
+  const userId = path.split("/")[0];
+  if (!userId) return null;
+  return { path, userId };
+}
+
+export async function deleteLibraryImage(path: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).remove([path]);
+  if (error) throw new Error(`Xoá ảnh thất bại: ${error.message}`);
+}

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
-import { uploadLibraryImages } from "@/lib/actions/image-library";
+import { uploadLibraryImages, removeLibraryImage } from "@/lib/actions/image-library";
 import { isOptimizableProductImage } from "@/lib/image-url";
 
 type LibraryImage = { url: string; name: string };
@@ -15,6 +15,7 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [removingUrl, setRemovingUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(e: FormEvent<HTMLFormElement>) {
@@ -40,6 +41,19 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
     await navigator.clipboard.writeText(url);
     setCopiedUrl(url);
     setTimeout(() => setCopiedUrl((c) => (c === url ? null : c)), 2000);
+  }
+
+  async function handleRemove(url: string) {
+    if (!window.confirm("Xoá ảnh này khỏi thư viện?")) return;
+    setRemovingUrl(url);
+    setError(null);
+    const res = await removeLibraryImage(url);
+    setRemovingUrl(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setImages((prev) => prev.filter((img) => img.url !== url));
   }
 
   return (
@@ -90,6 +104,14 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
                 className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
               >
                 {copiedUrl === img.url ? "Đã sao chép!" : "Sao chép link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemove(img.url)}
+                disabled={removingUrl === img.url}
+                className="rounded-md border border-red-200 bg-red-50/50 px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                {removingUrl === img.url ? "Đang xoá..." : "Xoá ảnh"}
               </button>
             </div>
           ))}
