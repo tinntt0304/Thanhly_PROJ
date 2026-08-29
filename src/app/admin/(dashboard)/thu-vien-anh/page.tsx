@@ -6,8 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImageLibraryPage() {
   const session = await requireAdmin();
-  const isSuperAdmin = session.user.role === "SUPERADMIN";
-  const images = await listLibraryImages(isSuperAdmin ? null : session.user.id);
+  const images = await listLibraryImages(session.user.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -16,7 +15,6 @@ export default async function ImageLibraryPage() {
         <p className="mt-1 text-sm text-neutral-700">
           Tải ảnh lên, lấy link để dán vào cột &ldquo;Ảnh&rdquo; khi import sản phẩm hàng loạt
           bằng Excel — không cần đăng từng sản phẩm mới upload được ảnh.
-          {isSuperAdmin && " Superadmin xem được ảnh của tất cả người bán."}
         </p>
       </div>
       <ImageLibraryManager initialImages={images} />
