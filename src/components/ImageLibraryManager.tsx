@@ -4,20 +4,28 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
 import { uploadLibraryImages, removeLibraryImage, removeLibraryImages } from "@/lib/actions/image-library";
+import { TOO_MANY_UPLOADS_ERROR } from "@/lib/image-library-messages";
 import { isOptimizableProductImage } from "@/lib/image-url";
 
 type LibraryImage = { url: string; name: string };
+type UploadProgress = { done: number; total: number };
+
+// Số ảnh tải cùng lúc — mỗi ảnh 1 lượt gọi server action riêng (thay vì gộp hết vào 1 lượt
+// gọi duy nhất như trước) để có thể cập nhật tiến trình "đã xong X/Y" theo thời gian thực
+// cho popup loading; giới hạn song song để không mở quá nhiều request cùng lúc khi chọn
+// hàng chục ảnh, vẫn nhanh hơn hẳn so với tải tuần tự từng ảnh một.
+const UPLOAD_CONCURRENCY = 3;
 
 // Upload xong prepend luôn URL trả về vào danh sách hiển thị (không gọi lại server để lấy
 // danh sách mới) — nhanh, và server action chỉ trả về đúng những ảnh vừa tải nên đủ dữ liệu.
 export function ImageLibraryManager({ initialImages }: { initialImages: LibraryImage[] }) {
   const [images, setImages] = useState<LibraryImage[]>(initialImages);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [removingUrl, setRemovingUrl] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRemoving, setBulkRemoving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(e: FormEvent<HTMLFormElement>) {
@@ -25,17 +33,47 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
     const files = Array.from(fileInputRef.current?.files ?? []);
     if (files.length === 0) return;
 
-    const formData = new FormData();
-    files.forEach((f) => formData.append("images", f));
-    setPending(true);
     setError(null);
-    const res = await uploadLibraryImages(undefined, formData);
-    setPending(false);
-    if (res.error) {
-      setError(res.error);
-      return;
+    setUploadProgress({ done: 0, total: files.length });
+
+    let uploadedCount = 0;
+    let rateLimited = false;
+    const failedNames: string[] = [];
+    let nextIndex = 0;
+
+    async function worker() {
+      while (!rateLimited && nextIndex < files.length) {
+        const file = files[nextIndex++];
+        const formData = new FormData();
+        formData.append("images", file);
+        const res = await uploadLibraryImages(undefined, formData);
+        if (res.error === TOO_MANY_UPLOADS_ERROR) {
+          // Chắc chắn các ảnh còn lại cũng sẽ bị chặn y hệt — dừng hẳn thay vì gọi tiếp vô ích.
+          rateLimited = true;
+          break;
+        }
+        if (res.error) {
+          failedNames.push(`${file.name} (${res.error})`);
+        } else if (res.images) {
+          setImages((prev) => [...res.images!, ...prev]);
+        }
+        uploadedCount++;
+        setUploadProgress({ done: uploadedCount, total: files.length });
+      }
     }
-    setImages((prev) => [...(res.images ?? []), ...prev]);
+
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, worker));
+
+    setUploadProgress(null);
+    if (rateLimited) {
+      setError(
+        failedNames.length > 0
+          ? `${TOO_MANY_UPLOADS_ERROR} (${failedNames.length} ảnh khác cũng lỗi: ${failedNames.join(", ")})`
+          : TOO_MANY_UPLOADS_ERROR
+      );
+    } else if (failedNames.length > 0) {
+      setError(`${failedNames.length} ảnh tải lên thất bại: ${failedNames.join(", ")}`);
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -106,10 +144,10 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
         />
         <button
           type="submit"
-          disabled={pending}
+          disabled={uploadProgress !== null}
           className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
         >
-          {pending ? "Đang tải lên..." : "Tải ảnh lên"}
+          {uploadProgress ? "Đang tải lên..." : "Tải ảnh lên"}
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -192,6 +230,22 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
             ))}
           </div>
         </>
+      )}
+
+      {uploadProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-surface p-5 shadow-xl">
+            <p className="mb-3 text-sm font-medium text-text">
+              Đang tải lên {uploadProgress.done}/{uploadProgress.total} ảnh...
+            </p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200">
+              <div
+                className="h-full rounded-full bg-accent-500 transition-all duration-300"
+                style={{ width: `${(uploadProgress.done / uploadProgress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

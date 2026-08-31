@@ -3,10 +3,9 @@
 import { requireAdmin } from "@/lib/admin-guard";
 import { uploadLibraryImage, deleteLibraryImages, parseLibraryImagePath } from "@/lib/storage";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { TOO_MANY_UPLOADS_ERROR } from "@/lib/image-library-messages";
 
 export type LibraryUploadState = { error?: string; images?: { url: string; name: string }[] };
-
-const TOO_MANY_UPLOADS_ERROR = "Bạn đã tải lên quá nhiều ảnh trong thời gian ngắn, vui lòng đợi vài phút rồi thử lại.";
 
 // Chỉ tải lên cho chính người đang đăng nhập (userId lấy từ session, không nhận qua form) —
 // mỗi seller chỉ thêm được ảnh vào thư mục của chính mình trong bucket image-library, xem
