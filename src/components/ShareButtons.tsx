@@ -66,8 +66,22 @@ export function ShareButtons({ url, title }: ShareButtonsProps) {
           aria-label="Chia sẻ qua Zalo hoặc ứng dụng khác"
           className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
-            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L7.04 9.81C6.5 9.31 5.79 9 5 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+          {/* Zalo không có icon Unicode/emoji riêng — vẽ badge bo góc xanh thương hiệu
+              (#0068FF) kèm chữ "Zalo" trắng, đúng bố cục logo app Zalo thật (chữ trong
+              khung bo góc), thay vì icon share chung chung không gắn với thương hiệu nào. */}
+          <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden="true">
+            <rect width="24" height="24" rx="6" fill="#0068FF" />
+            <text
+              x="12"
+              y="16.7"
+              textAnchor="middle"
+              fontSize="9.5"
+              fontWeight="700"
+              fontFamily="Arial, Helvetica, sans-serif"
+              fill="#fff"
+            >
+              Zalo
+            </text>
           </svg>{" "}
           Zalo / Khác
         </button>
