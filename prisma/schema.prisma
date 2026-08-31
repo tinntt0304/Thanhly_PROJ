@@ -114,8 +114,9 @@ enum OrderStatus {
   CANCELLED // đã huỷ (đơn nội bộ hoặc đã huỷ vận đơn GHN)
 }
 
-// Đơn hàng tạo ra từ 1 sản phẩm đã "Đánh dấu đã bán" (xem product.tsx) — gắn với đơn vị
-// vận chuyển GHN (Giao Hàng Nhanh) để tạo vận đơn thật + theo dõi trạng thái giao hàng.
+// Đơn hàng tạo ra từ 1 sản phẩm đã "Đánh dấu đã bán" (xem product.tsx), HOẶC người mua tự
+// bấm "Mua ngay" ở trang sản phẩm công khai (xem actions/buy-now.ts) — gắn với đơn vị vận
+// chuyển GHN (Giao Hàng Nhanh) để tạo vận đơn thật + theo dõi trạng thái giao hàng.
 // Không unique theo productId: 1 sản phẩm có thể tạo lại đơn (sửa sai) hoặc bán nhiều
 // lượt (quantity > 1) nên cho phép nhiều Order/1 Product.
 model Order {
@@ -146,6 +147,8 @@ model Order {
   note       String?
 
   shopPaysShipping Boolean @default(false) // false = người mua trả phí ship khi nhận hàng, true = shop tự trả
+
+  selectedAttributes Json @default("[]") // thuộc tính người mua chọn khi bấm "Mua ngay": [{ name, value }] — rỗng nếu đơn tạo thủ công từ admin hoặc sản phẩm không có thuộc tính
 
   status OrderStatus @default(NEW)
 

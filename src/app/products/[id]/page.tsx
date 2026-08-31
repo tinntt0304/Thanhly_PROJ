@@ -14,6 +14,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { BidForm } from "@/components/BidForm";
+import { BuyNowButton } from "@/components/BuyNowButton";
 import { asAttributes } from "@/lib/attributes";
 import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
@@ -106,12 +107,16 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                   Còn lại: <Countdown endTime={product.endTime.toISOString()} />
                 </p>
               )}
-              {product.buyNowPrice && state === "BIDDING" && (
-                <p className="mt-1 text-sm text-neutral-700">
-                  Mua ngay: {formatVND(product.buyNowPrice)}
-                </p>
-              )}
             </div>
+
+            {product.buyNowPrice && (
+              <BuyNowButton
+                productId={product.id}
+                buyNowPrice={product.buyNowPrice}
+                attributes={attributes}
+                canBuy={state === "BIDDING"}
+              />
+            )}
 
             {state === "BIDDING" && (
               <BidForm productId={product.id} minAllowed={minNextBid(product)} />

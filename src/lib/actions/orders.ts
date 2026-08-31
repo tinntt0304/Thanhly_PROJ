@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   getProvinces as ghnGetProvinces,
   getDistricts as ghnGetDistricts,
@@ -69,6 +70,38 @@ export async function getGhnWards(
   districtId: number
 ): Promise<{ ok: true; data: GhnWard[] } | { ok: false; error: string }> {
   await requireAdmin();
+  return safeGhnCall(() => ghnGetWards(districtId));
+}
+
+// ===== Bản công khai của 3 hàm trên — dùng cho AddressPicker ở form "Mua ngay" (khách
+// chưa đăng nhập, xem BuyNowForm.tsx) =====
+// Không có requireAdmin() nên rate-limit theo IP để tránh bị lợi dụng dò/tốn quota API GHN.
+async function checkPublicLookupRateLimit(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ip = await getClientIp();
+  const allowed = await checkRateLimit(`ghn-public-lookup-ip:${ip}`, 60, 60);
+  if (!allowed) return { ok: false, error: "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút." };
+  return { ok: true };
+}
+
+export async function getPublicGhnProvinces(): Promise<{ ok: true; data: GhnProvince[] } | { ok: false; error: string }> {
+  const limit = await checkPublicLookupRateLimit();
+  if (!limit.ok) return limit;
+  return safeGhnCall(ghnGetProvinces);
+}
+
+export async function getPublicGhnDistricts(
+  provinceId: number
+): Promise<{ ok: true; data: GhnDistrict[] } | { ok: false; error: string }> {
+  const limit = await checkPublicLookupRateLimit();
+  if (!limit.ok) return limit;
+  return safeGhnCall(() => ghnGetDistricts(provinceId));
+}
+
+export async function getPublicGhnWards(
+  districtId: number
+): Promise<{ ok: true; data: GhnWard[] } | { ok: false; error: string }> {
+  const limit = await checkPublicLookupRateLimit();
+  if (!limit.ok) return limit;
   return safeGhnCall(() => ghnGetWards(districtId));
 }
 

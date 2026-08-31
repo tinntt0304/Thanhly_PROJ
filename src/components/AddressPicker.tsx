@@ -9,10 +9,16 @@ const inputClass =
 const lockedInputClass =
   "rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-500 cursor-not-allowed";
 
+type LookupResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
 // 3 select phụ thuộc (Tỉnh/Thành -> Quận/Huyện -> Phường/Xã) lấy trực tiếp từ GHN — bắt
 // buộc vì GHN chỉ nhận địa chỉ người nhận dạng mã (district_id, ward_code), không nhận
 // text tự do. Giá trị submit thật nằm ở input ẩn (id + tên hiển thị, để lưu tên đẹp vào
 // Order mà không cần tra cứu lại), 3 select chỉ để chọn.
+//
+// fetchProvinces/Districts/Wards mặc định dùng bản admin (getGhnProvinces...) — form
+// "Mua ngay" công khai (BuyNowForm.tsx) truyền vào bản public (getPublicGhnProvinces...,
+// không cần đăng nhập) vì khách mua hàng chưa có session admin.
 export function AddressPicker({
   initialProvinceId,
   initialProvinceName,
@@ -21,6 +27,9 @@ export function AddressPicker({
   initialWardCode,
   initialWardName,
   locked = false,
+  fetchProvinces = getGhnProvinces,
+  fetchDistricts = getGhnDistricts,
+  fetchWards = getGhnWards,
 }: {
   initialProvinceId?: number;
   initialProvinceName?: string;
@@ -29,6 +38,9 @@ export function AddressPicker({
   initialWardCode?: string;
   initialWardName?: string;
   locked?: boolean;
+  fetchProvinces?: () => Promise<LookupResult<GhnProvince[]>>;
+  fetchDistricts?: (provinceId: number) => Promise<LookupResult<GhnDistrict[]>>;
+  fetchWards?: (districtId: number) => Promise<LookupResult<GhnWard[]>>;
 }) {
   const [provinces, setProvinces] = useState<GhnProvince[]>([]);
   const [districts, setDistricts] = useState<GhnDistrict[]>([]);
@@ -47,9 +59,12 @@ export function AddressPicker({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getGhnProvinces()
-      .then((res) => (res.ok ? setProvinces(res.data) : setError(res.error)))
+    fetchProvinces()
+      // GHN sandbox có sẵn vài tỉnh "Test - Alert" cố tình trả data: null để test client xử
+      // lý lỗi — res.ok vẫn true nhưng res.data không phải mảng, ?? [] để không crash .map().
+      .then((res) => (res.ok ? setProvinces(res.data ?? []) : setError(res.error)))
       .finally(() => setLoadingProvinces(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // "Rỗng thì dọn danh sách con" và "bật loading" đều nằm ở onChange (tương tác thật của
@@ -58,16 +73,18 @@ export function AddressPicker({
   // react-hooks/set-state-in-effect.
   useEffect(() => {
     if (!provinceId) return;
-    getGhnDistricts(Number(provinceId))
-      .then((res) => (res.ok ? setDistricts(res.data) : setError(res.error)))
+    fetchDistricts(Number(provinceId))
+      .then((res) => (res.ok ? setDistricts(res.data ?? []) : setError(res.error)))
       .finally(() => setLoadingDistricts(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provinceId]);
 
   useEffect(() => {
     if (!districtId) return;
-    getGhnWards(Number(districtId))
-      .then((res) => (res.ok ? setWards(res.data) : setError(res.error)))
+    fetchWards(Number(districtId))
+      .then((res) => (res.ok ? setWards(res.data ?? []) : setError(res.error)))
       .finally(() => setLoadingWards(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [districtId]);
 
   return (

@@ -10,6 +10,17 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const ORDERS_PAGE_SIZE = 30;
 
+// Đọc lại Order.selectedAttributes ([{name, value}]) ghi bởi buyNowAction (actions/buy-now.ts)
+// khi khách chọn thuộc tính lúc bấm "Mua ngay" — không tin dữ liệu JSON thô, lọc bỏ phần tử
+// sai dạng thay vì để lỗi runtime khi hiển thị ở trang chi tiết đơn.
+export function parseSelectedAttributes(value: unknown): { name: string; value: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (v): v is { name: string; value: string } =>
+      typeof v === "object" && v !== null && typeof (v as { name?: unknown }).name === "string" && typeof (v as { value?: unknown }).value === "string"
+  );
+}
+
 // Tab lọc trạng thái ở trang danh sách đơn (/admin/orders) — theo tinh thần tab trạng thái
 // nhiều nấc của GHN Dashboard (Đang giao / Đang hoàn hàng / Chờ xác nhận giao lại...),
 // nhưng đơn giản hoá theo đúng dữ liệu hệ thống này thật sự theo dõi được: OrderStatus nội
