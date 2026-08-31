@@ -9,6 +9,7 @@ import { asAttributes } from "@/lib/attributes";
 import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 import { TAG_LABEL, TAG_VALUES, asProductTags, type ProductTag } from "@/lib/tags";
 import { toDateTimeLocal } from "@/lib/datetime";
+import { compressImageForUpload } from "@/lib/client-image-compress";
 
 const initialState: ProductFormState = {};
 
@@ -48,9 +49,14 @@ export function ProductForm({
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }
 
-  function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
+  // Nén ngay trong trình duyệt trước khi đưa vào input thật — phần chậm khi đăng sản phẩm có
+  // nhiều ảnh chủ yếu là thời gian TRUYỀN file gốc (vài MB/ảnh) qua đường tải lên của người
+  // dùng khi bấm lưu, không phải xử lý phía server (server vẫn nén lại 1 lần nữa, xem
+  // lib/storage.ts). Xem lib/client-image-compress.ts.
+  async function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
-    const next = [...pendingFiles, ...selected].slice(0, MAX_IMAGES_PER_PRODUCT - keptImages.length);
+    const compressed = await Promise.all(selected.map(compressImageForUpload));
+    const next = [...pendingFiles, ...compressed].slice(0, MAX_IMAGES_PER_PRODUCT - keptImages.length);
     setPendingFiles(next);
     syncFileInput(fileInputRef.current, next);
   }

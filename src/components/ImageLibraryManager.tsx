@@ -6,6 +6,7 @@ import Image from "next/image";
 import { uploadLibraryImages, removeLibraryImage, removeLibraryImages } from "@/lib/actions/image-library";
 import { TOO_MANY_UPLOADS_ERROR } from "@/lib/image-library-messages";
 import { isOptimizableProductImage } from "@/lib/image-url";
+import { compressImageForUpload } from "@/lib/client-image-compress";
 
 type LibraryImage = { url: string; name: string };
 type UploadProgress = { done: number; total: number };
@@ -44,8 +45,12 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
     async function worker() {
       while (!rateLimited && nextIndex < files.length) {
         const file = files[nextIndex++];
+        // Nén ngay trong trình duyệt trước khi gửi — phần chậm thật sự nằm ở việc truyền file
+        // gốc (vài MB) qua đường tải lên của người dùng, không phải xử lý phía server (đã đo
+        // thật: server chỉ mất ~1 giây/ảnh). Xem lib/client-image-compress.ts.
+        const compressed = await compressImageForUpload(file);
         const formData = new FormData();
-        formData.append("images", file);
+        formData.append("images", compressed);
         const res = await uploadLibraryImages(undefined, formData);
         if (res.error === TOO_MANY_UPLOADS_ERROR) {
           // Chắc chắn các ảnh còn lại cũng sẽ bị chặn y hệt — dừng hẳn thay vì gọi tiếp vô ích.

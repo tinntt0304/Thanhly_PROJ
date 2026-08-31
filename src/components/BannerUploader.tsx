@@ -6,6 +6,7 @@ import Image from "next/image";
 import { addBannerImages, removeBannerImage, updateBannerInterval } from "@/lib/actions/site-content";
 import { isOptimizableProductImage } from "@/lib/image-url";
 import { MAX_BANNER_IMAGES } from "@/lib/product-limits";
+import { compressImageForUpload } from "@/lib/client-image-compress";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
@@ -40,8 +41,12 @@ export function BannerUploader({
       return;
     }
 
+    // Nén ngay trong trình duyệt trước khi gửi — phần chậm thật sự nằm ở việc truyền file gốc
+    // (vài MB) qua đường tải lên của người dùng, không phải xử lý phía server (xem
+    // lib/client-image-compress.ts).
+    const compressedFiles = await Promise.all(files.map(compressImageForUpload));
     const formData = new FormData();
-    files.forEach((f) => formData.append("banners", f));
+    compressedFiles.forEach((f) => formData.append("banners", f));
     setUploadPending(true);
     setUploadError(null);
     const res = await addBannerImages(undefined, formData);
