@@ -15,16 +15,24 @@ export async function getClientIp(): Promise<string> {
 // userId để gắn cooldown vào (đăng ký, đăng nhập). 1 câu lệnh SQL duy nhất (INSERT ...
 // ON CONFLICT) để atomic: 2 request đến gần như đồng thời vẫn tăng đếm đúng, không bị
 // race condition kiểu đọc rồi ghi riêng lẻ.
-// Trả về true nếu còn trong hạn mức (cho phép), false nếu đã vượt (chặn).
-export async function checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+// Trả về true nếu còn trong hạn mức (cho phép), false nếu đã vượt (chặn). weight (mặc định
+// 1) cho hành động 1 lượt gọi có thể "nặng" hơn 1 đơn vị thật (vd. upload nhiều ảnh cùng lúc
+// trong 1 request — đếm theo SỐ ẢNH chứ không phải số lượt gọi, tránh gửi ít lượt nhưng mỗi
+// lượt kèm rất nhiều file để né hạn mức đếm theo lượt gọi).
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+  weight: number = 1
+): Promise<boolean> {
   const rows = await prisma.$queryRaw<{ count: number }[]>`
     INSERT INTO "RateLimitHit" (key, "windowStart", count)
-    VALUES (${key}, now(), 1)
+    VALUES (${key}, now(), ${weight})
     ON CONFLICT (key) DO UPDATE SET
       count = CASE
         WHEN "RateLimitHit"."windowStart" < now() - (${windowSeconds}::text || ' seconds')::interval
-        THEN 1
-        ELSE "RateLimitHit".count + 1
+        THEN ${weight}
+        ELSE "RateLimitHit".count + ${weight}
       END,
       "windowStart" = CASE
         WHEN "RateLimitHit"."windowStart" < now() - (${windowSeconds}::text || ' seconds')::interval
@@ -33,6 +41,6 @@ export async function checkRateLimit(key: string, limit: number, windowSeconds: 
       END
     RETURNING count;
   `;
-  const count = rows[0]?.count ?? 1;
+  const count = rows[0]?.count ?? weight;
   return count <= limit;
 }

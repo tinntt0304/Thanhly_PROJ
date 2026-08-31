@@ -34,21 +34,22 @@ function getSupabaseAdmin() {
   return cachedClient;
 }
 
-// Gọi (rẻ, cache trong tiến trình) trước lần upload đầu tiên để tự tạo bucket nếu
-// project Supabase chưa có sẵn — người vận hành không cần bước setup thủ công riêng.
-// Theo dõi riêng từng bucket (Set) vì giờ có 2 bucket khác nhau (ảnh sản phẩm + banner).
-async function ensureBucket(supabase: ReturnType<typeof createClient>, bucket: string) {
-  if (ensuredBuckets.has(bucket)) return;
-
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) throw new Error(`Không đọc được danh sách bucket: ${listError.message}`);
-
-  if (!buckets.some((b) => b.name === bucket)) {
-    const { error: createError } = await supabase.storage.createBucket(bucket, {
-      public: true,
-      fileSizeLimit: MAX_IMAGE_BYTES,
-    });
-    if (createError) throw new Error(`Không tạo được bucket ảnh: ${createError.message}`);
+// Tạo bucket nếu chưa có — CHỈ gọi khi upload thật sự báo lỗi "bucket không tồn tại" (xem
+// uploadImage), không gọi trước mỗi lần upload như trước đây. listBuckets() trước đây chạy
+// lại mỗi lần function serverless khởi động lại (cache ensuredBuckets là in-memory, mất theo
+// mỗi cold start trên Vercel) — cộng thêm 1 lượt round-trip mạng vào MỌI request kể cả khi
+// bucket đã tồn tại từ lâu, dù trong 99% trường hợp bucket luôn đã có sẵn. Tạo theo kiểu
+// try-upload-trước, tạo-khi-thiếu giúp bỏ hẳn round-trip thừa đó ở đường thường gặp nhất.
+async function createBucketIfMissing(supabase: ReturnType<typeof createClient>, bucket: string) {
+  const { error } = await supabase.storage.createBucket(bucket, {
+    public: true,
+    fileSizeLimit: MAX_IMAGE_BYTES,
+  });
+  // Bỏ qua lỗi "đã tồn tại" — 2 request cùng gặp bucket thiếu gần như đồng thời có thể cùng
+  // chạy tới đây, chỉ 1 cái tạo thành công, cái còn lại nhận lỗi trùng nhưng mục tiêu (bucket
+  // đã tồn tại) vẫn đạt được, không phải lỗi thật.
+  if (error && !error.message?.toLowerCase().includes("already exists")) {
+    throw new Error(`Không tạo được bucket ảnh: ${error.message}`);
   }
   ensuredBuckets.add(bucket);
 }
@@ -87,7 +88,6 @@ async function uploadImage(file: File, bucket: string, pathPrefix = ""): Promise
   }
 
   const supabase = getSupabaseAdmin();
-  await ensureBucket(supabase, bucket);
 
   const rawBuffer = Buffer.from(await file.arrayBuffer());
   let uploadBuffer: Buffer<ArrayBufferLike> = rawBuffer;
@@ -104,10 +104,19 @@ async function uploadImage(file: File, bucket: string, pathPrefix = ""): Promise
   }
 
   const path = `${pathPrefix}${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, uploadBuffer, {
+  let { error } = await supabase.storage.from(bucket).upload(path, uploadBuffer, {
     contentType,
     upsert: false,
   });
+  // Chỉ tạo bucket + thử lại đúng 1 lần khi thật sự thiếu — đường thường gặp (bucket đã có)
+  // không tốn thêm round-trip nào so với upload thẳng.
+  if (error?.message === "Bucket not found" && !ensuredBuckets.has(bucket)) {
+    await createBucketIfMissing(supabase, bucket);
+    ({ error } = await supabase.storage.from(bucket).upload(path, uploadBuffer, {
+      contentType,
+      upsert: false,
+    }));
+  }
   if (error) throw new Error(`Upload ảnh "${file.name}" thất bại: ${error.message}`);
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -152,8 +161,8 @@ export type LibraryImage = { url: string; name: string; createdAt: string };
 
 export async function listLibraryImages(userId: string, limit = 200): Promise<LibraryImage[]> {
   const supabase = getSupabaseAdmin();
-  await ensureBucket(supabase, IMAGE_LIBRARY_BUCKET);
-
+  // Không cần ensureBucket ở đây — .list() trên bucket chưa tồn tại trả về mảng rỗng (không
+  // lỗi), y hệt thư mục rỗng, nên khỏi tốn round-trip kiểm tra trước.
   const { data, error } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).list(userId, {
     limit,
     sortBy: { column: "created_at", order: "desc" },
@@ -182,8 +191,11 @@ export function parseLibraryImagePath(url: string): { path: string; userId: stri
   return { path, userId };
 }
 
-export async function deleteLibraryImage(path: string): Promise<void> {
+// Nhận mảng path — Supabase remove() xoá nhiều file trong 1 lần gọi mạng duy nhất, dùng cho
+// cả xoá 1 ảnh (mảng 1 phần tử) lẫn xoá nhiều ảnh đã chọn, thay vì lặp N lượt gọi riêng lẻ.
+export async function deleteLibraryImages(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).remove([path]);
+  const { error } = await supabase.storage.from(IMAGE_LIBRARY_BUCKET).remove(paths);
   if (error) throw new Error(`Xoá ảnh thất bại: ${error.message}`);
 }
