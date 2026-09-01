@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/admin-guard";
 import { revalidatePath } from "next/cache";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export type ChatMessageDTO = {
   id: string;
@@ -41,6 +42,13 @@ export async function createChatSession(
   if (!parsedName.success) return { error: parsedName.error.issues[0]?.message };
   const parsedPhone = phoneSchema.safeParse(phone);
   if (!parsedPhone.success) return { error: parsedPhone.error.issues[0]?.message };
+
+  // Public, không đăng nhập — chặn spam tạo hàng loạt phiên chat rác (mỗi phiên là 1 dòng DB
+  // tồn tại lâu dài, không có TTL tự dọn).
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`chat-create-ip:${ip}`, 5, 600))) {
+    return { error: "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút." };
+  }
 
   const session = await prisma.chatSession.create({
     data: { visitorName: parsedName.data, visitorPhone: parsedPhone.data },
@@ -90,6 +98,13 @@ export async function sendVisitorMessage(
 ): Promise<{ error?: string }> {
   const parsed = contentSchema.safeParse(content);
   if (!parsed.success) return { error: "Nội dung tin nhắn không hợp lệ." };
+
+  // Public, không đăng nhập — chặn 1 script dội hàng loạt tin nhắn (mỗi tin tối đa 2000 ký
+  // tự) vào hộp thư admin. Giới hạn theo IP rộng rãi để không cản trở chat thật (nhắn nhanh).
+  const ip = await getClientIp();
+  if (!(await checkRateLimit(`chat-msg-ip:${ip}`, 30, 60))) {
+    return { error: "Bạn gửi tin nhắn quá nhanh, vui lòng thử lại sau ít giây." };
+  }
 
   const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
   if (!session) return { error: "Không tìm thấy phiên chat." };

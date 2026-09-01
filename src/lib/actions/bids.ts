@@ -4,6 +4,14 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAuctionState, isBiddingOpen, minNextBid } from "@/lib/auction";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+
+// Chặn 1 lượt trả giá duy nhất đẩy currentPrice lên gấp quá nhiều lần bước giá tối thiểu —
+// không cần đăng nhập, không rate-limit trước đây nên 1 request có thể set currentPrice lên
+// bất kỳ số nào (vd. 999,999,999,999đ), phá hẳn phiên đấu giá (không ai trả nổi mức tối thiểu
+// tiếp theo nữa) mà không cần gọi lại lần 2. Trần gắn theo minBidStep của chính sản phẩm (thay
+// vì 1 số tuyệt đối) nên co giãn tự nhiên theo giá trị món hàng, vẫn đủ rộng cho trả giá thật.
+const MAX_BID_STEP_MULTIPLE = 1000;
 
 const bidSchema = z.object({
   productId: z.string().min(1),
@@ -32,6 +40,17 @@ export async function placeBid(
 
   const { productId, phone, amount } = parsed.data;
 
+  // Public, không đăng nhập — chặn spam trả giá theo IP (1 script gọi liên tục) VÀ theo sản
+  // phẩm (nhiều IP/script cùng nhắm 1 sản phẩm), cùng tinh thần với buyNowAction.
+  const ip = await getClientIp();
+  const [ipOk, productOk] = await Promise.all([
+    checkRateLimit(`bid-ip:${ip}`, 20, 60),
+    checkRateLimit(`bid-product:${productId}`, 100, 60),
+  ]);
+  if (!ipOk || !productOk) {
+    return { error: "Bạn thao tác quá nhanh, vui lòng thử lại sau ít giây." };
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       const product = await tx.product.findUnique({ where: { id: productId } });
@@ -55,6 +74,11 @@ export async function placeBid(
       const minAllowed = minNextBid(product);
       if (amount < minAllowed) {
         throw new Error(`Mức giá phải từ ${minAllowed.toLocaleString("vi-VN")}đ trở lên.`);
+      }
+
+      const maxAllowed = product.currentPrice + product.minBidStep * MAX_BID_STEP_MULTIPLE;
+      if (amount > maxAllowed) {
+        throw new Error(`Mức giá tối đa cho 1 lượt trả giá là ${maxAllowed.toLocaleString("vi-VN")}đ.`);
       }
 
       // Optimistic concurrency: chỉ cập nhật nếu currentPrice chưa bị người khác trả giá

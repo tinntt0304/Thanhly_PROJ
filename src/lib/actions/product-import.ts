@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { parseImportFile, validateImportRow, type ImportRowInput } from "@/lib/product-import";
+import { MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS } from "@/lib/product-limits";
 
 export type ImportRowResult = {
   row: number;
@@ -44,6 +45,9 @@ export async function importProductsFromExcel(
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Vui lòng chọn file Excel để import." };
   }
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    return { error: `File Excel vượt quá ${MAX_IMPORT_FILE_BYTES / (1024 * 1024)}MB.` };
+  }
 
   let rows: ImportRowInput[];
   try {
@@ -55,6 +59,9 @@ export async function importProductsFromExcel(
 
   if (rows.length === 0) {
     return { error: "File không có dữ liệu sản phẩm nào." };
+  }
+  if (rows.length > MAX_IMPORT_ROWS) {
+    return { error: `File có ${rows.length} dòng, vượt quá tối đa ${MAX_IMPORT_ROWS} dòng/lần import. Hãy chia nhỏ file.` };
   }
 
   const results: ImportRowResult[] = [];
