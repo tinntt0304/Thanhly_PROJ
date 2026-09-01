@@ -44,8 +44,12 @@ export type BuyNowState = { error?: string; success?: boolean; orderId?: string 
 // thông tin nhận hàng rồi tạo thẳng 1 Order — hiện ngay trong "Quản lý đơn hàng" của
 // người bán ở admin (/admin/orders), y hệt đơn tạo thủ công, không cần thao tác gì thêm
 // từ phía admin. Vì gọi công khai (không qua requireAdmin) nên phải tự kiểm tra kỹ hơn
-// createOrder ở actions/orders.ts: rate-limit theo IP, khoá trạng thái sản phẩm bằng
-// updateMany có điều kiện để 2 người bấm "Mua ngay" gần như đồng thời không cùng thành công.
+// createOrder ở actions/orders.ts: rate-limit theo IP, trừ kho bằng updateMany có điều
+// kiện để 2 người bấm "Mua ngay" gần như đồng thời không cùng trừ được 1 đơn vị cuối cùng.
+//
+// Mua ngay và đấu giá là 2 lối mua ĐỘC LẬP cho cùng 1 sản phẩm nhiều số lượng (quantity):
+// mua ngay chỉ trừ kho, không tự đóng phiên đấu giá — người khác vẫn tiếp tục trả giá/mua
+// ngay thêm bình thường cho tới khi quantity về 0 mới coi là hết hàng (status: SOLD).
 export async function buyNowAction(
   productId: string,
   _prevState: BuyNowState | undefined,
@@ -117,15 +121,27 @@ export async function buyNowAction(
 
   try {
     const order = await prisma.$transaction(async (tx) => {
-      // updateMany có điều kiện status: "ACTIVE" — 2 người cùng bấm "Mua ngay" gần như
-      // đồng thời chỉ 1 người cập nhật thành công, người còn lại nhận lỗi rõ ràng thay vì
-      // tạo thêm 1 đơn cho sản phẩm đã bán.
+      // Mua ngay chỉ trừ đi 1 đơn vị trong quantity — KHÔNG tự động đóng cả phiên đấu giá
+      // nếu vẫn còn hàng. Người khác vẫn tiếp tục trả giá/mua ngay được thêm cho tới khi hết
+      // hàng thật sự (quantity về 0) mới chuyển status sang SOLD. updateMany có điều kiện
+      // status: "ACTIVE" + quantity: {gt: 0} — 2 người cùng bấm "Mua ngay" gần như đồng thời
+      // khi chỉ còn đúng 1 đơn vị thì chỉ 1 người trừ kho thành công (Postgres khoá dòng lúc
+      // UPDATE, người tới sau đọc lại quantity đã về 0 nên điều kiện gt:0 không còn đúng),
+      // người còn lại nhận lỗi rõ ràng thay vì tạo thêm 1 đơn cho hàng đã hết.
       const updateResult = await tx.product.updateMany({
-        where: { id: productId, status: "ACTIVE" },
-        data: { status: "SOLD" },
+        where: { id: productId, status: "ACTIVE", quantity: { gt: 0 } },
+        data: { quantity: { decrement: 1 } },
       });
       if (updateResult.count === 0) {
-        throw new Error("Sản phẩm này vừa được mua hoặc phiên đấu giá đã kết thúc, vui lòng tải lại trang.");
+        throw new Error("Sản phẩm này vừa hết hàng hoặc phiên đấu giá đã kết thúc, vui lòng tải lại trang.");
+      }
+
+      const remaining = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        select: { quantity: true },
+      });
+      if (remaining.quantity <= 0) {
+        await tx.product.update({ where: { id: productId }, data: { status: "SOLD" } });
       }
 
       let sellerId = product.sellerId;
