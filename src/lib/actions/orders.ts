@@ -594,6 +594,7 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
+  if (order.status === "CANCELLED") return { ok: true }; // đã huỷ rồi — tránh hoàn kho 2 lần nếu gọi lại
 
   if (order.ghnOrderCode && order.status === "SHIPPING") {
     try {
@@ -603,9 +604,33 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
     }
   }
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+
+    // Đơn tạo từ "Mua ngay" (buyNowAction) đã trừ 1 đơn vị Product.quantity lúc tạo — huỷ
+    // đơn thì hoàn lại đúng đơn vị đó. Đơn tạo thủ công ở admin (kể cả từ người thắng đấu
+    // giá) không đụng quantity nên cũng không hoàn gì ở đây (stockDecremented = false).
+    if (order.stockDecremented) {
+      const before = await tx.product.findUniqueOrThrow({
+        where: { id: order.productId },
+        select: { quantity: true, status: true },
+      });
+      await tx.product.update({ where: { id: order.productId }, data: { quantity: { increment: 1 } } });
+      // Chỉ tự mở lại (ACTIVE) đúng trường hợp sản phẩm đang SOLD VÌ hết hàng (quantity đã
+      // về 0 — khớp điều kiện buyNowAction dùng để chuyển SOLD) — không đụng tới trường hợp
+      // người bán tự tay đánh dấu đã bán trong khi vẫn còn hàng (quyết định riêng của họ,
+      // huỷ 1 đơn khác không nên tự ý đảo ngược). Không reset currentPrice như "Mở lại" thủ
+      // công (setProductStatus) — đây chỉ là hoàn lại 1 đơn vị, không phải khởi động lại
+      // phiên đấu giá từ đầu.
+      if (before.status === "SOLD" && before.quantity === 0) {
+        await tx.product.update({ where: { id: order.productId }, data: { status: "ACTIVE" } });
+      }
+    }
+  });
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
+  revalidatePath(`/products/${order.productId}`);
+  revalidatePath("/");
   return { ok: true };
 }

@@ -171,6 +171,7 @@ export async function buyNowAction(
           heightCm: DEFAULT_HEIGHT_CM,
           note: data.note || null,
           selectedAttributes,
+          stockDecremented: true, // đã trừ 1 đơn vị quantity ở trên — huỷ đơn (cancelOrder) sẽ hoàn lại đúng đơn vị này
         },
       });
     });

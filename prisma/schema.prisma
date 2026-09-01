@@ -150,6 +150,13 @@ model Order {
 
   selectedAttributes Json @default("[]") // thuộc tính người mua chọn khi bấm "Mua ngay": [{ name, value }] — rỗng nếu đơn tạo thủ công từ admin hoặc sản phẩm không có thuộc tính
 
+  // true nếu đơn này đã trừ 1 đơn vị Product.quantity lúc tạo (hiện chỉ buyNowAction làm
+  // việc này — đơn tạo thủ công ở admin, kể cả từ người thắng đấu giá, KHÔNG đụng tới
+  // quantity). Dùng để biết chính xác có nên hoàn lại quantity khi huỷ đơn hay không — cần
+  // 1 cờ tường minh vì không thể suy ngược lại "đơn này có từng trừ kho hay chưa" chỉ từ
+  // trạng thái hiện tại của Product (nhiều đơn có thể cùng ảnh hưởng 1 Product).
+  stockDecremented Boolean @default(false)
+
   status OrderStatus @default(NEW)
 
   ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
