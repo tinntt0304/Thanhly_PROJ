@@ -97,8 +97,27 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
 
             <ShareButtons url={`${getSiteUrl()}/products/${product.id}`} title={product.title} />
 
+            {/* Mua ngay đặt TRƯỚC, tách hẳn khỏi khối đấu giá bên dưới — 2 lối mua độc lập,
+                không phải Mua ngay là 1 bước "sau khi đã đấu giá". */}
+            {product.buyNowPrice && (
+              <BuyNowButton
+                productId={product.id}
+                buyNowPrice={product.buyNowPrice}
+                attributes={attributes}
+                canBuy={state === "BIDDING"}
+              />
+            )}
+
+            {product.buyNowPrice && state === "BIDDING" && (
+              <div className="flex items-center gap-3 text-xs font-medium text-neutral-400">
+                <span className="h-px flex-1 bg-neutral-200" />
+                HOẶC ĐẤU GIÁ
+                <span className="h-px flex-1 bg-neutral-200" />
+              </div>
+            )}
+
             <div className="rounded-lg border border-neutral-200 bg-surface p-4">
-              <p className="text-sm text-neutral-700">Giá hiện tại</p>
+              <p className="text-sm text-neutral-700">Giá đấu giá hiện tại</p>
               <p className="font-heading text-2xl font-bold text-text">
                 {formatVND(product.currentPrice)}
               </p>
@@ -108,15 +127,6 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                 </p>
               )}
             </div>
-
-            {product.buyNowPrice && (
-              <BuyNowButton
-                productId={product.id}
-                buyNowPrice={product.buyNowPrice}
-                attributes={attributes}
-                canBuy={state === "BIDDING"}
-              />
-            )}
 
             {state === "BIDDING" && (
               <BidForm productId={product.id} minAllowed={minNextBid(product)} />

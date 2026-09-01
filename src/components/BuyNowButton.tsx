@@ -59,13 +59,24 @@ export function BuyNowButton({
   return (
     <>
       {!state.success && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-md bg-accent-2-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-2-700"
-        >
-          Mua ngay — {formatVND(buyNowPrice)}
-        </button>
+        // Bọc trong 1 khối riêng có viền + tiêu đề — tránh nhìn giống 1 bước trong luồng đấu
+        // giá (ngay sát ô "Trả giá" bên dưới). Mua ngay là lối đi RIÊNG, độc lập hoàn toàn:
+        // chốt đúng giá này, không phụ thuộc có ai đã trả giá hay chưa, không cần chờ.
+        <div className="flex flex-col gap-2 rounded-lg border border-accent-2-300 bg-accent-2-50 p-4">
+          <div>
+            <p className="text-sm font-semibold text-accent-2-700">🛒 Mua ngay — không cần đấu giá</p>
+            <p className="text-xs text-neutral-600">
+              Chốt ngay giá cố định bên dưới, khỏi chờ đấu giá hay so kè với ai.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="self-start rounded-md bg-accent-2-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-2-700"
+          >
+            Mua ngay — {formatVND(buyNowPrice)}
+          </button>
+        </div>
       )}
 
       {open && (
