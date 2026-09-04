@@ -14,7 +14,6 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
   const boundUpdate = updateOrder.bind(null, order.id);
   const locks = getOrderFieldLocks(order.ghnStatus);
-  const selectedAttributes = parseSelectedAttributes(order.selectedAttributes);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -23,27 +22,40 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         <span className="text-sm text-neutral-700">Trạng thái: {orderDisplayStatusLabel(order)}</span>
       </div>
 
-      <p className="text-sm text-neutral-600">
-        Sản phẩm:{" "}
-        <Link href={`/admin/products/${order.product.id}`} className="font-medium text-accent-600 hover:underline">
-          {order.product.title}
-        </Link>{" "}
-        · Tạo lúc: {formatDateTime(order.createdAt)}
-      </p>
+      <p className="text-xs text-neutral-500">Tạo lúc: {formatDateTime(order.createdAt)}</p>
 
-      {selectedAttributes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-surface p-3 text-sm">
-          <span className="font-medium text-text">Khách chọn:</span>
-          {selectedAttributes.map((attr, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center rounded-full bg-accent-2-100 px-2.5 py-0.5 text-xs font-medium text-accent-2-700"
-            >
-              {attr.name}: {attr.value}
-            </span>
-          ))}
-        </div>
-      )}
+      <ul className="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-surface">
+        {order.items.map((item) => {
+          const selectedAttributes = parseSelectedAttributes(item.selectedAttributes);
+          return (
+            <li key={item.id} className="flex flex-col gap-1.5 p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  href={`/admin/products/${item.product.id}`}
+                  className="font-medium text-accent-600 hover:underline"
+                >
+                  {item.product.title}
+                </Link>
+                <span className="text-neutral-700">
+                  {item.quantity} × {formatVND(item.unitPrice)}
+                </span>
+              </div>
+              {selectedAttributes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedAttributes.map((attr, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center rounded-full bg-accent-2-100 px-2.5 py-0.5 text-xs font-medium text-accent-2-700"
+                    >
+                      {attr.name}: {attr.value}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
       <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
         <h2 className="font-heading text-sm font-bold text-text">Thông tin đơn hàng</h2>

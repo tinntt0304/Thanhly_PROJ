@@ -21,12 +21,20 @@ export default async function BuyerOrderHistoryPage() {
           <ul className="flex flex-col gap-3">
             {items.map((order) => (
               <li key={order.id} className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <div>
-                    <p className="font-medium text-text">{order.product.title}</p>
-                    <p className="text-xs text-neutral-500">{formatDateTime(order.createdAt)}</p>
-                  </div>
-                  <span className="font-medium text-text">{formatVND(order.codAmount)}</span>
+                <div className="flex flex-col gap-1 text-sm">
+                  {order.items.map((item) => (
+                    <div key={item.id} className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-text">
+                        {item.product.title}
+                        {item.quantity > 1 && ` × ${item.quantity}`}
+                      </span>
+                      <span className="text-neutral-700">{formatVND(item.unitPrice * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2 text-sm">
+                  <p className="text-xs text-neutral-500">{formatDateTime(order.createdAt)}</p>
+                  <span className="font-semibold text-text">Tổng: {formatVND(order.codAmount)}</span>
                 </div>
                 <OrderTrackingSteps tracking={getOrderTracking(order)} />
               </li>

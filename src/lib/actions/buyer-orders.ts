@@ -19,7 +19,7 @@ export async function listMyOrders(page: number = 1) {
       orderBy: { createdAt: "desc" },
       skip: (safePage - 1) * ORDERS_PAGE_SIZE,
       take: ORDERS_PAGE_SIZE,
-      include: { product: { select: { title: true, images: true } } },
+      include: { items: { include: { product: { select: { title: true, images: true } } } } },
     }),
     prisma.order.count({ where }),
   ]);
@@ -34,7 +34,7 @@ export async function getMyOrders(orderIds: string[]) {
   if (orderIds.length === 0) return [];
   return prisma.order.findMany({
     where: { id: { in: orderIds }, buyerId: session.user.id },
-    include: { product: { select: { title: true, images: true } } },
+    include: { items: { include: { product: { select: { title: true, images: true } } } } },
   });
 }
 

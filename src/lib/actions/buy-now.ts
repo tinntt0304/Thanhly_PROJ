@@ -159,7 +159,6 @@ export async function buyNowAction(
       return tx.order.create({
         data: {
           sellerId,
-          productId,
           buyerId: session?.user.id ?? null,
           buyerName: data.buyerName,
           buyerPhone: data.buyerPhone,
@@ -176,8 +175,10 @@ export async function buyNowAction(
           widthCm: DEFAULT_WIDTH_CM,
           heightCm: DEFAULT_HEIGHT_CM,
           note: data.note || null,
-          selectedAttributes,
-          stockDecremented: true, // đã trừ 1 đơn vị quantity ở trên — huỷ đơn (cancelOrder) sẽ hoàn lại đúng đơn vị này
+          items: {
+            // đã trừ 1 đơn vị quantity ở trên — huỷ đơn (cancelOrder) sẽ hoàn lại đúng đơn vị này
+            create: [{ productId, quantity: 1, unitPrice: product.buyNowPrice!, selectedAttributes, stockDecremented: true }],
+          },
         },
       });
     });

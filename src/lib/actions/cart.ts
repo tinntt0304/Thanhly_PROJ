@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { getAuctionState, isBiddingOpen } from "@/lib/auction";
 import { asAttributes } from "@/lib/attributes";
+import type { Prisma } from "@/generated/prisma/client";
 
 // Kích thước/cân nặng mặc định — giống hệt buyNowAction (actions/buy-now.ts), người bán chỉnh
 // lại đúng số đo thật trước khi tạo vận đơn GHN nếu cần.
@@ -98,6 +99,11 @@ export type CheckoutCartState =
 // không còn mua được (hết hàng/đã huỷ/hết phiên) thì rollback toàn bộ, báo lỗi rõ sản phẩm nào,
 // không checkout một phần (tránh buyer hiểu lầm "đã đặt hết" trong khi thiếu vài món). Lặp lại
 // đúng pattern optimistic-lock của buyNowAction (actions/buy-now.ts) cho từng sản phẩm trong giỏ.
+//
+// Gộp theo người bán: nhiều sản phẩm CÙNG 1 seller trong giỏ → 1 Order duy nhất (nhiều
+// OrderItem) để dễ theo dõi/tạo 1 vận đơn GHN chung — giống cách Shopee tách đơn theo shop lúc
+// checkout. Giỏ có sản phẩm của nhiều seller khác nhau thì vẫn ra nhiều Order, mỗi seller 1 đơn
+// riêng (Order chỉ có đúng 1 sellerId, không gộp được xuyên seller).
 export async function checkoutCart(
   _prevState: CheckoutCartState | undefined,
   formData: FormData
@@ -131,7 +137,10 @@ export async function checkoutCart(
 
   try {
     const orderIds = await prisma.$transaction(async (tx) => {
-      const ids: string[] = [];
+      const bySeller = new Map<
+        string,
+        { productId: string; unitPrice: number; selectedAttributes: unknown }[]
+      >();
 
       for (const item of cartItems) {
         const { product } = item;
@@ -170,10 +179,21 @@ export async function checkoutCart(
           sellerId = superadmin.id;
         }
 
+        const group = bySeller.get(sellerId) ?? [];
+        group.push({
+          productId: product.id,
+          unitPrice: product.buyNowPrice,
+          selectedAttributes: item.selectedAttributes ?? [],
+        });
+        bySeller.set(sellerId, group);
+      }
+
+      const ids: string[] = [];
+      for (const [sellerId, items] of bySeller) {
+        const codAmount = items.reduce((sum, i) => sum + i.unitPrice, 0);
         const order = await tx.order.create({
           data: {
             sellerId,
-            productId: product.id,
             buyerId: session.user.id,
             buyerName: data.buyerName,
             buyerPhone: data.buyerPhone,
@@ -184,14 +204,21 @@ export async function checkoutCart(
             districtName: data.districtName,
             wardCode: data.wardCode,
             wardName: data.wardName,
-            codAmount: product.buyNowPrice,
-            weightGram: DEFAULT_WEIGHT_GRAM,
+            codAmount,
+            weightGram: DEFAULT_WEIGHT_GRAM * items.length,
             lengthCm: DEFAULT_LENGTH_CM,
             widthCm: DEFAULT_WIDTH_CM,
             heightCm: DEFAULT_HEIGHT_CM,
             note: data.note || null,
-            selectedAttributes: item.selectedAttributes ?? [],
-            stockDecremented: true,
+            items: {
+              create: items.map((i) => ({
+                productId: i.productId,
+                quantity: 1,
+                unitPrice: i.unitPrice,
+                selectedAttributes: i.selectedAttributes as Prisma.InputJsonValue,
+                stockDecremented: true,
+              })),
+            },
           },
         });
         ids.push(order.id);

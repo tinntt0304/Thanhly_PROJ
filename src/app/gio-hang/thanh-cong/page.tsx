@@ -24,11 +24,24 @@ export default async function CartCheckoutSuccessPage({
         </div>
 
         {orders.length > 0 && (
-          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-surface">
+          <ul className="flex flex-col gap-3">
             {orders.map((order) => (
-              <li key={order.id} className="flex items-center justify-between gap-2 p-3 text-sm">
-                <span className="text-text">{order.product.title}</span>
-                <span className="font-medium text-text">{formatVND(order.codAmount)}</span>
+              <li key={order.id} className="rounded-lg border border-neutral-200 bg-surface p-3 text-sm">
+                <ul className="flex flex-col gap-1">
+                  {order.items.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-2">
+                      <span className="text-text">
+                        {item.product.title}
+                        {item.quantity > 1 && ` × ${item.quantity}`}
+                      </span>
+                      <span className="text-neutral-700">{formatVND(item.unitPrice * item.quantity)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 flex items-center justify-between border-t border-neutral-100 pt-2 font-medium text-text">
+                  <span>Tổng</span>
+                  <span>{formatVND(order.codAmount)}</span>
+                </div>
               </li>
             ))}
           </ul>

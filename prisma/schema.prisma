@@ -104,9 +104,9 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bids      Bid[]
-  orders    Order[]
-  cartItems CartItem[]
+  bids       Bid[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
 
   @@index([status, endTime])
 }
@@ -145,16 +145,16 @@ enum OrderStatus {
 // Đơn hàng tạo ra từ 1 sản phẩm đã "Đánh dấu đã bán" (xem product.tsx), HOẶC người mua tự
 // bấm "Mua ngay" ở trang sản phẩm công khai (xem actions/buy-now.ts) — gắn với đơn vị vận
 // chuyển GHN (Giao Hàng Nhanh) để tạo vận đơn thật + theo dõi trạng thái giao hàng.
-// Không unique theo productId: 1 sản phẩm có thể tạo lại đơn (sửa sai) hoặc bán nhiều
-// lượt (quantity > 1) nên cho phép nhiều Order/1 Product.
+// 1 Order = 1 lượt giao hàng (1 vận đơn GHN) tới 1 người nhận, có thể gồm NHIỀU sản phẩm
+// (OrderItem) — vd. checkout cả giỏ hàng của cùng 1 người bán gộp thành 1 Order duy nhất thay
+// vì tách riêng từng sản phẩm 1 đơn (giỏ hàng có sản phẩm của nhiều người bán khác nhau thì mỗi
+// người bán vẫn ra 1 Order riêng, vì mỗi Order chỉ có 1 sellerId — giống cách Shopee tách đơn
+// theo shop lúc checkout). Mua ngay/tạo đơn thủ công ở admin vẫn tạo Order với đúng 1 OrderItem.
 model Order {
   id String @id @default(cuid())
 
   seller   User   @relation("OrderAsSeller", fields: [sellerId], references: [id])
   sellerId String
-
-  product   Product @relation(fields: [productId], references: [id])
-  productId String
 
   // Gắn tài khoản người mua nếu lúc tạo đơn đã đăng nhập (Mua ngay hoặc checkout giỏ hàng) —
   // null cho đơn khách vãng lai (vẫn hợp lệ). buyerName/Phone/Address vẫn giữ nguyên dạng text
@@ -174,23 +174,14 @@ model Order {
   wardCode     String
   wardName     String
 
-  codAmount  Int // tiền thu hộ khi giao (VNĐ) — 0 nếu người mua đã thanh toán trước
-  weightGram Int     @default(500)
+  codAmount  Int // tổng tiền thu hộ khi giao (VNĐ) — tổng unitPrice*quantity của các OrderItem; 0 nếu người mua đã thanh toán trước
+  weightGram Int     @default(500) // cân nặng/kích thước cả kiện hàng (gộp tất cả OrderItem), không phải riêng từng sản phẩm
   lengthCm   Int     @default(20)
   widthCm    Int     @default(20)
   heightCm   Int     @default(10)
   note       String?
 
   shopPaysShipping Boolean @default(false) // false = người mua trả phí ship khi nhận hàng, true = shop tự trả
-
-  selectedAttributes Json @default("[]") // thuộc tính người mua chọn khi bấm "Mua ngay": [{ name, value }] — rỗng nếu đơn tạo thủ công từ admin hoặc sản phẩm không có thuộc tính
-
-  // true nếu đơn này đã trừ 1 đơn vị Product.quantity lúc tạo (hiện chỉ buyNowAction làm
-  // việc này — đơn tạo thủ công ở admin, kể cả từ người thắng đấu giá, KHÔNG đụng tới
-  // quantity). Dùng để biết chính xác có nên hoàn lại quantity khi huỷ đơn hay không — cần
-  // 1 cờ tường minh vì không thể suy ngược lại "đơn này có từng trừ kho hay chưa" chỉ từ
-  // trạng thái hiện tại của Product (nhiều đơn có thể cùng ảnh hưởng 1 Product).
-  stockDecremented Boolean @default(false)
 
   status OrderStatus @default(NEW)
 
@@ -199,15 +190,42 @@ model Order {
   shippingFee        Int?
   expectedDeliveryAt DateTime?
 
+  items OrderItem[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([sellerId, status])
-  @@index([productId])
   @@index([buyerId])
   @@index([ghnOrderCode])
   @@index([ghnStatus]) // tab SHIPPING/RETURNING/ISSUE ở /admin/orders lọc theo ghnStatus IN (...)
   @@index([createdAt]) // tab list sắp xếp + lọc theo khoảng ngày tạo
+}
+
+// 1 dòng sản phẩm trong 1 Order — tách khỏi Order (trước đây Order gắn thẳng 1 productId) để 1
+// Order chứa được nhiều sản phẩm cùng lúc (gộp giỏ hàng cùng người bán vào 1 đơn duy nhất).
+model OrderItem {
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  quantity  Int // số lượng sản phẩm này trong đơn — Mua ngay/checkout giỏ hàng hiện luôn tạo 1 dòng/lần bấm nên quantity = 1, nhưng để sẵn > 1 cho admin tạo đơn thủ công sau này
+  unitPrice Int // giá 1 đơn vị TẠI THỜI ĐIỂM MUA (buyNowPrice lúc đó) — giữ nguyên dù giá sản phẩm sau này đổi
+
+  selectedAttributes Json @default("[]") // thuộc tính người mua chọn cho riêng sản phẩm này: [{ name, value }] — rỗng nếu đơn tạo thủ công từ admin hoặc sản phẩm không có thuộc tính
+
+  // true nếu dòng này đã trừ đúng `quantity` đơn vị Product.quantity lúc tạo (hiện chỉ
+  // buyNowAction/checkoutCart làm việc này — đơn tạo thủ công ở admin, kể cả từ người thắng đấu
+  // giá, KHÔNG đụng tới quantity). Dùng để biết chính xác có nên hoàn lại quantity khi huỷ đơn
+  // hay không — cần 1 cờ tường minh vì không thể suy ngược lại "dòng này có từng trừ kho hay
+  // chưa" chỉ từ trạng thái hiện tại của Product (nhiều OrderItem có thể cùng ảnh hưởng 1 Product).
+  stockDecremented Boolean @default(false)
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Bid {

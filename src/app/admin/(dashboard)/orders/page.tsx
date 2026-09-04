@@ -123,7 +123,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
                 <tr key={order.id}>
                   <td className="px-4 py-2">
                     <Link href={`/admin/orders/${order.id}`} className="font-medium text-text hover:underline">
-                      {order.product.title}
+                      {order.items[0]?.product.title ?? "—"}
+                      {order.items.length > 1 && ` và ${order.items.length - 1} sản phẩm khác`}
                     </Link>
                     {order.ghnOrderCode && (
                       <span className="block font-mono text-xs text-neutral-500">{order.ghnOrderCode}</span>

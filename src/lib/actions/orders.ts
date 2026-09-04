@@ -236,7 +236,6 @@ export async function createOrder(
   const order = await prisma.order.create({
     data: {
       sellerId: product.sellerId ?? session.user.id,
-      productId: product.id,
       buyerName: data.buyerName,
       buyerPhone: data.buyerPhone,
       buyerAddress: data.buyerAddress,
@@ -253,6 +252,9 @@ export async function createOrder(
       heightCm: data.heightCm,
       note: data.note || null,
       shopPaysShipping: data.shopPaysShipping,
+      items: {
+        create: [{ productId: product.id, quantity: 1, unitPrice: data.codAmount }],
+      },
     },
   });
 
@@ -276,7 +278,10 @@ export async function updateOrder(
     return { error: e instanceof Error ? e.message : "Không có quyền." };
   }
 
-  const existing = await prisma.order.findUnique({ where: { id: orderId }, include: { product: true } });
+  const existing = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { product: true } } },
+  });
   if (!existing) return { error: "Không tìm thấy đơn hàng." };
   if (existing.status === "CANCELLED") return { error: "Đơn đã huỷ, không sửa được nữa." };
 
@@ -318,7 +323,7 @@ export async function updateOrder(
         heightCm: data.heightCm,
         codAmount: data.codAmount,
         insuranceValue: Math.min(data.codAmount, 5_000_000),
-        content: existing.product.title,
+        content: existing.items.map((i) => i.product.title).join(", "),
         paymentTypeId: data.shopPaysShipping ? 1 : 2,
         note: data.note,
       });
@@ -404,7 +409,10 @@ export async function listOrders(
       orderBy: { createdAt: "desc" },
       skip: (safePage - 1) * ORDERS_PAGE_SIZE,
       take: ORDERS_PAGE_SIZE,
-      include: { product: { select: { title: true } }, seller: { select: { name: true } } },
+      include: {
+        items: { include: { product: { select: { title: true } } } },
+        seller: { select: { name: true } },
+      },
     }),
     prisma.order.count({ where }),
     Promise.all(
@@ -428,7 +436,7 @@ export async function getOrder(orderId: string) {
   const session = await requireAdmin();
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { product: { select: { id: true, title: true, images: true } } },
+    include: { items: { include: { product: { select: { id: true, title: true, images: true } } } } },
   });
   if (!order) return null;
   if (session.user.role !== "SUPERADMIN" && order.sellerId !== session.user.id) return null;
@@ -510,7 +518,10 @@ export async function createGhnShipment(
     return { ok: false, error: "Chưa chọn gói vận chuyển." };
   }
 
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { product: true } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { product: { select: { title: true } } } } },
+  });
   if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
   if (order.ghnOrderCode) return { ok: false, error: "Đơn này đã có vận đơn GHN rồi." };
   if (order.status === "CANCELLED") return { ok: false, error: "Đơn đã huỷ, không tạo vận đơn được." };
@@ -528,11 +539,11 @@ export async function createGhnShipment(
       heightCm: order.heightCm,
       codAmount: order.codAmount,
       insuranceValue: Math.min(order.codAmount, 5_000_000),
-      content: order.product.title,
+      content: order.items.map((i) => i.product.title).join(", "),
       requiredNote,
       paymentTypeId: order.shopPaysShipping ? 1 : 2,
       clientOrderCode: order.id,
-      items: [{ name: order.product.title, quantity: 1 }],
+      items: order.items.map((i) => ({ name: i.product.title, quantity: i.quantity })),
       serviceId,
       serviceTypeId,
     });
@@ -592,7 +603,7 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Không có quyền." };
   }
 
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
   if (order.status === "CANCELLED") return { ok: true }; // đã huỷ rồi — tránh hoàn kho 2 lần nếu gọi lại
 
@@ -607,30 +618,37 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
   await prisma.$transaction(async (tx) => {
     await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
 
-    // Đơn tạo từ "Mua ngay" (buyNowAction) đã trừ 1 đơn vị Product.quantity lúc tạo — huỷ
-    // đơn thì hoàn lại đúng đơn vị đó. Đơn tạo thủ công ở admin (kể cả từ người thắng đấu
-    // giá) không đụng quantity nên cũng không hoàn gì ở đây (stockDecremented = false).
-    if (order.stockDecremented) {
+    // Dòng nào tạo từ "Mua ngay"/checkout giỏ hàng đã trừ đúng `quantity` đơn vị
+    // Product.quantity lúc tạo — huỷ đơn thì hoàn lại đúng số đó cho TỪNG dòng. Dòng tạo thủ
+    // công ở admin (kể cả từ người thắng đấu giá) không đụng quantity nên cũng không hoàn gì
+    // ở đây (stockDecremented = false).
+    for (const item of order.items) {
+      if (!item.stockDecremented) continue;
       const before = await tx.product.findUniqueOrThrow({
-        where: { id: order.productId },
+        where: { id: item.productId },
         select: { quantity: true, status: true },
       });
-      await tx.product.update({ where: { id: order.productId }, data: { quantity: { increment: 1 } } });
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: { increment: item.quantity } },
+      });
       // Chỉ tự mở lại (ACTIVE) đúng trường hợp sản phẩm đang SOLD VÌ hết hàng (quantity đã
       // về 0 — khớp điều kiện buyNowAction dùng để chuyển SOLD) — không đụng tới trường hợp
       // người bán tự tay đánh dấu đã bán trong khi vẫn còn hàng (quyết định riêng của họ,
       // huỷ 1 đơn khác không nên tự ý đảo ngược). Không reset currentPrice như "Mở lại" thủ
-      // công (setProductStatus) — đây chỉ là hoàn lại 1 đơn vị, không phải khởi động lại
+      // công (setProductStatus) — đây chỉ là hoàn lại đơn vị đã trừ, không phải khởi động lại
       // phiên đấu giá từ đầu.
       if (before.status === "SOLD" && before.quantity === 0) {
-        await tx.product.update({ where: { id: order.productId }, data: { status: "ACTIVE" } });
+        await tx.product.update({ where: { id: item.productId }, data: { status: "ACTIVE" } });
       }
     }
   });
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
-  revalidatePath(`/products/${order.productId}`);
+  for (const item of order.items) {
+    revalidatePath(`/products/${item.productId}`);
+  }
   revalidatePath("/");
   return { ok: true };
 }
