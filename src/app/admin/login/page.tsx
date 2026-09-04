@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/LoginForm";
+import { AuthAudienceTabs } from "@/components/AuthAudienceTabs";
 import { Logo } from "@/components/Logo";
 
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
@@ -9,6 +10,7 @@ export default async function AdminLoginPage({ searchParams }: PageProps<"/admin
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
       <Logo size="lg" withTagline href={null} />
       <div className="flex w-full max-w-sm flex-col gap-4">
+        <AuthAudienceTabs active="seller" mode="login" />
         <h1 className="font-heading text-lg font-bold text-text">Đăng nhập người bán</h1>
         {verified === "1" && (
           <p className="rounded-md bg-accent-2-100 px-3 py-2 text-sm text-accent-2-700">

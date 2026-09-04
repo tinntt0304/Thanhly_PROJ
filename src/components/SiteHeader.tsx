@@ -52,14 +52,15 @@ export async function SiteHeader() {
               </form>
             </div>
           ) : (
-            <div className="flex items-center gap-3 border-r border-neutral-700 pr-4 text-sm text-neutral-200">
-              <Link href="/dang-nhap" className="transition-colors hover:text-white">
-                Đăng nhập
-              </Link>
-              <Link href="/dang-ky" className="transition-colors hover:text-white">
-                Đăng ký
-              </Link>
-            </div>
+            // 1 nút gộp duy nhất thay vì 2 link "Đăng nhập"/"Đăng ký" rời rạc đứng cạnh cụm
+            // người bán — dễ gây hiểu lầm "đăng nhập cái gì" (feedback người dùng). Trang đích
+            // /dang-nhap có sẵn tab chuyển sang "Người bán" nếu cần, xem AuthAudienceTabs.
+            <Link
+              href="/dang-nhap"
+              className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+            >
+              Đăng nhập / Đăng ký
+            </Link>
           )}
 
           {session ? (
@@ -85,9 +86,12 @@ export async function SiteHeader() {
               </form>
             </div>
           ) : (
+            // Ghost/outline (không phải nút đặc accent-500) — chủ ý làm nhẹ hơn nút mua hàng ở
+            // trên, vì đối tượng chính của trang công khai là người mua, người bán chỉ là lối
+            // vào phụ (secondary).
             <Link
               href="/admin/login"
-              className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+              className="rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
             >
               Người bán
             </Link>
