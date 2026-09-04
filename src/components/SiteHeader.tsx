@@ -29,7 +29,7 @@ export async function SiteHeader() {
         <div className="flex items-center gap-4">
           <Clock className="hidden text-neutral-50 sm:block" />
 
-          {buyerSession ? (
+          {buyerSession && (
             <div className="flex items-center gap-3 border-r border-neutral-700 pr-4 text-sm text-neutral-200">
               <Link href="/gio-hang" className="transition-colors hover:text-white">
                 Giỏ hàng{cartCount > 0 ? ` (${cartCount})` : ""}
@@ -51,25 +51,16 @@ export async function SiteHeader() {
                 </button>
               </form>
             </div>
-          ) : (
-            // 1 nút gộp duy nhất thay vì 2 link "Đăng nhập"/"Đăng ký" rời rạc đứng cạnh cụm
-            // người bán — dễ gây hiểu lầm "đăng nhập cái gì" (feedback người dùng). Trang đích
-            // /dang-nhap có sẵn tab chuyển sang "Người bán" nếu cần, xem AuthAudienceTabs.
-            <Link
-              href="/dang-nhap"
-              className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
-            >
-              Đăng nhập / Đăng ký
-            </Link>
           )}
 
-          {session ? (
-            <div className="flex items-center gap-2">
+          {session && (
+            <div className="flex items-center gap-3 text-sm text-neutral-200">
+              <span className="hidden sm:inline">{session.user.name || session.user.email}</span>
               <Link
                 href="/admin"
                 className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
               >
-                Quản lý
+                Quản lý bán hàng
               </Link>
               <form
                 action={async () => {
@@ -85,15 +76,17 @@ export async function SiteHeader() {
                 </button>
               </form>
             </div>
-          ) : (
-            // Ghost/outline (không phải nút đặc accent-500) — chủ ý làm nhẹ hơn nút mua hàng ở
-            // trên, vì đối tượng chính của trang công khai là người mua, người bán chỉ là lối
-            // vào phụ (secondary).
+          )}
+
+          {!buyerSession && !session && (
+            // 1 khu vực đăng nhập/đăng ký duy nhất cho cả 2 vai trò — không còn 2 nút rời
+            // ("Đăng nhập / Đăng ký" + "Người bán") đứng cạnh nhau gây hiểu lầm. Trang đích
+            // /dang-nhap có sẵn tab chuyển sang "Người bán" nếu cần, xem AuthAudienceTabs.
             <Link
-              href="/admin/login"
-              className="rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+              href="/dang-nhap"
+              className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
             >
-              Người bán
+              Đăng nhập / Đăng ký
             </Link>
           )}
         </div>
