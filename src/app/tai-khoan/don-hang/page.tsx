@@ -1,6 +1,7 @@
 import { listMyOrders } from "@/lib/actions/buyer-orders";
-import { orderDisplayStatusLabel } from "@/lib/orders";
+import { getOrderTracking } from "@/lib/orders";
 import { SiteHeader } from "@/components/SiteHeader";
+import { OrderTrackingSteps } from "@/components/OrderTrackingSteps";
 import { formatDateTime, formatVND } from "@/lib/auction";
 
 export const dynamic = "force-dynamic";
@@ -17,17 +18,17 @@ export default async function BuyerOrderHistoryPage() {
         {items.length === 0 ? (
           <p className="text-sm text-neutral-700">Bạn chưa có đơn hàng nào.</p>
         ) : (
-          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-surface">
+          <ul className="flex flex-col gap-3">
             {items.map((order) => (
-              <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-                <div>
-                  <p className="font-medium text-text">{order.product.title}</p>
-                  <p className="text-xs text-neutral-500">{formatDateTime(order.createdAt)}</p>
+              <li key={order.id} className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <div>
+                    <p className="font-medium text-text">{order.product.title}</p>
+                    <p className="text-xs text-neutral-500">{formatDateTime(order.createdAt)}</p>
+                  </div>
+                  <span className="font-medium text-text">{formatVND(order.codAmount)}</span>
                 </div>
-                <span className="font-medium text-text">{formatVND(order.codAmount)}</span>
-                <span className="rounded-full bg-accent-100 px-3 py-1 text-xs font-semibold text-accent-700">
-                  {orderDisplayStatusLabel(order)}
-                </span>
+                <OrderTrackingSteps tracking={getOrderTracking(order)} />
               </li>
             ))}
           </ul>

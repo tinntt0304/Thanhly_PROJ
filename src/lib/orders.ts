@@ -76,6 +76,47 @@ export function orderDisplayStatusLabel(order: {
   return order.status === "CANCELLED" ? "Đã huỷ" : "Chưa tạo vận đơn";
 }
 
+export type OrderTrackingStep = { label: string; done: boolean };
+export type OrderTracking =
+  | { kind: "cancelled" }
+  | { kind: "steps"; steps: OrderTrackingStep[]; warning?: string };
+
+// Rút gọn toàn bộ vòng đời đơn (OrderStatus nội bộ + ghnStatus thô, xem orderDisplayStatusLabel
+// ở trên) thành 4 mốc cố định kiểu tracking Shopee cho người mua dễ theo dõi — "Đặt hàng" luôn
+// xong ngay khi tạo Order, 3 mốc còn lại suy từ ghnOrderCode/ghnStatus vì hệ thống chỉ thật sự
+// theo dõi được tới đó (không có mốc trung gian nào khác lưu riêng). Đơn đang hoàn/có sự cố vẫn
+// hiện dạng tracking (không coi là huỷ) nhưng đổi nhãn mốc 3 + thêm dòng cảnh báo ghnStatus thật.
+export function getOrderTracking(order: {
+  status: OrderStatus;
+  ghnOrderCode: string | null;
+  ghnStatus: string | null;
+}): OrderTracking {
+  if (order.status === "CANCELLED") return { kind: "cancelled" };
+
+  const ghnStatus = order.ghnStatus;
+  const hasShipment = !!order.ghnOrderCode;
+  const isDelivered = order.status === "DELIVERED" || ghnStatus === "delivered";
+  const isShippingPhase = (!!ghnStatus && SHIPPING_GHN_STATUSES.includes(ghnStatus)) || isDelivered;
+  const isReturning = !!ghnStatus && RETURNING_GHN_STATUSES.includes(ghnStatus);
+  const isIssue = !!ghnStatus && ISSUE_GHN_STATUSES.includes(ghnStatus);
+
+  const steps: OrderTrackingStep[] = [
+    { label: "Đặt hàng thành công", done: true },
+    { label: "Người bán xác nhận", done: hasShipment || isDelivered },
+    {
+      label: isReturning ? "Đang hoàn hàng" : isIssue ? "Có vấn đề khi giao" : "Đang giao hàng",
+      done: isShippingPhase,
+    },
+    { label: "Giao hàng thành công", done: isDelivered },
+  ];
+
+  return {
+    kind: "steps",
+    steps,
+    warning: (isReturning || isIssue) && ghnStatus ? ghnStatusLabel(ghnStatus) : undefined,
+  };
+}
+
 // GHN có 1 trang tài liệu riêng "Update fields according to order status" (docs id 117)
 // nhưng trang đó render bằng JS, không lấy được nội dung bảng thật để chép chính xác —
 // quy tắc tô xám dưới đây dựa trên 2 mốc GHN xác nhận rõ ràng ở chỗ khác:
