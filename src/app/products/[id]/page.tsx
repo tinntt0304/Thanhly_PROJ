@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { BidForm } from "@/components/BidForm";
 import { BuyNowButton } from "@/components/BuyNowButton";
+import { AddToCartButton } from "@/components/AddToCartButton";
 import { asAttributes } from "@/lib/attributes";
 import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
@@ -22,6 +23,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ShareButtons } from "@/components/ShareButtons";
 import { getSiteUrl } from "@/lib/site";
+import { getBuyerSession } from "@/lib/buyer-guard";
 
 // cache() dedupe cùng 1 lượt fetch giữa generateMetadata() và component trang bên dưới
 // trong cùng 1 request, tránh query Prisma 2 lần cho mỗi lượt xem trang sản phẩm.
@@ -60,7 +62,7 @@ export async function generateMetadata({
 export default async function ProductPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
 
-  const product = await getProduct(id);
+  const [product, buyerSession] = await Promise.all([getProduct(id), getBuyerSession()]);
 
   if (!product) notFound();
 
@@ -100,12 +102,22 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             {/* Mua ngay đặt TRƯỚC, tách hẳn khỏi khối đấu giá bên dưới — 2 lối mua độc lập,
                 không phải Mua ngay là 1 bước "sau khi đã đấu giá". */}
             {product.buyNowPrice && (
-              <BuyNowButton
-                productId={product.id}
-                buyNowPrice={product.buyNowPrice}
-                attributes={attributes}
-                canBuy={state === "BIDDING"}
-              />
+              <div className="flex flex-col gap-2">
+                <BuyNowButton
+                  productId={product.id}
+                  buyNowPrice={product.buyNowPrice}
+                  attributes={attributes}
+                  canBuy={state === "BIDDING"}
+                  defaultBuyerName={buyerSession?.user.name}
+                  defaultBuyerPhone={buyerSession?.user.phone}
+                />
+                <AddToCartButton
+                  productId={product.id}
+                  attributes={attributes}
+                  canBuy={state === "BIDDING"}
+                  isLoggedIn={!!buyerSession}
+                />
+              </div>
             )}
 
             {product.buyNowPrice && state === "BIDDING" && (

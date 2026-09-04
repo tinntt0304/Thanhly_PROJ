@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuctionState, isBiddingOpen } from "@/lib/auction";
 import { asAttributes } from "@/lib/attributes";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getBuyerSession } from "@/lib/buyer-guard";
 
 // Kích thước/cân nặng mặc định khi tạo đơn từ "Mua ngay" — khách mua không cần khai
 // (giống OrderForm.tsx dùng cho tạo đơn thủ công ở admin), người bán chỉnh lại đúng số đo
@@ -119,6 +120,10 @@ export async function buyNowAction(
     }
   }
 
+  // Gắn buyerId nếu đang đăng nhập tài khoản người mua — hoàn toàn tuỳ chọn, đơn khách vãng
+  // lai (chưa đăng nhập) vẫn tạo được bình thường như trước (buyerId null).
+  const buyerSession = await getBuyerSession();
+
   try {
     const order = await prisma.$transaction(async (tx) => {
       // Mua ngay chỉ trừ đi 1 đơn vị trong quantity — KHÔNG tự động đóng cả phiên đấu giá
@@ -155,6 +160,7 @@ export async function buyNowAction(
         data: {
           sellerId,
           productId,
+          buyerId: buyerSession?.user.id ?? null,
           buyerName: data.buyerName,
           buyerPhone: data.buyerPhone,
           buyerAddress: data.buyerAddress,

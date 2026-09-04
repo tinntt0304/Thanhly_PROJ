@@ -74,6 +74,23 @@ model EmailOtp {
   createdAt DateTime @default(now())
 }
 
+// Tài khoản người mua (khác hẳn User — User chỉ dành cho người bán/superadmin). Đăng ký bằng
+// SĐT + mật khẩu, không cần OTP (khác luồng seller). Hoàn toàn TUỲ CHỌN: mua ngay/đấu giá vẫn
+// hoạt động ẩn danh như trước (Order.buyerId/Bid.buyerId đều nullable) — có tài khoản chỉ để
+// tiện gộp giỏ hàng + xem lại lịch sử đơn đã mua, xem src/lib/buyer-auth.ts.
+model Buyer {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders    Order[]
+  bids      Bid[]
+  cartItems CartItem[]
+}
+
 model Product {
   id String @id @default(cuid())
 
@@ -101,10 +118,32 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bids   Bid[]
-  orders Order[]
+  bids      Bid[]
+  orders    Order[]
+  cartItems CartItem[]
 
   @@index([status, endTime])
+}
+
+// Giỏ hàng của người mua — CHỈ áp dụng cho sản phẩm "Mua ngay" (buyNowPrice có giá trị), không
+// dùng cho đấu giá (giá luôn đổi, không "chốt" được để bỏ giỏ — xem mục "Đang đấu giá" ở
+// /gio-hang, suy ra trực tiếp từ Bid.buyerId, không qua bảng này). unique [buyerId, productId]:
+// 1 dòng giỏ/sản phẩm/người mua — thêm lại sản phẩm đã có trong giỏ thì ghi đè selectedAttributes
+// thay vì tạo dòng thứ 2. Không có cột số lượng: Mua ngay hiện tại vốn đã giới hạn 1 đơn vị/lần
+// (xem buyNowAction ở actions/buy-now.ts), giữ nguyên giới hạn đó cho giỏ hàng.
+model CartItem {
+  id      String @id @default(cuid())
+  buyer   Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId String
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  selectedAttributes Json @default("[]")
+
+  createdAt DateTime @default(now())
+
+  @@unique([buyerId, productId])
 }
 
 enum OrderStatus {
@@ -127,6 +166,13 @@ model Order {
 
   product   Product @relation(fields: [productId], references: [id])
   productId String
+
+  // Gắn tài khoản người mua nếu lúc tạo đơn đã đăng nhập (Mua ngay hoặc checkout giỏ hàng) —
+  // null cho đơn khách vãng lai (vẫn hợp lệ, xem model Buyer). buyerName/Phone/Address vẫn giữ
+  // nguyên dạng text tự do bên dưới (không đổi sang đọc từ Buyer) để không phá đơn cũ và để 1
+  // đơn vẫn đúng dữ liệu nhận hàng ngay cả khi buyer sau này đổi tên/SĐT tài khoản.
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+  buyerId String?
 
   buyerName    String
   buyerPhone   String
@@ -169,6 +215,7 @@ model Order {
 
   @@index([sellerId, status])
   @@index([productId])
+  @@index([buyerId])
   @@index([ghnOrderCode])
   @@index([ghnStatus]) // tab SHIPPING/RETURNING/ISSUE ở /admin/orders lọc theo ghnStatus IN (...)
   @@index([createdAt]) // tab list sắp xếp + lọc theo khoảng ngày tạo
@@ -180,12 +227,18 @@ model Bid {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
 
+  // Gắn tài khoản người mua nếu lúc trả giá đã đăng nhập — null cho khách vãng lai (vẫn hợp
+  // lệ). Dùng để suy ra mục "Đang đấu giá" ở /gio-hang (listMyActiveBids), xem model Buyer.
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+  buyerId String?
+
   phone  String // SĐT người trả giá; ẩn một phần khi hiển thị công khai
   amount Int
 
   createdAt DateTime @default(now())
 
   @@index([productId, amount])
+  @@index([buyerId])
 }
 
 // Singleton: nội dung "bằng chứng uy tín" hiển thị đầu trang chủ (P0.5).

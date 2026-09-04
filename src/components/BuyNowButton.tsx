@@ -2,15 +2,11 @@
 
 import { useActionState, useState, type FormEvent } from "react";
 import { buyNowAction, type BuyNowState } from "@/lib/actions/buy-now";
-import { getPublicGhnProvinces, getPublicGhnDistricts, getPublicGhnWards } from "@/lib/actions/orders";
 import type { Attribute } from "@/lib/attributes";
-import { AddressPicker } from "@/components/AddressPicker";
+import { BuyerShippingFields } from "@/components/BuyerShippingFields";
 import { formatVND } from "@/lib/auction";
 
 const initialState: BuyNowState = {};
-
-const inputClass =
-  "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text placeholder:text-neutral-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
 
 // Nút "Mua ngay" ở trang sản phẩm công khai — mở modal chứa form nhận hàng (tên/SĐT/địa
 // chỉ + GHN tỉnh/quận/phường) và chọn thuộc tính nếu sản phẩm có khai báo (xem
@@ -22,6 +18,8 @@ export function BuyNowButton({
   buyNowPrice,
   attributes,
   canBuy,
+  defaultBuyerName,
+  defaultBuyerPhone,
 }: {
   productId: string;
   buyNowPrice: number;
@@ -32,6 +30,9 @@ export function BuyNowButton({
   // với canBuy=false NGAY LẬP TỨC; nếu unmount theo canBuy thì modal xác nhận "Đã tạo đơn
   // hàng thành công" biến mất trước khi người mua kịp thấy.
   canBuy: boolean;
+  // Điền sẵn nếu đã đăng nhập tài khoản người mua — tuỳ chọn, khách vãng lai vẫn nhập tay được.
+  defaultBuyerName?: string;
+  defaultBuyerPhone?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(buyNowAction.bind(null, productId), initialState);
@@ -139,49 +140,11 @@ export function BuyNowButton({
 
                 <input type="hidden" name="selectedAttributesJson" value={selectedAttributesJson} />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="buyNow-buyerName" className="text-sm font-medium text-text">
-                      Họ tên người nhận
-                    </label>
-                    <input id="buyNow-buyerName" name="buyerName" required className={inputClass} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="buyNow-buyerPhone" className="text-sm font-medium text-text">
-                      Số điện thoại
-                    </label>
-                    <input
-                      id="buyNow-buyerPhone"
-                      name="buyerPhone"
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="0901234567"
-                      required
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="buyNow-buyerAddress" className="text-sm font-medium text-text">
-                    Địa chỉ (số nhà, tên đường...)
-                  </label>
-                  <input id="buyNow-buyerAddress" name="buyerAddress" required className={inputClass} />
-                </div>
-
-                <AddressPicker
-                  fetchProvinces={getPublicGhnProvinces}
-                  fetchDistricts={getPublicGhnDistricts}
-                  fetchWards={getPublicGhnWards}
+                <BuyerShippingFields
+                  idPrefix="buyNow"
+                  defaultName={defaultBuyerName}
+                  defaultPhone={defaultBuyerPhone}
                 />
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="buyNow-note" className="text-sm font-medium text-text">
-                    Ghi chú (không bắt buộc)
-                  </label>
-                  <textarea id="buyNow-note" name="note" rows={2} className={inputClass} />
-                </div>
 
                 {displayedError && <p className="text-sm text-red-600">{displayedError}</p>}
 

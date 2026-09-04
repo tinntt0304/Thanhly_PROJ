@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
+import { buyerAuth, buyerSignOut } from "@/lib/buyer-auth";
 import { getNavLinks } from "@/lib/nav";
+import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import { Clock } from "@/components/Clock";
 
 export async function SiteHeader() {
-  const [navLinks, session] = await Promise.all([getNavLinks(), auth()]);
+  const [navLinks, session, buyerSession] = await Promise.all([getNavLinks(), auth(), buyerAuth()]);
+  const cartCount = buyerSession
+    ? await prisma.cartItem.count({ where: { buyerId: buyerSession.user.id } })
+    : 0;
 
   return (
     <header className="bg-neutral-900">
@@ -23,6 +28,39 @@ export async function SiteHeader() {
 
         <div className="flex items-center gap-4">
           <Clock className="hidden text-neutral-50 sm:block" />
+
+          {buyerSession ? (
+            <div className="flex items-center gap-3 border-r border-neutral-700 pr-4 text-sm text-neutral-200">
+              <Link href="/gio-hang" className="transition-colors hover:text-white">
+                Giỏ hàng{cartCount > 0 ? ` (${cartCount})` : ""}
+              </Link>
+              <Link href="/tai-khoan/don-hang" className="transition-colors hover:text-white">
+                Đơn hàng
+              </Link>
+              <Link href="/tai-khoan" className="transition-colors hover:text-white">
+                {buyerSession.user.name || "Tài khoản"}
+              </Link>
+              <form
+                action={async () => {
+                  "use server";
+                  await buyerSignOut({ redirectTo: "/" });
+                }}
+              >
+                <button type="submit" className="transition-colors hover:text-white">
+                  Đăng xuất
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 border-r border-neutral-700 pr-4 text-sm text-neutral-200">
+              <Link href="/dang-nhap" className="transition-colors hover:text-white">
+                Đăng nhập
+              </Link>
+              <Link href="/dang-ky" className="transition-colors hover:text-white">
+                Đăng ký
+              </Link>
+            </div>
+          )}
 
           {session ? (
             <div className="flex items-center gap-2">
