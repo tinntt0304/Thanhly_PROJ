@@ -5,10 +5,11 @@ import { getNavLinks } from "@/lib/nav";
 import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import { Clock } from "@/components/Clock";
+import { BuyerAccountMenu } from "@/components/BuyerAccountMenu";
 
 function CartIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -42,30 +43,25 @@ export async function SiteHeader() {
           <Clock className="hidden text-neutral-50 sm:block" />
 
           {buyerSession && (
-            <div className="flex items-center divide-x divide-neutral-700 rounded-full border border-neutral-700 bg-neutral-800 text-sm text-neutral-200">
+            <div className="flex items-center gap-2">
               <Link
                 href="/gio-hang"
-                className="flex items-center gap-1.5 px-3 py-1.5 transition-colors hover:text-white"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full text-neutral-200 transition-colors hover:bg-neutral-800 hover:text-white"
               >
                 <CartIcon />
-                Giỏ hàng{cartCount > 0 ? ` (${cartCount})` : ""}
+                {cartCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold leading-none text-white">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
               </Link>
-              <Link href="/tai-khoan/don-hang" className="px-3 py-1.5 transition-colors hover:text-white">
-                Đơn hàng
-              </Link>
-              <Link href="/tai-khoan" className="px-3 py-1.5 transition-colors hover:text-white">
-                {buyerSession.user.name || "Tài khoản"}
-              </Link>
-              <form
-                action={async () => {
+              <BuyerAccountMenu
+                name={buyerSession.user.name || "Tài khoản"}
+                onSignOut={async () => {
                   "use server";
                   await buyerSignOut({ redirectTo: "/" });
                 }}
-              >
-                <button type="submit" className="px-3 py-1.5 transition-colors hover:text-white">
-                  Đăng xuất
-                </button>
-              </form>
+              />
             </div>
           )}
 
