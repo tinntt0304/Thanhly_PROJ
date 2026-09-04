@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/LoginForm";
-import { AuthAudienceTabs } from "@/components/AuthAudienceTabs";
 import { Logo } from "@/components/Logo";
 
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
-  const { verified, reset } = await searchParams;
+  const { verified, reset, next } = await searchParams;
+  const nextValue = typeof next === "string" ? next : undefined;
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
       <Logo size="lg" withTagline href={null} />
       <div className="flex w-full max-w-sm flex-col gap-4">
-        <AuthAudienceTabs active="seller" mode="login" />
-        <h1 className="font-heading text-lg font-bold text-text">Đăng nhập người bán</h1>
+        <h1 className="font-heading text-lg font-bold text-text">Đăng nhập</h1>
         {verified === "1" && (
           <p className="rounded-md bg-accent-2-100 px-3 py-2 text-sm text-accent-2-700">
             Xác minh email thành công — mời bạn đăng nhập.
@@ -22,11 +21,11 @@ export default async function AdminLoginPage({ searchParams }: PageProps<"/admin
             Đặt lại mật khẩu thành công — mời bạn đăng nhập bằng mật khẩu mới.
           </p>
         )}
-        <LoginForm />
+        <LoginForm next={nextValue} />
         <p className="text-sm text-neutral-700">
           Chưa có tài khoản?{" "}
           <Link href="/admin/register" className="text-accent-600 underline">
-            Đăng ký làm người bán
+            Đăng ký tài khoản
           </Link>
         </p>
       </div>

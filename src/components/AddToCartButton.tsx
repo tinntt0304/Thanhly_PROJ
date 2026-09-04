@@ -32,7 +32,7 @@ export function AddToCartButton({
   if (!isLoggedIn) {
     return (
       <Link
-        href={`/dang-nhap?next=/products/${productId}`}
+        href={`/admin/login?next=/products/${productId}`}
         className="self-start rounded-md border border-accent-2-300 px-4 py-2 text-sm font-medium text-accent-2-700 transition-colors hover:bg-accent-2-50"
       >
         Đăng nhập để thêm vào giỏ

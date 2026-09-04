@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBuyer } from "@/lib/buyer-guard";
+import { requireAdmin } from "@/lib/admin-guard";
 import { getMyOrders } from "@/lib/actions/buyer-orders";
 import { SiteHeader } from "@/components/SiteHeader";
 import { formatVND } from "@/lib/auction";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function CartCheckoutSuccessPage({
   searchParams,
 }: PageProps<"/gio-hang/thanh-cong">) {
-  await requireBuyer();
+  await requireAdmin();
   const { orders: ordersParam } = await searchParams;
   const orderIds =
     typeof ordersParam === "string" ? ordersParam.split(",").filter(Boolean) : [];

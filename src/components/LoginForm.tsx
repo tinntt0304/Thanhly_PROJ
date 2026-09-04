@@ -9,11 +9,12 @@ const initialState: LoginFormState = {};
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
 
   return (
     <form action={formAction} className="flex w-full max-w-sm flex-col gap-3">
+      {next && <input type="hidden" name="next" value={next} />}
       <div className="flex flex-col gap-1">
         <label htmlFor="email" className="text-sm font-medium text-text">
           Email

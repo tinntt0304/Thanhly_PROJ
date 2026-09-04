@@ -75,7 +75,7 @@ export async function loginAction(
   }
 
   try {
-    await signIn("credentials", { email: emailRaw, password, redirectTo: "/admin" });
+    await signIn("credentials", { email: emailRaw, password, redirectTo: safeRedirectTarget(formData.get("next")) });
   } catch (e) {
     if (e instanceof AuthError) {
       return { error: "Email hoặc mật khẩu không đúng." };
@@ -83,6 +83,15 @@ export async function loginAction(
     throw e;
   }
   return {};
+}
+
+// Chỉ nhận đường dẫn nội bộ bắt đầu bằng "/" và KHÔNG bắt đầu bằng "//" (tránh open redirect
+// kiểu protocol-relative URL, vd. ?next=//evil.com bị trình duyệt hiểu thành //evil.com).
+function safeRedirectTarget(value: FormDataEntryValue | null): string {
+  if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+  return "/admin";
 }
 
 export type OtpFormState = { error?: string; success?: boolean };

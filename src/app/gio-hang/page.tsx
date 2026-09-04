@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBuyer } from "@/lib/buyer-guard";
+import { requireAdmin } from "@/lib/admin-guard";
 import { getCartItems } from "@/lib/actions/cart";
 import { listMyActiveBids } from "@/lib/actions/buyer-orders";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -10,7 +10,7 @@ import { formatVND } from "@/lib/auction";
 export const dynamic = "force-dynamic";
 
 export default async function CartPage() {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
   const [cartItems, activeBids] = await Promise.all([getCartItems(), listMyActiveBids()]);
 
   const items: CartItemView[] = cartItems.map((item) => ({
@@ -27,7 +27,11 @@ export default async function CartPage() {
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-6">
         <section className="flex flex-col gap-3">
           <h1 className="font-heading text-lg font-bold text-text">Giỏ hàng</h1>
-          <CartCheckoutForm items={items} defaultName={session.user.name} defaultPhone={session.user.phone} />
+          <CartCheckoutForm
+            items={items}
+            defaultName={session.user.name ?? undefined}
+            defaultPhone={session.user.phone ?? undefined}
+          />
         </section>
 
         <section className="flex flex-col gap-3">

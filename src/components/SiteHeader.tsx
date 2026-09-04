@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
-import { buyerAuth, buyerSignOut } from "@/lib/buyer-auth";
 import { getNavLinks } from "@/lib/nav";
 import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import { Clock } from "@/components/Clock";
-import { BuyerAccountMenu } from "@/components/BuyerAccountMenu";
+import { AccountMenu } from "@/components/AccountMenu";
 
 function CartIcon() {
   return (
@@ -19,10 +18,14 @@ function CartIcon() {
   );
 }
 
+// Chỉ 1 loại tài khoản duy nhất (User: SELLER/SUPERADMIN, đăng ký/đăng nhập ở /admin/register,
+// /admin/login) dùng chung cho cả mua lẫn bán — không còn tài khoản người mua (Buyer) riêng.
+// Đã đăng nhập thì luôn mua được (giỏ hàng, đấu giá, Mua ngay) kể cả sản phẩm của người bán
+// khác, và menu tài khoản có lối vào "Quản lý bán hàng" nếu muốn tự đăng sản phẩm.
 export async function SiteHeader() {
-  const [navLinks, session, buyerSession] = await Promise.all([getNavLinks(), auth(), buyerAuth()]);
-  const cartCount = buyerSession
-    ? await prisma.cartItem.count({ where: { buyerId: buyerSession.user.id } })
+  const [navLinks, session] = await Promise.all([getNavLinks(), auth()]);
+  const cartCount = session
+    ? await prisma.cartItem.count({ where: { buyerId: session.user.id } })
     : 0;
 
   return (
@@ -42,7 +45,7 @@ export async function SiteHeader() {
         <div className="flex items-center gap-4">
           <Clock className="hidden text-neutral-50 sm:block" />
 
-          {buyerSession && (
+          {session ? (
             <div className="flex items-center gap-2">
               <Link
                 href="/gio-hang"
@@ -55,47 +58,17 @@ export async function SiteHeader() {
                   </span>
                 )}
               </Link>
-              <BuyerAccountMenu
-                name={buyerSession.user.name || "Tài khoản"}
+              <AccountMenu
+                name={session.user.name || session.user.email || "Tài khoản"}
                 onSignOut={async () => {
-                  "use server";
-                  await buyerSignOut({ redirectTo: "/" });
-                }}
-              />
-            </div>
-          )}
-
-          {session && (
-            <div className="flex items-center gap-3 text-sm text-neutral-200">
-              <span className="hidden sm:inline">{session.user.name || session.user.email}</span>
-              <Link
-                href="/admin"
-                className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
-              >
-                Quản lý bán hàng
-              </Link>
-              <form
-                action={async () => {
                   "use server";
                   await signOut({ redirectTo: "/" });
                 }}
-              >
-                <button
-                  type="submit"
-                  className="rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
-                >
-                  Đăng xuất
-                </button>
-              </form>
+              />
             </div>
-          )}
-
-          {!buyerSession && !session && (
-            // 1 khu vực đăng nhập/đăng ký duy nhất cho cả 2 vai trò — không còn 2 nút rời
-            // ("Đăng nhập / Đăng ký" + "Người bán") đứng cạnh nhau gây hiểu lầm. Trang đích
-            // /dang-nhap có sẵn tab chuyển sang "Người bán" nếu cần, xem AuthAudienceTabs.
+          ) : (
             <Link
-              href="/dang-nhap"
+              href="/admin/login"
               className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
             >
               Đăng nhập / Đăng ký

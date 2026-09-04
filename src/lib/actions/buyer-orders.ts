@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireBuyer } from "@/lib/buyer-guard";
+import { requireAdmin } from "@/lib/admin-guard";
 import { ORDERS_PAGE_SIZE } from "@/lib/orders";
 
 export type MyOrderListItem = Awaited<ReturnType<typeof listMyOrders>>["items"][number];
@@ -9,7 +9,7 @@ export type MyOrderListItem = Awaited<ReturnType<typeof listMyOrders>>["items"][
 // Mirror listOrders (actions/orders.ts) nhưng scope theo buyerId thay vì sellerId — chỉ đọc,
 // không có tab/thao tác sửa như bản admin (buyer không sửa được đơn của mình).
 export async function listMyOrders(page: number = 1) {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
   const safePage = Math.max(1, Math.trunc(page) || 1);
   const where = { buyerId: session.user.id };
 
@@ -30,7 +30,7 @@ export async function listMyOrders(page: number = 1) {
 // Đơn vừa checkout xong — hiện ở trang xác nhận /gio-hang/thanh-cong, scope theo buyerId để
 // buyer này không xem được order của người khác dù biết id.
 export async function getMyOrders(orderIds: string[]) {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
   if (orderIds.length === 0) return [];
   return prisma.order.findMany({
     where: { id: { in: orderIds }, buyerId: session.user.id },
@@ -53,7 +53,7 @@ export type MyActiveBid = {
 // (không có thao tác thêm/xoá thủ công) vì giá đấu giá luôn thay đổi, không "chốt" được để bỏ
 // giỏ. Khối lượng bid/sản phẩm nhỏ nên tính isWinning/myBest trong JS thay vì SQL phức tạp.
 export async function listMyActiveBids(): Promise<MyActiveBid[]> {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
 
   const products = await prisma.product.findMany({
     where: { bids: { some: { buyerId: session.user.id } } },

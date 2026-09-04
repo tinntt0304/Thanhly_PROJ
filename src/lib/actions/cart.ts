@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireBuyer } from "@/lib/buyer-guard";
+import { requireAdmin } from "@/lib/admin-guard";
 import { getAuctionState, isBiddingOpen } from "@/lib/auction";
 import { asAttributes } from "@/lib/attributes";
 
@@ -24,7 +24,7 @@ export type AddToCartResult = { ok: true } | { ok: false; error: string };
 // Chỉ nhận sản phẩm có buyNowPrice (Mua ngay) — sản phẩm chỉ đấu giá không "thêm vào giỏ"
 // được vì giá không cố định, xem CartItem trong schema.prisma.
 export async function addToCart(productId: string, selectedAttributesJson?: string): Promise<AddToCartResult> {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return { ok: false, error: "Không tìm thấy sản phẩm." };
@@ -60,13 +60,13 @@ export async function addToCart(productId: string, selectedAttributesJson?: stri
 }
 
 export async function removeFromCart(productId: string): Promise<void> {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
   await prisma.cartItem.deleteMany({ where: { buyerId: session.user.id, productId } });
   revalidatePath("/gio-hang");
 }
 
 export async function getCartItems() {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
   return prisma.cartItem.findMany({
     where: { buyerId: session.user.id },
     orderBy: { createdAt: "desc" },
@@ -102,7 +102,7 @@ export async function checkoutCart(
   _prevState: CheckoutCartState | undefined,
   formData: FormData
 ): Promise<CheckoutCartState> {
-  const session = await requireBuyer();
+  const session = await requireAdmin();
 
   const parsed = checkoutSchema.safeParse({
     buyerName: formData.get("buyerName"),

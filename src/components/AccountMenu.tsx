@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-export function BuyerAccountMenu({
+// Menu tài khoản DÙNG CHUNG cho 1 loại tài khoản duy nhất (User: SELLER/SUPERADMIN) — không
+// còn tách riêng "tài khoản người mua" (Buyer) vs "tài khoản người bán" nữa: ai đăng nhập cũng
+// vừa mua (đấu giá/Mua ngay/giỏ hàng) vừa bán (nếu tự đăng sản phẩm) bằng cùng 1 tài khoản.
+export function AccountMenu({
   name,
   onSignOut,
 }: {
@@ -36,9 +39,16 @@ export function BuyerAccountMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-44 overflow-hidden rounded-md border border-neutral-200 bg-surface py-1 text-sm shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-md border border-neutral-200 bg-surface py-1 text-sm shadow-lg">
           <Link
-            href="/tai-khoan"
+            href="/admin"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-neutral-700 hover:bg-neutral-100"
+          >
+            Quản lý bán hàng
+          </Link>
+          <Link
+            href="/admin/account"
             onClick={() => setOpen(false)}
             className="block px-4 py-2 text-neutral-700 hover:bg-neutral-100"
           >

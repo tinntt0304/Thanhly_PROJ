@@ -55,7 +55,10 @@ model User {
   topUpRequests         TopUpRequest[]
   facebookGroups        FacebookGroup[]
   facebookKeywordSearch FacebookKeywordSearch[]
-  orders                Order[]
+  orders                Order[]    @relation("OrderAsSeller") // đơn của những sản phẩm mình bán ra
+  buyerOrders           Order[]    @relation("OrderAsBuyer") // đơn mình tự mua từ người bán khác
+  bids                  Bid[] // lượt trả giá mình đã đặt (kể cả cho sản phẩm của người bán khác)
+  cartItems             CartItem[]
   phoneReports          PhoneReport[]
   emailOtp              EmailOtp?
 }
@@ -72,23 +75,6 @@ model EmailOtp {
   expiresAt DateTime
   attempts  Int      @default(0)
   createdAt DateTime @default(now())
-}
-
-// Tài khoản người mua (khác hẳn User — User chỉ dành cho người bán/superadmin). Đăng ký bằng
-// SĐT + mật khẩu, không cần OTP (khác luồng seller). Hoàn toàn TUỲ CHỌN: mua ngay/đấu giá vẫn
-// hoạt động ẩn danh như trước (Order.buyerId/Bid.buyerId đều nullable) — có tài khoản chỉ để
-// tiện gộp giỏ hàng + xem lại lịch sử đơn đã mua, xem src/lib/buyer-auth.ts.
-model Buyer {
-  id           String   @id @default(cuid())
-  phone        String   @unique
-  passwordHash String
-  name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  orders    Order[]
-  bids      Bid[]
-  cartItems CartItem[]
 }
 
 model Product {
@@ -125,15 +111,18 @@ model Product {
   @@index([status, endTime])
 }
 
-// Giỏ hàng của người mua — CHỈ áp dụng cho sản phẩm "Mua ngay" (buyNowPrice có giá trị), không
-// dùng cho đấu giá (giá luôn đổi, không "chốt" được để bỏ giỏ — xem mục "Đang đấu giá" ở
-// /gio-hang, suy ra trực tiếp từ Bid.buyerId, không qua bảng này). unique [buyerId, productId]:
-// 1 dòng giỏ/sản phẩm/người mua — thêm lại sản phẩm đã có trong giỏ thì ghi đè selectedAttributes
-// thay vì tạo dòng thứ 2. Không có cột số lượng: Mua ngay hiện tại vốn đã giới hạn 1 đơn vị/lần
-// (xem buyNowAction ở actions/buy-now.ts), giữ nguyên giới hạn đó cho giỏ hàng.
+// Giỏ hàng của người mua — dùng chung 1 tài khoản User (SELLER/SUPERADMIN) cho cả bán lẫn mua,
+// không có bảng tài khoản người mua riêng: 1 seller hoàn toàn mua được sản phẩm của seller khác
+// bằng chính tài khoản mình đang đăng nhập. CHỈ áp dụng cho sản phẩm "Mua ngay" (buyNowPrice có
+// giá trị), không dùng cho đấu giá (giá luôn đổi, không "chốt" được để bỏ giỏ — xem mục "Đang
+// đấu giá" ở /gio-hang, suy ra trực tiếp từ Bid.buyerId, không qua bảng này). unique
+// [buyerId, productId]: 1 dòng giỏ/sản phẩm/người mua — thêm lại sản phẩm đã có trong giỏ thì
+// ghi đè selectedAttributes thay vì tạo dòng thứ 2. Không có cột số lượng: Mua ngay hiện tại vốn
+// đã giới hạn 1 đơn vị/lần (xem buyNowAction ở actions/buy-now.ts), giữ nguyên giới hạn đó cho
+// giỏ hàng.
 model CartItem {
   id      String @id @default(cuid())
-  buyer   Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyer   User   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   buyerId String
 
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -161,17 +150,17 @@ enum OrderStatus {
 model Order {
   id String @id @default(cuid())
 
-  seller   User   @relation(fields: [sellerId], references: [id])
+  seller   User   @relation("OrderAsSeller", fields: [sellerId], references: [id])
   sellerId String
 
   product   Product @relation(fields: [productId], references: [id])
   productId String
 
   // Gắn tài khoản người mua nếu lúc tạo đơn đã đăng nhập (Mua ngay hoặc checkout giỏ hàng) —
-  // null cho đơn khách vãng lai (vẫn hợp lệ, xem model Buyer). buyerName/Phone/Address vẫn giữ
-  // nguyên dạng text tự do bên dưới (không đổi sang đọc từ Buyer) để không phá đơn cũ và để 1
-  // đơn vẫn đúng dữ liệu nhận hàng ngay cả khi buyer sau này đổi tên/SĐT tài khoản.
-  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+  // null cho đơn khách vãng lai (vẫn hợp lệ). buyerName/Phone/Address vẫn giữ nguyên dạng text
+  // tự do bên dưới (không đổi sang đọc từ User) để không phá đơn cũ và để 1 đơn vẫn đúng dữ liệu
+  // nhận hàng ngay cả khi người mua sau này đổi tên/SĐT tài khoản.
+  buyer   User?   @relation("OrderAsBuyer", fields: [buyerId], references: [id])
   buyerId String?
 
   buyerName    String
@@ -228,8 +217,8 @@ model Bid {
   productId String
 
   // Gắn tài khoản người mua nếu lúc trả giá đã đăng nhập — null cho khách vãng lai (vẫn hợp
-  // lệ). Dùng để suy ra mục "Đang đấu giá" ở /gio-hang (listMyActiveBids), xem model Buyer.
-  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+  // lệ). Dùng để suy ra mục "Đang đấu giá" ở /gio-hang (listMyActiveBids).
+  buyer   User?   @relation(fields: [buyerId], references: [id])
   buyerId String?
 
   phone  String // SĐT người trả giá; ẩn một phần khi hiển thị công khai

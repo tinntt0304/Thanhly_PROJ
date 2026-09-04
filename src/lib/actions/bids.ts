@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAuctionState, isBiddingOpen, minNextBid } from "@/lib/auction";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { getBuyerSession } from "@/lib/buyer-guard";
+import { auth } from "@/lib/auth";
 
 // Chặn 1 lượt trả giá duy nhất đẩy currentPrice lên gấp quá nhiều lần bước giá tối thiểu —
 // không cần đăng nhập, không rate-limit trước đây nên 1 request có thể set currentPrice lên
@@ -52,9 +52,9 @@ export async function placeBid(
     return { error: "Bạn thao tác quá nhanh, vui lòng thử lại sau ít giây." };
   }
 
-  // Gắn buyerId nếu đang đăng nhập tài khoản người mua — tuỳ chọn, dùng để suy ra mục "Đang
+  // Gắn buyerId nếu đang đăng nhập tài khoản (User) — tuỳ chọn, dùng để suy ra mục "Đang
   // đấu giá" ở /gio-hang (listMyActiveBids). Khách vãng lai vẫn trả giá được như trước.
-  const buyerSession = await getBuyerSession();
+  const session = await auth();
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -96,7 +96,7 @@ export async function placeBid(
         throw new Error("Vừa có người trả giá khác nhanh hơn, vui lòng tải lại trang và thử lại.");
       }
 
-      await tx.bid.create({ data: { productId, phone, amount, buyerId: buyerSession?.user.id ?? null } });
+      await tx.bid.create({ data: { productId, phone, amount, buyerId: session?.user.id ?? null } });
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Có lỗi xảy ra, vui lòng thử lại." };

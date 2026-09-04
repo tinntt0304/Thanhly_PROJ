@@ -23,7 +23,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ShareButtons } from "@/components/ShareButtons";
 import { getSiteUrl } from "@/lib/site";
-import { getBuyerSession } from "@/lib/buyer-guard";
+import { auth } from "@/lib/auth";
 
 // cache() dedupe cùng 1 lượt fetch giữa generateMetadata() và component trang bên dưới
 // trong cùng 1 request, tránh query Prisma 2 lần cho mỗi lượt xem trang sản phẩm.
@@ -62,7 +62,7 @@ export async function generateMetadata({
 export default async function ProductPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
 
-  const [product, buyerSession] = await Promise.all([getProduct(id), getBuyerSession()]);
+  const [product, session] = await Promise.all([getProduct(id), auth()]);
 
   if (!product) notFound();
 
@@ -108,14 +108,14 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                   buyNowPrice={product.buyNowPrice}
                   attributes={attributes}
                   canBuy={state === "BIDDING"}
-                  defaultBuyerName={buyerSession?.user.name}
-                  defaultBuyerPhone={buyerSession?.user.phone}
+                  defaultBuyerName={session?.user.name ?? undefined}
+                  defaultBuyerPhone={session?.user.phone ?? undefined}
                 />
                 <AddToCartButton
                   productId={product.id}
                   attributes={attributes}
                   canBuy={state === "BIDDING"}
-                  isLoggedIn={!!buyerSession}
+                  isLoggedIn={!!session}
                 />
               </div>
             )}
