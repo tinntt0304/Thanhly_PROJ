@@ -6,6 +6,18 @@ import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import { Clock } from "@/components/Clock";
 
+function CartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 3h1.386c.51 0 .955.343 1.087.836l2.377 8.921A1.125 1.125 0 007.18 13.5h9.982a1.125 1.125 0 001.12-1.243l-.982-6a1.125 1.125 0 00-1.12-1.007H5.106M9 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm9 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
+      />
+    </svg>
+  );
+}
+
 export async function SiteHeader() {
   const [navLinks, session, buyerSession] = await Promise.all([getNavLinks(), auth(), buyerAuth()]);
   const cartCount = buyerSession
@@ -30,14 +42,18 @@ export async function SiteHeader() {
           <Clock className="hidden text-neutral-50 sm:block" />
 
           {buyerSession && (
-            <div className="flex items-center gap-3 border-r border-neutral-700 pr-4 text-sm text-neutral-200">
-              <Link href="/gio-hang" className="transition-colors hover:text-white">
+            <div className="flex items-center divide-x divide-neutral-700 rounded-full border border-neutral-700 bg-neutral-800 text-sm text-neutral-200">
+              <Link
+                href="/gio-hang"
+                className="flex items-center gap-1.5 px-3 py-1.5 transition-colors hover:text-white"
+              >
+                <CartIcon />
                 Giỏ hàng{cartCount > 0 ? ` (${cartCount})` : ""}
               </Link>
-              <Link href="/tai-khoan/don-hang" className="transition-colors hover:text-white">
+              <Link href="/tai-khoan/don-hang" className="px-3 py-1.5 transition-colors hover:text-white">
                 Đơn hàng
               </Link>
-              <Link href="/tai-khoan" className="transition-colors hover:text-white">
+              <Link href="/tai-khoan" className="px-3 py-1.5 transition-colors hover:text-white">
                 {buyerSession.user.name || "Tài khoản"}
               </Link>
               <form
@@ -46,7 +62,7 @@ export async function SiteHeader() {
                   await buyerSignOut({ redirectTo: "/" });
                 }}
               >
-                <button type="submit" className="transition-colors hover:text-white">
+                <button type="submit" className="px-3 py-1.5 transition-colors hover:text-white">
                   Đăng xuất
                 </button>
               </form>
