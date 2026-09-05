@@ -32,6 +32,7 @@ import {
   RETURNING_GHN_STATUSES,
   ISSUE_GHN_STATUSES,
   combinePhoneRisk,
+  isOrderCancellable,
   type OrderListTab,
   type PhoneRiskDisplay,
 } from "@/lib/orders";
@@ -595,17 +596,28 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
   return { ok: true };
 }
 
+// Huỷ đơn: KHÔNG dùng assertOwnsOrder (chỉ seller/SUPERADMIN) vì người mua (buyerId) cũng được
+// tự huỷ đơn CỦA CHÍNH MÌNH lúc còn "mới tạo" — nhưng người mua chỉ được phép mỗi việc huỷ,
+// không được sửa/tạo vận đơn/làm mới trạng thái (những action đó vẫn chỉ dành cho seller qua
+// assertOwnsOrder), nên kiểm tra quyền riêng ở đây thay vì mở rộng assertOwnsOrder dùng chung.
 export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
   const session = await requireAdmin();
-  try {
-    await assertOwnsOrder(session.user.id, session.user.role, orderId);
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Không có quyền." };
-  }
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
+
+  const isOwner =
+    session.user.role === "SUPERADMIN" || order.sellerId === session.user.id || order.buyerId === session.user.id;
+  if (!isOwner) return { ok: false, error: "Bạn không có quyền thao tác với đơn hàng này." };
+
   if (order.status === "CANCELLED") return { ok: true }; // đã huỷ rồi — tránh hoàn kho 2 lần nếu gọi lại
+
+  // Từ "picking" trở đi (shipper đã bắt đầu tới lấy hàng) không cho huỷ nữa ở tầng ứng dụng —
+  // chặn sớm ở đây thay vì để GHN tự từ chối lúc gọi cancelGhnOrder bên dưới, báo lỗi rõ ràng
+  // hơn cho cả seller lẫn buyer.
+  if (!isOrderCancellable(order)) {
+    return { ok: false, error: "Đơn đã được lấy hàng, không huỷ được nữa." };
+  }
 
   if (order.ghnOrderCode && order.status === "SHIPPING") {
     try {

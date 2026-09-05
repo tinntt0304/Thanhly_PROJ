@@ -117,6 +117,25 @@ export function getOrderTracking(order: {
   };
 }
 
+// Từ "picking" trở đi (shipper đã bắt đầu tới lấy hàng), coi như không huỷ được nữa ở tầng
+// ứng dụng — chặn ngay từ đây (không đợi GHN từ chối) để cả admin lẫn người mua đều thấy rõ lý
+// do thay vì lỗi chung chung từ GHN. "ready_to_pick" (đã tạo vận đơn, đang chờ lấy hàng) vẫn coi
+// là "mới tạo" nên vẫn huỷ được — đúng ranh giới GHN cho phép huỷ (shipping-order/cancel chỉ
+// nhận đơn CHƯA lấy hàng).
+const NOT_CANCELLABLE_GHN_STATUSES = [
+  ...SHIPPING_GHN_STATUSES.filter((s) => s !== "ready_to_pick"),
+  ...RETURNING_GHN_STATUSES,
+  ...ISSUE_GHN_STATUSES,
+  "delivered",
+  "cancel",
+];
+
+export function isOrderCancellable(order: { status: OrderStatus; ghnStatus: string | null }): boolean {
+  if (order.status === "CANCELLED" || order.status === "DELIVERED") return false;
+  if (order.ghnStatus && NOT_CANCELLABLE_GHN_STATUSES.includes(order.ghnStatus)) return false;
+  return true;
+}
+
 // GHN có 1 trang tài liệu riêng "Update fields according to order status" (docs id 117)
 // nhưng trang đó render bằng JS, không lấy được nội dung bảng thật để chép chính xác —
 // quy tắc tô xám dưới đây dựa trên 2 mốc GHN xác nhận rõ ràng ở chỗ khác:

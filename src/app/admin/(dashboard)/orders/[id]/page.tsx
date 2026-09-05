@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrder, updateOrder } from "@/lib/actions/orders";
-import { orderDisplayStatusLabel, getOrderFieldLocks, parseSelectedAttributes } from "@/lib/orders";
+import { orderDisplayStatusLabel, getOrderFieldLocks, isOrderCancellable, parseSelectedAttributes } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 import { OrderActions } from "@/components/OrderActions";
@@ -111,7 +111,12 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         )}
       </div>
 
-      <OrderActions orderId={order.id} status={order.status} hasGhnOrderCode={!!order.ghnOrderCode} />
+      <OrderActions
+        orderId={order.id}
+        status={order.status}
+        hasGhnOrderCode={!!order.ghnOrderCode}
+        cancellable={isOrderCancellable(order)}
+      />
     </div>
   );
 }

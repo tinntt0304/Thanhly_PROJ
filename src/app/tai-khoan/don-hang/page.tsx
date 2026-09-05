@@ -1,7 +1,8 @@
 import { listMyOrders } from "@/lib/actions/buyer-orders";
-import { getOrderTracking } from "@/lib/orders";
+import { getOrderTracking, isOrderCancellable } from "@/lib/orders";
 import { SiteHeader } from "@/components/SiteHeader";
 import { OrderTrackingSteps } from "@/components/OrderTrackingSteps";
+import { BuyerOrderCancelButton } from "@/components/BuyerOrderCancelButton";
 import { formatDateTime, formatVND } from "@/lib/auction";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export default async function BuyerOrderHistoryPage() {
                   <span className="font-semibold text-text">Tổng: {formatVND(order.codAmount)}</span>
                 </div>
                 <OrderTrackingSteps tracking={getOrderTracking(order)} />
+                {isOrderCancellable(order) && <BuyerOrderCancelButton orderId={order.id} />}
               </li>
             ))}
           </ul>

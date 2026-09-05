@@ -20,10 +20,12 @@ export function OrderActions({
   orderId,
   status,
   hasGhnOrderCode,
+  cancellable,
 }: {
   orderId: string;
   status: OrderStatus;
   hasGhnOrderCode: boolean;
+  cancellable: boolean;
 }) {
   const router = useRouter();
   const [requiredNote, setRequiredNote] = useState<RequiredNote>("KHONGCHOXEMHANG");
@@ -145,7 +147,7 @@ export function OrderActions({
         </button>
       )}
 
-      {status !== "CANCELLED" && (
+      {status !== "CANCELLED" && cancellable && (
         <button
           type="button"
           disabled={pending !== null}
@@ -157,6 +159,10 @@ export function OrderActions({
         >
           {pending === "cancel" ? "Đang huỷ..." : "Huỷ đơn"}
         </button>
+      )}
+
+      {status !== "CANCELLED" && !cancellable && (
+        <p className="text-sm text-neutral-500">Đơn đã được lấy hàng, không huỷ được nữa.</p>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
