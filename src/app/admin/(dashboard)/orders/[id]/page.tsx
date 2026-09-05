@@ -119,9 +119,12 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
             </p>
             {order.ghnStatus &&
               (ISSUE_GHN_STATUSES.includes(order.ghnStatus) ? (
-                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 font-semibold text-red-700">
-                  <span aria-hidden="true">⚠</span> {ghnStatusLabel(order.ghnStatus)}
-                </p>
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 font-semibold text-red-700">
+                  <p>
+                    <span aria-hidden="true">⚠</span> {ghnStatusLabel(order.ghnStatus)}
+                  </p>
+                  {order.ghnStatusReason && <p className="mt-0.5 text-sm font-normal">Lý do: {order.ghnStatusReason}</p>}
+                </div>
               ) : (
                 <p>Trạng thái GHN: {ghnStatusLabel(order.ghnStatus)}</p>
               ))}

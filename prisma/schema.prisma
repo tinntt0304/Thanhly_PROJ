@@ -195,6 +195,7 @@ model Order {
 
   ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
   ghnStatus          String? // trạng thái thô GHN trả về (picking, delivering, delivered...), cập nhật khi bấm "Làm mới trạng thái"
+  ghnStatusReason    String? // lý do thất bại GHN trả kèm ghnStatus (vd. "Khách không nghe máy") — CHỈ có từ webhook (api/webhooks/ghn), API "Làm mới trạng thái" (shipping-order/detail) không trả kèm lý do nên bị xoá về null nếu ghnStatus đổi qua đường đó (tránh hiện lý do cũ sai lệch với trạng thái mới)
   shippingFee        Int?
   expectedDeliveryAt DateTime?
 

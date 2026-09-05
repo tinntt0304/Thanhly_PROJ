@@ -619,6 +619,10 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
       data: {
         ghnStatus: detail.status,
         status: deriveOrderStatusFromGhn(detail.status, order.status),
+        // shipping-order/detail KHÔNG trả kèm lý do (chỉ webhook mới có) — nếu trạng thái vừa
+        // đổi khác trước, xoá lý do cũ đi thay vì để nó hiện lẫn với 1 trạng thái mới không
+        // liên quan; giữ nguyên (không đụng) nếu trạng thái không đổi.
+        ...(detail.status !== order.ghnStatus ? { ghnStatusReason: null } : {}),
       },
     });
   } catch (e) {

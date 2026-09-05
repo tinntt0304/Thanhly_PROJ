@@ -181,9 +181,14 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
                   </td>
                   <td className="px-4 py-2">
                     {order.ghnStatus && ISSUE_GHN_STATUSES.includes(order.ghnStatus) ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                        <span aria-hidden="true">⚠</span> {orderDisplayStatusLabel(order)}
-                      </span>
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                          <span aria-hidden="true">⚠</span> {orderDisplayStatusLabel(order)}
+                        </span>
+                        {order.ghnStatusReason && (
+                          <span className="block text-xs text-red-600">Lý do: {order.ghnStatusReason}</span>
+                        )}
+                      </>
                     ) : (
                       orderDisplayStatusLabel(order)
                     )}

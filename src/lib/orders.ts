@@ -131,6 +131,7 @@ export function getOrderTracking(order: {
   status: OrderStatus;
   ghnOrderCode: string | null;
   ghnStatus: string | null;
+  ghnStatusReason?: string | null;
 }): OrderTracking {
   if (order.status === "CANCELLED") return { kind: "cancelled" };
 
@@ -153,11 +154,16 @@ export function getOrderTracking(order: {
 
   // isIssue (delivery_fail/exception/damage/lost/return_fail) là lỗi CẦN CHÚ Ý ngay — hiện đỏ,
   // nổi bật hơn hẳn isReturning (đang hoàn hàng, vẫn là 1 bước bình thường trong quy trình, chỉ
-  // cần biết chứ không cần lo lắng) — hiện cam/thông tin.
+  // cần biết chứ không cần lo lắng) — hiện cam/thông tin. Kèm lý do thật GHN trả về (nếu có,
+  // chỉ webhook mới cung cấp — xem ghnStatusReason ở schema) ngay sau nhãn trạng thái.
+  const baseWarning = (isReturning || isIssue) && ghnStatus ? ghnStatusLabel(ghnStatus) : undefined;
+  const warning =
+    baseWarning && order.ghnStatusReason ? `${baseWarning} — Lý do: ${order.ghnStatusReason}` : baseWarning;
+
   return {
     kind: "steps",
     steps,
-    warning: (isReturning || isIssue) && ghnStatus ? ghnStatusLabel(ghnStatus) : undefined,
+    warning,
     warningSeverity: isIssue ? "error" : "info",
   };
 }

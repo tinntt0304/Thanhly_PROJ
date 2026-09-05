@@ -21,6 +21,11 @@ const payloadSchema = z.object({
   OrderCode: z.string().min(1),
   ClientOrderCode: z.string().nullish(),
   Status: z.string().min(1),
+  // GHN kèm lý do (đặc biệt cho delivery_fail/exception, vd. "Khách không nghe máy") ở 1 trong
+  // các field này tuỳ phiên bản webhook — chấp nhận cả 3, dùng field nào có giá trị trước.
+  Reason: z.string().nullish(),
+  ReasonCode: z.string().nullish(),
+  Description: z.string().nullish(),
 });
 
 export async function POST(request: Request) {
@@ -41,7 +46,8 @@ export async function POST(request: Request) {
     // 4xx — tránh GHN hiểu lầm là lỗi tạm thời rồi retry 10 lần/5 giây liên tục vô ích.
     return NextResponse.json({ ok: true, skipped: "unrecognized payload shape" });
   }
-  const { OrderCode, Status } = parsed.data;
+  const { OrderCode, Status, Reason, ReasonCode, Description } = parsed.data;
+  const ghnStatusReason = Reason || Description || ReasonCode || null;
 
   // ghnOrderCode không có ràng buộc unique ở schema (chỉ đánh index) nên dùng findFirst —
   // về lý thuyết 1 mã vận đơn GHN chỉ gắn với đúng 1 Order vì ta tự tạo ra mã này lúc gọi
@@ -53,7 +59,9 @@ export async function POST(request: Request) {
 
   await prisma.order.update({
     where: { id: order.id },
-    data: { ghnStatus: Status, status: deriveOrderStatusFromGhn(Status, order.status) },
+    // Luôn ghi lại ghnStatusReason (kể cả null khi sự kiện này không kèm lý do) — lý do luôn
+    // gắn với ĐÚNG lần cập nhật trạng thái mới nhất, không giữ lại lý do cũ của lần trước.
+    data: { ghnStatus: Status, status: deriveOrderStatusFromGhn(Status, order.status), ghnStatusReason },
   });
 
   revalidatePath(`/admin/orders/${order.id}`);
