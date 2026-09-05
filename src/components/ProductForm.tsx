@@ -10,6 +10,7 @@ import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 import { TAG_LABEL, TAG_VALUES, asProductTags, type ProductTag } from "@/lib/tags";
 import { toDateTimeLocal } from "@/lib/datetime";
 import { compressImageForUpload } from "@/lib/client-image-compress";
+import { PRODUCT_CONDITIONS } from "@/lib/product-condition";
 
 const initialState: ProductFormState = {};
 
@@ -152,14 +153,19 @@ export function ProductForm({
         <label htmlFor="condition" className="text-sm font-medium text-text">
           Tình trạng
         </label>
-        <input
+        <select
           id="condition"
           name="condition"
-          defaultValue={product?.condition}
+          defaultValue={product?.condition ?? PRODUCT_CONDITIONS[0]}
           required
-          placeholder="Mới / Đã dùng - còn tốt / Lỗi nhẹ: ..."
           className={inputClass}
-        />
+        >
+          {PRODUCT_CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-1">

@@ -9,13 +9,14 @@ import { uploadProductImage } from "@/lib/storage";
 import { MAX_IMAGES_PER_PRODUCT } from "@/lib/product-limits";
 import type { Attribute } from "@/lib/attributes";
 import { asProductTags } from "@/lib/tags";
+import { PRODUCT_CONDITIONS } from "@/lib/product-condition";
 import type { ProductStatus } from "@/generated/prisma/client";
 
 const productSchema = z
   .object({
     title: z.string().trim().min(1, "Thiếu tên sản phẩm"),
     description: z.string().trim().min(1, "Thiếu mô tả"),
-    condition: z.string().trim().min(1, "Thiếu tình trạng sản phẩm"),
+    condition: z.enum(PRODUCT_CONDITIONS, { message: "Tình trạng không hợp lệ" }),
     quantity: z.coerce.number().int().positive("Số lượng phải lớn hơn 0"),
     startPrice: z.coerce.number().int().positive("Giá khởi điểm phải lớn hơn 0"),
     minBidStep: z.coerce.number().int().positive("Bước giá phải lớn hơn 0"),
