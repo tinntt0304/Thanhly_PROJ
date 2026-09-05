@@ -66,6 +66,32 @@ export async function removeFromCart(productId: string): Promise<void> {
   revalidatePath("/gio-hang");
 }
 
+export type UpdateCartItemQuantityResult = { ok: true; quantity: number } | { ok: false; error: string };
+
+// Buyer chỉnh số lượng trực tiếp ở trang giỏ hàng — luôn kẹp lại trong [1, Product.quantity]
+// (số lượng thật còn lại) ngay khi lưu, không tin số buyer gửi lên.
+export async function updateCartItemQuantity(
+  productId: string,
+  quantity: number
+): Promise<UpdateCartItemQuantityResult> {
+  const session = await requireAdmin();
+
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { quantity: true } });
+  if (!product) return { ok: false, error: "Không tìm thấy sản phẩm." };
+  if (product.quantity <= 0) return { ok: false, error: "Sản phẩm đã hết hàng." };
+
+  const clamped = Math.min(Math.max(Math.trunc(quantity) || 1, 1), product.quantity);
+
+  const item = await prisma.cartItem.updateMany({
+    where: { buyerId: session.user.id, productId },
+    data: { quantity: clamped },
+  });
+  if (item.count === 0) return { ok: false, error: "Sản phẩm không có trong giỏ." };
+
+  revalidatePath("/gio-hang");
+  return { ok: true, quantity: clamped };
+}
+
 export async function getCartItems() {
   const session = await requireAdmin();
   return prisma.cartItem.findMany({
@@ -139,11 +165,14 @@ export async function checkoutCart(
     const orderIds = await prisma.$transaction(async (tx) => {
       const bySeller = new Map<
         string,
-        { productId: string; unitPrice: number; selectedAttributes: unknown }[]
+        { productId: string; unitPrice: number; quantity: number; selectedAttributes: unknown }[]
       >();
 
       for (const item of cartItems) {
         const { product } = item;
+        // Số lượng buyer chọn trong giỏ, kẹp lại 1 lần nữa phòng trường hợp kho đã tụt xuống
+        // thấp hơn từ lúc chỉnh số lượng ở trang giỏ hàng tới lúc bấm đặt hàng.
+        const wantQuantity = Math.min(Math.max(item.quantity, 1), Math.max(product.quantity, 1));
 
         if (!product.buyNowPrice) {
           throw new Error(`"${product.title}" không còn hỗ trợ mua ngay, vui lòng xoá khỏi giỏ.`);
@@ -155,13 +184,13 @@ export async function checkoutCart(
           throw new Error(`"${product.title}" không còn mở để mua, vui lòng xoá khỏi giỏ.`);
         }
 
-        // Cùng pattern optimistic-lock với buyNowAction: chỉ trừ kho nếu còn ACTIVE + quantity > 0.
+        // Cùng pattern optimistic-lock với buyNowAction: chỉ trừ kho nếu còn ACTIVE + đủ số lượng.
         const updateResult = await tx.product.updateMany({
-          where: { id: product.id, status: "ACTIVE", quantity: { gt: 0 } },
-          data: { quantity: { decrement: 1 } },
+          where: { id: product.id, status: "ACTIVE", quantity: { gte: wantQuantity } },
+          data: { quantity: { decrement: wantQuantity } },
         });
         if (updateResult.count === 0) {
-          throw new Error(`"${product.title}" vừa hết hàng, vui lòng xoá khỏi giỏ và thử lại.`);
+          throw new Error(`"${product.title}" không còn đủ hàng, vui lòng chỉnh lại số lượng.`);
         }
 
         const remaining = await tx.product.findUniqueOrThrow({
@@ -183,6 +212,7 @@ export async function checkoutCart(
         group.push({
           productId: product.id,
           unitPrice: product.buyNowPrice,
+          quantity: wantQuantity,
           selectedAttributes: item.selectedAttributes ?? [],
         });
         bySeller.set(sellerId, group);
@@ -190,7 +220,8 @@ export async function checkoutCart(
 
       const ids: string[] = [];
       for (const [sellerId, items] of bySeller) {
-        const codAmount = items.reduce((sum, i) => sum + i.unitPrice, 0);
+        const codAmount = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+        const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
         const order = await tx.order.create({
           data: {
             sellerId,
@@ -205,7 +236,7 @@ export async function checkoutCart(
             wardCode: data.wardCode,
             wardName: data.wardName,
             codAmount,
-            weightGram: DEFAULT_WEIGHT_GRAM * items.length,
+            weightGram: DEFAULT_WEIGHT_GRAM * totalQuantity,
             lengthCm: DEFAULT_LENGTH_CM,
             widthCm: DEFAULT_WIDTH_CM,
             heightCm: DEFAULT_HEIGHT_CM,
@@ -213,7 +244,7 @@ export async function checkoutCart(
             items: {
               create: items.map((i) => ({
                 productId: i.productId,
-                quantity: 1,
+                quantity: i.quantity,
                 unitPrice: i.unitPrice,
                 selectedAttributes: i.selectedAttributes as Prisma.InputJsonValue,
                 stockDecremented: true,

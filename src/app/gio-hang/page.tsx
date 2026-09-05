@@ -18,6 +18,8 @@ export default async function CartPage() {
     title: item.product.title,
     image: item.product.images[0] ?? null,
     buyNowPrice: item.product.buyNowPrice,
+    quantity: Math.min(Math.max(item.quantity, 1), Math.max(item.product.quantity, 1)),
+    stock: item.product.quantity,
     available: item.product.status === "ACTIVE" && item.product.quantity > 0 && !!item.product.buyNowPrice,
   }));
 

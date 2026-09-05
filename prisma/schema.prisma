@@ -117,9 +117,8 @@ model Product {
 // giá trị), không dùng cho đấu giá (giá luôn đổi, không "chốt" được để bỏ giỏ — xem mục "Đang
 // đấu giá" ở /gio-hang, suy ra trực tiếp từ Bid.buyerId, không qua bảng này). unique
 // [buyerId, productId]: 1 dòng giỏ/sản phẩm/người mua — thêm lại sản phẩm đã có trong giỏ thì
-// ghi đè selectedAttributes thay vì tạo dòng thứ 2. Không có cột số lượng: Mua ngay hiện tại vốn
-// đã giới hạn 1 đơn vị/lần (xem buyNowAction ở actions/buy-now.ts), giữ nguyên giới hạn đó cho
-// giỏ hàng.
+// ghi đè selectedAttributes thay vì tạo dòng thứ 2. buyNowAction (mua ngay trực tiếp, không qua
+// giỏ) vẫn giới hạn cố định 1 đơn vị/lần — riêng giỏ hàng cho chỉnh số lượng qua cột quantity.
 model CartItem {
   id      String @id @default(cuid())
   buyer   User   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
@@ -129,6 +128,9 @@ model CartItem {
   productId String
 
   selectedAttributes Json @default("[]")
+
+  quantity Int @default(1) // số lượng buyer muốn mua, chỉnh trực tiếp ở trang giỏ hàng — luôn bị
+  // kẹp lại trong khoảng [1, Product.quantity] (số lượng thật còn lại) mỗi khi đổi và lúc checkout
 
   createdAt DateTime @default(now())
 
