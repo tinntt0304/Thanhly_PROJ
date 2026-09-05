@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-guard";
 import { listOrders } from "@/lib/actions/orders";
-import { ORDER_LIST_TABS, orderDisplayStatusLabel, formatOrderCode, type OrderListTab } from "@/lib/orders";
+import {
+  ORDER_LIST_TABS,
+  orderDisplayStatusLabel,
+  formatOrderCode,
+  ISSUE_GHN_STATUSES,
+  type OrderListTab,
+} from "@/lib/orders";
 import { formatVND, formatDateTime } from "@/lib/auction";
 
 export const dynamic = "force-dynamic";
@@ -173,7 +179,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
                       <span className="block text-xs text-neutral-500">Phí ship: {formatVND(order.shippingFee)}</span>
                     )}
                   </td>
-                  <td className="px-4 py-2">{orderDisplayStatusLabel(order)}</td>
+                  <td className="px-4 py-2">
+                    {order.ghnStatus && ISSUE_GHN_STATUSES.includes(order.ghnStatus) ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                        <span aria-hidden="true">⚠</span> {orderDisplayStatusLabel(order)}
+                      </span>
+                    ) : (
+                      orderDisplayStatusLabel(order)
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

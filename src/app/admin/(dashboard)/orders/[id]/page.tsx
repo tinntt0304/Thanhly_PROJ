@@ -7,6 +7,7 @@ import {
   isOrderCancellable,
   parseSelectedAttributes,
   formatOrderCode,
+  ISSUE_GHN_STATUSES,
 } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
@@ -116,7 +117,14 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
             <p>
               Mã vận đơn: <span className="font-mono font-medium text-text">{order.ghnOrderCode}</span>
             </p>
-            {order.ghnStatus && <p>Trạng thái GHN: {ghnStatusLabel(order.ghnStatus)}</p>}
+            {order.ghnStatus &&
+              (ISSUE_GHN_STATUSES.includes(order.ghnStatus) ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 font-semibold text-red-700">
+                  <span aria-hidden="true">⚠</span> {ghnStatusLabel(order.ghnStatus)}
+                </p>
+              ) : (
+                <p>Trạng thái GHN: {ghnStatusLabel(order.ghnStatus)}</p>
+              ))}
             {order.shippingFee !== null && <p>Phí ship: {formatVND(order.shippingFee)}</p>}
             {order.expectedDeliveryAt && <p>Dự kiến giao: {formatDateTime(order.expectedDeliveryAt)}</p>}
           </>

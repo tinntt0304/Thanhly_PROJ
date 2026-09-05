@@ -12,7 +12,7 @@ export function OrderTrackingSteps({ tracking }: { tracking: OrderTracking }) {
     );
   }
 
-  const { steps, warning } = tracking;
+  const { steps, warning, warningSeverity } = tracking;
   const lastDoneIndex = steps.reduce((acc, s, i) => (s.done ? i : acc), -1);
 
   return (
@@ -42,11 +42,16 @@ export function OrderTrackingSteps({ tracking }: { tracking: OrderTracking }) {
           </div>
         ))}
       </div>
-      {warning && (
-        <p className="text-xs font-medium text-amber-600">
-          <span aria-hidden="true">⚠</span> {warning}
-        </p>
-      )}
+      {warning &&
+        (warningSeverity === "error" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+            <span aria-hidden="true">⚠</span> {warning}
+          </div>
+        ) : (
+          <p className="text-xs font-medium text-amber-600">
+            <span aria-hidden="true">⚠</span> {warning}
+          </p>
+        ))}
     </div>
   );
 }

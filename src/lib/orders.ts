@@ -120,7 +120,7 @@ export function orderDisplayStatusLabel(order: {
 export type OrderTrackingStep = { label: string; done: boolean };
 export type OrderTracking =
   | { kind: "cancelled" }
-  | { kind: "steps"; steps: OrderTrackingStep[]; warning?: string };
+  | { kind: "steps"; steps: OrderTrackingStep[]; warning?: string; warningSeverity?: "error" | "info" };
 
 // Rút gọn toàn bộ vòng đời đơn (OrderStatus nội bộ + ghnStatus thô, xem orderDisplayStatusLabel
 // ở trên) thành 4 mốc cố định kiểu tracking Shopee cho người mua dễ theo dõi — "Đặt hàng" luôn
@@ -145,16 +145,20 @@ export function getOrderTracking(order: {
     { label: "Đặt hàng thành công", done: true },
     { label: "Người bán xác nhận", done: hasShipment || isDelivered },
     {
-      label: isReturning ? "Đang hoàn hàng" : isIssue ? "Có vấn đề khi giao" : "Đang giao hàng",
+      label: isReturning ? "Đang hoàn hàng" : isIssue ? "Lấy/giao hàng thất bại" : "Đang giao hàng",
       done: isShippingPhase,
     },
     { label: "Giao hàng thành công", done: isDelivered },
   ];
 
+  // isIssue (delivery_fail/exception/damage/lost/return_fail) là lỗi CẦN CHÚ Ý ngay — hiện đỏ,
+  // nổi bật hơn hẳn isReturning (đang hoàn hàng, vẫn là 1 bước bình thường trong quy trình, chỉ
+  // cần biết chứ không cần lo lắng) — hiện cam/thông tin.
   return {
     kind: "steps",
     steps,
     warning: (isReturning || isIssue) && ghnStatus ? ghnStatusLabel(ghnStatus) : undefined,
+    warningSeverity: isIssue ? "error" : "info",
   };
 }
 
