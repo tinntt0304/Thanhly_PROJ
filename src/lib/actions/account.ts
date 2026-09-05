@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
+import { unstable_update } from "@/lib/auth";
 
 export type AccountInfoFormState = { error?: string; success?: boolean };
 
@@ -34,6 +35,10 @@ export async function updateAccountInfo(
     where: { id: session.user.id },
     data: { name: parsed.data.name, phone: parsed.data.phone || null },
   });
+
+  // DB đã đổi nhưng session/JWT hiện tại (header, AccountMenu, mọi nơi đọc session.user.name)
+  // vẫn giữ tên cũ trong cookie tới khi đăng xuất — đồng bộ lại ngay để khỏi cần đăng nhập lại.
+  await unstable_update({ user: { name: parsed.data.name, phone: parsed.data.phone || null } });
 
   revalidatePath("/admin/account");
   return { success: true };

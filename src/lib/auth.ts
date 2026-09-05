@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   providers: [
     Credentials({
       credentials: {
@@ -34,10 +34,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    jwt: ({ token, user }) => {
+    jwt: ({ token, user, trigger, session }) => {
       if (user) {
         token.role = user.role;
         token.phone = user.phone ?? null;
+      }
+      // JWT chỉ được điền từ `user` lúc đăng nhập, sau đó nằm im trong cookie — sửa tên/SĐT ở
+      // trang tài khoản chỉ đổi DB, không tự đổi cookie. unstable_update() (actions/account.ts)
+      // gọi lại đây với trigger "update" để đồng bộ ngay, khỏi cần đăng xuất/đăng nhập lại.
+      if (trigger === "update" && session) {
+        if (typeof session.user?.name === "string") token.name = session.user.name;
+        if (session.user && "phone" in session.user) token.phone = session.user.phone ?? null;
       }
       return token;
     },
