@@ -24,6 +24,12 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
       <p className="text-xs text-neutral-500">Tạo lúc: {formatDateTime(order.createdAt)}</p>
 
+      {order.status === "CANCELLED" && order.cancelReason && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Lý do người mua huỷ: {order.cancelReason}
+        </p>
+      )}
+
       <ul className="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-surface">
         {order.items.map((item) => {
           const selectedAttributes = parseSelectedAttributes(item.selectedAttributes);

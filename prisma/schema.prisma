@@ -183,7 +183,8 @@ model Order {
 
   shopPaysShipping Boolean @default(false) // false = người mua trả phí ship khi nhận hàng, true = shop tự trả
 
-  status OrderStatus @default(NEW)
+  status       OrderStatus @default(NEW)
+  cancelReason String? // lý do huỷ — chỉ ghi khi NGƯỜI MUA tự huỷ đơn (chọn 1 trong 5 lý do dựng sẵn hoặc tự nhập "Lý do khác" ở /tai-khoan/don-hang); admin/seller tự huỷ thì để trống
 
   ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
   ghnStatus          String? // trạng thái thô GHN trả về (picking, delivering, delivered...), cập nhật khi bấm "Làm mới trạng thái"

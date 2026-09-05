@@ -10,6 +10,19 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const ORDERS_PAGE_SIZE = 30;
 
+// 5 lý do dựng sẵn cho người mua tự huỷ đơn ở /tai-khoan/don-hang — + tuỳ chọn "Lý do khác" xử
+// lý riêng ở UI (hiện thêm ô nhập tự do), không nằm trong danh sách này vì giá trị thật gửi lên
+// server là nội dung người mua tự gõ, không phải chuỗi "Lý do khác" cố định.
+export const CANCEL_REASON_OPTIONS = [
+  "Đổi ý, không muốn mua nữa",
+  "Đặt nhầm sản phẩm hoặc số lượng",
+  "Muốn thay đổi địa chỉ/thông tin nhận hàng",
+  "Tìm được giá tốt hơn ở nơi khác",
+  "Thời gian giao hàng quá lâu",
+] as const;
+
+export const MAX_CANCEL_REASON_LENGTH = 200;
+
 // Đọc lại Order.selectedAttributes ([{name, value}]) ghi bởi buyNowAction (actions/buy-now.ts)
 // khi khách chọn thuộc tính lúc bấm "Mua ngay" — không tin dữ liệu JSON thô, lọc bỏ phần tử
 // sai dạng thay vì để lỗi runtime khi hiển thị ở trang chi tiết đơn.

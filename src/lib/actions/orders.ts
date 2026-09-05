@@ -33,6 +33,7 @@ import {
   ISSUE_GHN_STATUSES,
   combinePhoneRisk,
   isOrderCancellable,
+  MAX_CANCEL_REASON_LENGTH,
   type OrderListTab,
   type PhoneRiskDisplay,
 } from "@/lib/orders";
@@ -600,7 +601,9 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
 // tự huỷ đơn CỦA CHÍNH MÌNH lúc còn "mới tạo" — nhưng người mua chỉ được phép mỗi việc huỷ,
 // không được sửa/tạo vận đơn/làm mới trạng thái (những action đó vẫn chỉ dành cho seller qua
 // assertOwnsOrder), nên kiểm tra quyền riêng ở đây thay vì mở rộng assertOwnsOrder dùng chung.
-export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
+// reason: chỉ gửi từ BuyerOrderCancelButton (người mua tự huỷ, chọn preset hoặc "Lý do khác")
+// — admin/seller huỷ qua OrderActions không gửi, cột cancelReason giữ null.
+export async function cancelOrder(orderId: string, reason?: string): Promise<GhnActionResult> {
   const session = await requireAdmin();
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
@@ -619,6 +622,8 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
     return { ok: false, error: "Đơn đã được lấy hàng, không huỷ được nữa." };
   }
 
+  const cancelReason = reason?.trim().slice(0, MAX_CANCEL_REASON_LENGTH) || null;
+
   if (order.ghnOrderCode && order.status === "SHIPPING") {
     try {
       await cancelGhnOrder(order.ghnOrderCode);
@@ -628,7 +633,7 @@ export async function cancelOrder(orderId: string): Promise<GhnActionResult> {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED", cancelReason } });
 
     // Dòng nào tạo từ "Mua ngay"/checkout giỏ hàng đã trừ đúng `quantity` đơn vị
     // Product.quantity lúc tạo — huỷ đơn thì hoàn lại đúng số đó cho TỪNG dòng. Dòng tạo thủ
