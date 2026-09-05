@@ -1,5 +1,5 @@
 import { listMyOrders } from "@/lib/actions/buyer-orders";
-import { getOrderTracking, isOrderCancellable } from "@/lib/orders";
+import { getOrderTracking, isOrderCancellable, formatOrderCode } from "@/lib/orders";
 import { SiteHeader } from "@/components/SiteHeader";
 import { OrderTrackingSteps } from "@/components/OrderTrackingSteps";
 import { BuyerOrderCancelButton } from "@/components/BuyerOrderCancelButton";
@@ -22,6 +22,7 @@ export default async function BuyerOrderHistoryPage() {
           <ul className="flex flex-col gap-3">
             {items.map((order) => (
               <li key={order.id} className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
+                <p className="font-mono text-xs text-neutral-500">{formatOrderCode(order.orderSeq)}</p>
                 <div className="flex flex-col gap-1 text-sm">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex flex-wrap items-center justify-between gap-2">

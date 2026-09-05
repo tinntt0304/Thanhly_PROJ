@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-guard";
 import { listOrders } from "@/lib/actions/orders";
-import { ORDER_LIST_TABS, orderDisplayStatusLabel, type OrderListTab } from "@/lib/orders";
+import { ORDER_LIST_TABS, orderDisplayStatusLabel, formatOrderCode, type OrderListTab } from "@/lib/orders";
 import { formatVND, formatDateTime } from "@/lib/auction";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +23,17 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
   const tab: OrderListTab = ORDER_LIST_TABS.some((t) => t.key === sp.tab) ? (sp.tab as OrderListTab) : "ALL";
   const from = typeof sp.from === "string" ? sp.from : "";
   const to = typeof sp.to === "string" ? sp.to : "";
+  const q = typeof sp.q === "string" ? sp.q : "";
 
-  const { items, totalCount, pageSize, tabCounts } = await listOrders(page, tab, from || undefined, to || undefined);
+  const { items, totalCount, pageSize, tabCounts, lookbackFloor } = await listOrders(
+    page,
+    tab,
+    from || undefined,
+    to || undefined,
+    q || undefined
+  );
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const lookbackFloorDate = lookbackFloor.toISOString().slice(0, 10);
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,7 +43,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
         {ORDER_LIST_TABS.map((t) => (
           <Link
             key={t.key}
-            href={`/admin/orders${buildQuery({ tab: t.key === "ALL" ? undefined : t.key, from, to })}`}
+            href={`/admin/orders${buildQuery({ tab: t.key === "ALL" ? undefined : t.key, from, to, q })}`}
             className={`flex shrink-0 items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               tab === t.key
                 ? "border-accent-500 text-accent-600"
@@ -57,6 +65,19 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="tab" value={tab} />
         <div className="flex flex-col gap-1">
+          <label htmlFor="q" className="text-sm font-medium text-text">
+            Tìm theo mã đơn / SĐT / tên người nhận
+          </label>
+          <input
+            id="q"
+            name="q"
+            type="text"
+            defaultValue={q}
+            placeholder="VD: HF000123, 0901234567, Nguyễn Văn A"
+            className="w-72 rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <label htmlFor="from" className="text-sm font-medium text-text">
             Thời gian tạo đơn — Từ
           </label>
@@ -65,6 +86,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
             name="from"
             type="date"
             defaultValue={from}
+            min={lookbackFloorDate}
             className="rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
         </div>
@@ -77,6 +99,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
             name="to"
             type="date"
             defaultValue={to}
+            min={lookbackFloorDate}
             className="rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
         </div>
@@ -86,18 +109,22 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
         >
           Lọc
         </button>
-        {(from || to) && (
+        {(from || to || q) && (
           <Link
             href={`/admin/orders${buildQuery({ tab: tab === "ALL" ? undefined : tab })}`}
             className="text-sm text-neutral-500 underline"
           >
-            Bỏ lọc ngày
+            Bỏ lọc
           </Link>
         )}
         <span className="pb-2 text-sm text-neutral-600">
           Hiển thị {items.length}/{totalCount} đơn hàng
         </span>
       </form>
+
+      <p className="text-xs text-neutral-500">
+        Chỉ hiển thị đơn hàng trong 3 tháng gần nhất (từ {formatDateTime(lookbackFloor)}).
+      </p>
 
       {items.length === 0 ? (
         <p className="text-sm text-neutral-700">
@@ -122,9 +149,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
               {items.map((order) => (
                 <tr key={order.id}>
                   <td className="px-4 py-2">
-                    <Link href={`/admin/orders/${order.id}`} className="font-medium text-text hover:underline">
-                      {order.items[0]?.product.title ?? "—"}
-                      {order.items.length > 1 && ` và ${order.items.length - 1} sản phẩm khác`}
+                    <Link href={`/admin/orders/${order.id}`} className="font-mono font-medium text-text hover:underline">
+                      {formatOrderCode(order.orderSeq)}
                     </Link>
                     {order.ghnOrderCode && (
                       <span className="block font-mono text-xs text-neutral-500">{order.ghnOrderCode}</span>
@@ -158,7 +184,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
           <Link
-            href={`/admin/orders${buildQuery({ tab: tab === "ALL" ? undefined : tab, from, to, page: page - 1 })}`}
+            href={`/admin/orders${buildQuery({ tab: tab === "ALL" ? undefined : tab, from, to, q, page: page - 1 })}`}
             aria-disabled={page <= 1}
             className={`rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 ${page <= 1 ? "pointer-events-none opacity-40" : ""}`}
           >
@@ -168,7 +194,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
             Trang {page} / {totalPages}
           </span>
           <Link
-            href={`/admin/orders${buildQuery({ tab: tab === "ALL" ? undefined : tab, from, to, page: page + 1 })}`}
+            href={`/admin/orders${buildQuery({ tab: tab === "ALL" ? undefined : tab, from, to, q, page: page + 1 })}`}
             aria-disabled={page >= totalPages}
             className={`rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 ${page >= totalPages ? "pointer-events-none opacity-40" : ""}`}
           >

@@ -1,7 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrder, updateOrder } from "@/lib/actions/orders";
-import { orderDisplayStatusLabel, getOrderFieldLocks, isOrderCancellable, parseSelectedAttributes } from "@/lib/orders";
+import {
+  orderDisplayStatusLabel,
+  getOrderFieldLocks,
+  isOrderCancellable,
+  parseSelectedAttributes,
+  formatOrderCode,
+} from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
 import { formatVND, formatDateTime } from "@/lib/auction";
 import { OrderActions } from "@/components/OrderActions";
@@ -18,7 +24,9 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-lg font-bold text-text">Đơn hàng</h1>
+        <h1 className="font-heading text-lg font-bold text-text">
+          Đơn hàng <span className="font-mono">{formatOrderCode(order.orderSeq)}</span>
+        </h1>
         <span className="text-sm text-neutral-700">Trạng thái: {orderDisplayStatusLabel(order)}</span>
       </div>
 

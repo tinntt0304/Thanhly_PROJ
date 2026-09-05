@@ -10,6 +10,34 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const ORDERS_PAGE_SIZE = 30;
 
+// Mã đơn hàng ngắn hiển thị cho người dùng (Order.orderSeq là SERIAL, tăng dần, sinh ngay lúc
+// tạo đơn — xem schema.prisma) — dùng LUÔN mã này làm ClientOrderCode gửi cho GHN lúc tạo vận
+// đơn (createGhnShipment) nên phải là chuỗi ổn định, không đổi ngược lại được theo thời gian.
+export function formatOrderCode(orderSeq: number): string {
+  return `HF${String(orderSeq).padStart(6, "0")}`;
+}
+
+// Chuẩn hoá 1 chuỗi tìm kiếm mã đơn hàng (bỏ tiền tố "HF"/số 0 đệm) về lại số orderSeq gốc —
+// dùng khi tìm theo mã ở /admin/orders. Trả về null nếu chuỗi không chứa chữ số nào (không phải
+// đang tìm theo mã đơn, có thể đang tìm theo tên/SĐT).
+export function parseOrderCode(search: string): number | null {
+  const digits = search.replace(/\D/g, "");
+  if (!digits) return null;
+  const seq = Number.parseInt(digits, 10);
+  return Number.isNaN(seq) ? null : seq;
+}
+
+// Chỉ giữ/hiện dữ liệu đơn hàng trong 3 tháng gần nhất ở /admin/orders — luôn áp dụng ở tầng
+// server (buildQuery ở listOrders), không chỉ chặn UI, để tránh quét toàn bộ lịch sử đơn hàng
+// khi dữ liệu lớn dần theo thời gian. Admin vẫn lọc "Từ ngày"/"Đến ngày" trong phạm vi này được.
+export const ORDERS_LOOKBACK_MONTHS = 3;
+
+export function getOrdersLookbackFloor(): Date {
+  const floor = new Date();
+  floor.setMonth(floor.getMonth() - ORDERS_LOOKBACK_MONTHS);
+  return floor;
+}
+
 // 5 lý do dựng sẵn cho người mua tự huỷ đơn ở /tai-khoan/don-hang — + tuỳ chọn "Lý do khác" xử
 // lý riêng ở UI (hiện thêm ô nhập tự do), không nằm trong danh sách này vì giá trị thật gửi lên
 // server là nội dung người mua tự gõ, không phải chuỗi "Lý do khác" cố định.

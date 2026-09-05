@@ -153,6 +153,13 @@ enum OrderStatus {
 model Order {
   id String @id @default(cuid())
 
+  // Mã đơn hàng ngắn, tăng dần, sinh ra NGAY lúc tạo đơn (Postgres SERIAL — không cần code sinh
+  // tay ở tầng ứng dụng, không trùng, không phải chờ ai xử lý gì mới có) — hiển thị dạng
+  // "HF000123" (xem formatOrderCode ở lib/orders.ts) ở danh sách/chi tiết đơn thay vì id cuid dài
+  // khó nhớ. Dùng LUÔN mã này làm ClientOrderCode gửi cho GHN lúc tạo vận đơn (createGhnShipment)
+  // — 1 mã duy nhất tham chiếu xuyên suốt giữa hifen và đơn vị vận chuyển.
+  orderSeq Int @unique @default(autoincrement())
+
   seller   User   @relation("OrderAsSeller", fields: [sellerId], references: [id])
   sellerId String
 

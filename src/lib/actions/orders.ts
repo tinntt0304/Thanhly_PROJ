@@ -34,6 +34,9 @@ import {
   combinePhoneRisk,
   isOrderCancellable,
   MAX_CANCEL_REASON_LENGTH,
+  parseOrderCode,
+  getOrdersLookbackFloor,
+  formatOrderCode,
   type OrderListTab,
   type PhoneRiskDisplay,
 } from "@/lib/orders";
@@ -383,13 +386,28 @@ function buildTabWhere(tab: OrderListTab): Prisma.OrderWhereInput {
   }
 }
 
+// Tìm theo mã đơn hàng (HF000123, chấp nhận thiếu tiền tố/số 0 đệm — xem parseOrderCode) HOẶC
+// tên/SĐT người nhận — khớp bất kỳ 1 trong 3 là đủ (OR), không yêu cầu khớp cả 3.
+function buildSearchWhere(search?: string): Prisma.OrderWhereInput {
+  const trimmed = search?.trim();
+  if (!trimmed) return {};
+  const or: Prisma.OrderWhereInput[] = [
+    { buyerName: { contains: trimmed, mode: "insensitive" } },
+    { buyerPhone: { contains: trimmed } },
+  ];
+  const seq = parseOrderCode(trimmed);
+  if (seq !== null) or.push({ orderSeq: seq });
+  return { OR: or };
+}
+
 export type OrderListItem = Awaited<ReturnType<typeof listOrders>>["items"][number];
 
 export async function listOrders(
   page: number = 1,
   tab: OrderListTab = "ALL",
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  search?: string
 ) {
   const session = await requireAdmin();
   const isSuperAdmin = session.user.role === "SUPERADMIN";
@@ -397,13 +415,25 @@ export async function listOrders(
 
   const baseWhere: Prisma.OrderWhereInput = isSuperAdmin ? {} : { sellerId: session.user.id };
 
-  const createdAtFilter: Prisma.DateTimeFilter = {};
-  if (dateFrom) createdAtFilter.gte = new Date(`${dateFrom}T00:00:00`);
+  // Luôn giới hạn 3 tháng gần nhất (getOrdersLookbackFloor) bất kể admin có tự chọn "Từ" xa hơn
+  // hay không — chặn ở server, không chỉ ẩn ở UI.
+  const lookbackFloor = getOrdersLookbackFloor();
+  const createdAtFilter: Prisma.DateTimeFilter = { gte: lookbackFloor };
+  if (dateFrom) {
+    const fromDate = new Date(`${dateFrom}T00:00:00`);
+    if (fromDate > lookbackFloor) createdAtFilter.gte = fromDate;
+  }
   if (dateTo) createdAtFilter.lte = new Date(`${dateTo}T23:59:59.999`);
-  const createdAtWhere: Prisma.OrderWhereInput =
-    dateFrom || dateTo ? { createdAt: createdAtFilter } : {};
+  const createdAtWhere: Prisma.OrderWhereInput = { createdAt: createdAtFilter };
 
-  const where: Prisma.OrderWhereInput = { ...baseWhere, ...createdAtWhere, ...buildTabWhere(tab) };
+  const searchWhere = buildSearchWhere(search);
+
+  const where: Prisma.OrderWhereInput = {
+    ...baseWhere,
+    ...createdAtWhere,
+    ...searchWhere,
+    ...buildTabWhere(tab),
+  };
 
   const [items, totalCount, tabCountEntries] = await Promise.all([
     prisma.order.findMany({
@@ -420,7 +450,9 @@ export async function listOrders(
     Promise.all(
       ORDER_LIST_TABS.map(async (t) => [
         t.key,
-        await prisma.order.count({ where: { ...baseWhere, ...createdAtWhere, ...buildTabWhere(t.key) } }),
+        await prisma.order.count({
+          where: { ...baseWhere, ...createdAtWhere, ...searchWhere, ...buildTabWhere(t.key) },
+        }),
       ] as const)
     ),
   ]);
@@ -431,6 +463,7 @@ export async function listOrders(
     page: safePage,
     pageSize: ORDERS_PAGE_SIZE,
     tabCounts: Object.fromEntries(tabCountEntries) as Record<OrderListTab, number>,
+    lookbackFloor,
   };
 }
 
@@ -544,7 +577,7 @@ export async function createGhnShipment(
       content: order.items.map((i) => i.product.title).join(", "),
       requiredNote,
       paymentTypeId: order.shopPaysShipping ? 1 : 2,
-      clientOrderCode: order.id,
+      clientOrderCode: formatOrderCode(order.orderSeq),
       items: order.items.map((i) => ({ name: i.product.title, quantity: i.quantity })),
       serviceId,
       serviceTypeId,
