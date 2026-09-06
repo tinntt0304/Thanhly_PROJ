@@ -224,6 +224,33 @@ export async function cancelGhnOrder(orderCode: string): Promise<void> {
   await ghnFetch<unknown>(`${SHIPPING_BASE[env()]}/switch-status/cancel`, { order_codes: [orderCode] }, true);
 }
 
+// Trang in vận đơn (printA5/print80x80/print52x70) nằm ở domain gốc, KHÁC hẳn tiền tố
+// /shiip/public-api/v2 của mọi API khác (xem api.ghn.vn/home/docs/detail?id=100) — tách
+// riêng base URL này thay vì tái dùng SHIPPING_BASE.
+const PRINT_ORIGIN = {
+  sandbox: "https://dev-online-gateway.ghn.vn",
+  production: "https://online-gateway.ghn.vn",
+};
+
+export type GhnPrintSize = "A5" | "80x80" | "52x70";
+
+// Token in chỉ sống 30 phút (theo tài liệu GHN) — luôn xin token mới ngay trước khi mở
+// trang in thay vì lưu lại dùng nhiều lần, tránh mở link đã hết hạn.
+export async function genGhnPrintToken(orderCodes: string[]): Promise<string> {
+  assertHasToken();
+  const { token } = await ghnFetch<{ token: string }>(
+    `${SHIPPING_BASE[env()]}/a5/gen-token`,
+    { order_codes: orderCodes },
+    false
+  );
+  return token;
+}
+
+export function getGhnPrintUrl(token: string, size: GhnPrintSize = "A5"): string {
+  const path = size === "A5" ? "printA5" : `print${size}`;
+  return `${PRINT_ORIGIN[env()]}/a5/public-api/${path}?token=${encodeURIComponent(token)}`;
+}
+
 export type UpdateGhnOrderInput = {
   orderCode: string;
   toName: string;

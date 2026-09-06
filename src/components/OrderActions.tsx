@@ -7,6 +7,7 @@ import {
   refreshGhnStatus,
   cancelOrder,
   getShippingQuote,
+  getGhnPrintOrderUrl,
   type ShippingQuote,
 } from "@/lib/actions/orders";
 import { REQUIRED_NOTE_OPTIONS, type RequiredNote } from "@/lib/ghn";
@@ -29,7 +30,7 @@ export function OrderActions({
 }) {
   const router = useRouter();
   const [requiredNote, setRequiredNote] = useState<RequiredNote>("KHONGCHOXEMHANG");
-  const [pending, setPending] = useState<"create" | "refresh" | "cancel" | null>(null);
+  const [pending, setPending] = useState<"create" | "refresh" | "cancel" | "print" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [quotes, setQuotes] = useState<ShippingQuote[] | null>(null);
@@ -63,6 +64,24 @@ export function OrderActions({
       return;
     }
     router.refresh();
+  }
+
+  // Mở tab mới NGAY trong lúc bấm (không đợi await) để trình duyệt không chặn popup —
+  // xin token rồi window.open sau async thường bị coi là "không phải hành động trực tiếp
+  // của người dùng" và bị chặn. Mở trang trắng trước, điều hướng nó sau khi có URL thật.
+  async function handlePrint() {
+    setPending("print");
+    setError(null);
+    const printWindow = window.open("", "_blank");
+    const res = await getGhnPrintOrderUrl(orderId);
+    setPending(null);
+    if (!res.ok) {
+      printWindow?.close();
+      setError(res.error);
+      return;
+    }
+    if (printWindow) printWindow.location.href = res.url;
+    else window.open(res.url, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -137,14 +156,24 @@ export function OrderActions({
       )}
 
       {hasGhnOrderCode && (
-        <button
-          type="button"
-          disabled={pending !== null}
-          onClick={() => run("refresh", () => refreshGhnStatus(orderId))}
-          className="self-start rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50"
-        >
-          {pending === "refresh" ? "Đang làm mới..." : "Làm mới trạng thái GHN"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={() => run("refresh", () => refreshGhnStatus(orderId))}
+            className="self-start rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {pending === "refresh" ? "Đang làm mới..." : "Làm mới trạng thái GHN"}
+          </button>
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={handlePrint}
+            className="self-start rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {pending === "print" ? "Đang tạo link in..." : "🖨️ In vận đơn"}
+          </button>
+        </div>
       )}
 
       {status !== "CANCELLED" && cancellable && (

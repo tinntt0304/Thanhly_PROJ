@@ -17,12 +17,15 @@ import {
   getGhnOrderDetail,
   cancelGhnOrder,
   getReturnRate,
+  genGhnPrintToken,
+  getGhnPrintUrl,
   REQUIRED_NOTE_OPTIONS,
   type RequiredNote,
   type GhnProvince,
   type GhnDistrict,
   type GhnWard,
   type GhnService,
+  type GhnPrintSize,
 } from "@/lib/ghn";
 import {
   ORDERS_PAGE_SIZE,
@@ -632,6 +635,29 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
   return { ok: true };
+}
+
+export type PrintOrderResult = { ok: true; url: string } | { ok: false; error: string };
+
+// In vận đơn dùng luôn API in của GHN (xin token rồi mở trang in do GHN render sẵn — không
+// tự vẽ lại nhãn vận đơn), xem genGhnPrintToken/getGhnPrintUrl ở lib/ghn.ts.
+export async function getGhnPrintOrderUrl(orderId: string, size: GhnPrintSize = "A5"): Promise<PrintOrderResult> {
+  const session = await requireAdmin();
+  try {
+    await assertOwnsOrder(session.user.id, session.user.role, orderId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không có quyền." };
+  }
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order?.ghnOrderCode) return { ok: false, error: "Đơn này chưa có vận đơn GHN, chưa in được." };
+
+  try {
+    const token = await genGhnPrintToken([order.ghnOrderCode]);
+    return { ok: true, url: getGhnPrintUrl(token, size) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không lấy được link in vận đơn." };
+  }
 }
 
 // Huỷ đơn: KHÔNG dùng assertOwnsOrder (chỉ seller/SUPERADMIN) vì người mua (buyerId) cũng được
