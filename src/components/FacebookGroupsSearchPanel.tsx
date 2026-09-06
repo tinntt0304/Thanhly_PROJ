@@ -6,6 +6,7 @@ import { flushSync } from "react-dom";
 import {
   searchFacebookGroups,
   listSavedFacebookGroups,
+  listPromotableProducts,
   type FacebookGroupsSearchResult,
   type FacebookGroupResultItem,
   type SavedFacebookGroup,
@@ -15,6 +16,8 @@ import {
   MAX_ITEMS_LIMIT,
   SEARCH_CACHE_HOURS,
   SAVED_GROUPS_PAGE_SIZE,
+  buildGroupPostCaption,
+  type PromotableProduct,
 } from "@/lib/facebook-groups";
 
 const inputClass =
@@ -37,8 +40,43 @@ function formatRelativeHours(iso: string): string {
   return `${Math.round(hours / 24)} ngày trước`;
 }
 
+// Không có API nào đăng thẳng vào nhóm Facebook được nữa (xem ghi chú ở
+// buildGroupPostCaption) — nút này chỉ sao chép sẵn nội dung vào clipboard rồi mở nhóm
+// trong tab mới, người dùng tự dán + tự bấm đăng trong đúng phiên Facebook thật của họ.
+function GroupPromoteButton({ url, caption }: { url: string; caption: string }) {
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+
+  async function handleClick() {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => setCopied(null), 3000);
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={handleClick}
+        className="whitespace-nowrap rounded-md border border-accent-300 px-2 py-1 text-xs font-medium text-accent-700 transition-colors hover:bg-accent-50"
+      >
+        📋 Sao chép & mở nhóm
+      </button>
+      {copied === "ok" && <span className="text-[11px] text-accent-2-700">Đã sao chép, dán vào bài viết</span>}
+      {copied === "failed" && (
+        <span className="text-[11px] text-red-600">Không sao chép được, tự copy nội dung ở trên</span>
+      )}
+    </div>
+  );
+}
+
 function GroupTable({
   rows,
+  caption,
 }: {
   rows: {
     fbId: string;
@@ -51,6 +89,7 @@ function GroupTable({
     visibility: string | null;
     badge?: { text: string; className: string };
   }[];
+  caption?: string;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-neutral-500">Không có nhóm nào.</p>;
@@ -91,15 +130,19 @@ function GroupTable({
               </td>
               <td className="px-4 py-2 text-neutral-700">{g.visibility ?? "—"}</td>
               <td className="px-4 py-2">
-                {g.url && (
-                  <a
-                    href={g.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent-600 underline"
-                  >
-                    Mở nhóm
-                  </a>
+                {g.url && caption ? (
+                  <GroupPromoteButton url={g.url} caption={caption} />
+                ) : (
+                  g.url && (
+                    <a
+                      href={g.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent-600 underline"
+                    >
+                      Mở nhóm
+                    </a>
+                  )
                 )}
               </td>
             </tr>
@@ -110,7 +153,15 @@ function GroupTable({
   );
 }
 
-function SearchTab({ pricePerResult, isSuperAdmin }: { pricePerResult: number; isSuperAdmin: boolean }) {
+function SearchTab({
+  pricePerResult,
+  isSuperAdmin,
+  caption,
+}: {
+  pricePerResult: number;
+  isSuperAdmin: boolean;
+  caption: string;
+}) {
   const router = useRouter();
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -276,6 +327,7 @@ function SearchTab({ pricePerResult, isSuperAdmin }: { pricePerResult: number; i
                   ? { text: "Từ cache", className: "bg-neutral-100 text-neutral-600" }
                   : { text: "Đã biết", className: "bg-neutral-100 text-neutral-600" },
             }))}
+            caption={caption}
           />
         </div>
       )}
@@ -283,7 +335,7 @@ function SearchTab({ pricePerResult, isSuperAdmin }: { pricePerResult: number; i
   );
 }
 
-function SavedTab() {
+function SavedTab({ caption }: { caption: string }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [groups, setGroups] = useState<SavedFacebookGroup[] | null>(null);
@@ -346,6 +398,7 @@ function SavedTab() {
               postsPerDay: g.postsPerDay,
               visibility: g.visibility,
             }))}
+            caption={caption}
           />
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3">
@@ -376,6 +429,59 @@ function SavedTab() {
   );
 }
 
+// Chọn 1 sản phẩm đang bán để soạn sẵn nội dung quảng bá — nội dung sinh ra vẫn sửa được
+// tự do trước khi copy (đổi sản phẩm khác sẽ ghi đè lại theo mẫu, xoá phần đã sửa tay).
+function PromoteContentPanel({ caption, onCaptionChange }: { caption: string; onCaptionChange: (v: string) => void }) {
+  const [products, setProducts] = useState<PromotableProduct[] | null>(null);
+  const [selectedId, setSelectedId] = useState("");
+
+  useEffect(() => {
+    listPromotableProducts().then(setProducts);
+  }, []);
+
+  function handleSelectProduct(id: string) {
+    setSelectedId(id);
+    const product = products?.find((p) => p.id === id);
+    onCaptionChange(product ? buildGroupPostCaption(product) : "");
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-4">
+      <h2 className="font-heading text-sm font-bold text-text">Soạn nội dung quảng bá sang nhóm</h2>
+      <p className="text-xs text-neutral-500">
+        Không có API nào đăng thẳng vào nhóm Facebook được nữa (Meta đã gỡ quyền này) — chọn 1
+        sản phẩm để soạn sẵn nội dung, rồi ở mỗi nhóm bên dưới bấm &ldquo;Sao chép &amp; mở
+        nhóm&rdquo;: nội dung được copy vào clipboard, nhóm mở ra ở tab mới, bạn tự dán và bấm
+        đăng bằng chính tài khoản Facebook của mình.
+      </p>
+      <select
+        value={selectedId}
+        onChange={(e) => handleSelectProduct(e.target.value)}
+        className={inputClass}
+      >
+        <option value="">
+          {products === null ? "Đang tải sản phẩm..." : "-- Chọn sản phẩm đang bán --"}
+        </option>
+        {products?.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.title}
+          </option>
+        ))}
+      </select>
+      {products?.length === 0 && (
+        <p className="text-xs text-neutral-500">Chưa có sản phẩm nào đang bán để quảng bá.</p>
+      )}
+      <textarea
+        value={caption}
+        onChange={(e) => onCaptionChange(e.target.value)}
+        rows={4}
+        placeholder="Chọn sản phẩm ở trên để tự sinh nội dung, hoặc tự gõ nội dung riêng ở đây..."
+        className={inputClass}
+      />
+    </div>
+  );
+}
+
 export function FacebookGroupsSearchPanel({
   pricePerResult,
   isSuperAdmin,
@@ -384,10 +490,13 @@ export function FacebookGroupsSearchPanel({
   isSuperAdmin: boolean;
 }) {
   const [tab, setTab] = useState<"search" | "saved">("search");
+  const [caption, setCaption] = useState("");
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-heading text-lg font-bold text-text">Tìm nhóm Facebook theo từ khóa</h1>
+
+      <PromoteContentPanel caption={caption} onCaptionChange={setCaption} />
 
       <div className="flex gap-2 border-b border-neutral-200 text-sm">
         <button
@@ -407,9 +516,9 @@ export function FacebookGroupsSearchPanel({
       </div>
 
       {tab === "search" ? (
-        <SearchTab pricePerResult={pricePerResult} isSuperAdmin={isSuperAdmin} />
+        <SearchTab pricePerResult={pricePerResult} isSuperAdmin={isSuperAdmin} caption={caption} />
       ) : (
-        <SavedTab />
+        <SavedTab caption={caption} />
       )}
     </div>
   );

@@ -10,8 +10,10 @@ import {
   SEARCH_RATE_LIMIT_SECONDS,
   SAVED_GROUPS_PAGE_SIZE,
   type FacebookGroupItem,
+  type PromotableProduct,
 } from "@/lib/facebook-groups";
 import { chargeForSearch, getPricePerResult } from "@/lib/credits";
+import { getSiteUrl } from "@/lib/site";
 
 export type FacebookGroupResultItem = {
   fbId: string;
@@ -391,4 +393,24 @@ export async function listSavedFacebookGroups(
     page: safePage,
     pageSize: SAVED_GROUPS_PAGE_SIZE,
   };
+}
+
+// Sản phẩm của chính người bán (đang ACTIVE) để chọn nội dung quảng bá sang nhóm Facebook —
+// không dùng để tự đăng bài (xem ghi chú ở buildGroupPostCaption), chỉ để soạn sẵn caption.
+export async function listPromotableProducts(): Promise<PromotableProduct[]> {
+  const session = await requireAdmin();
+
+  const products = await prisma.product.findMany({
+    where: { sellerId: session.user.id, status: "ACTIVE" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, title: true, buyNowPrice: true, currentPrice: true },
+  });
+
+  const siteUrl = getSiteUrl();
+  return products.map((p) => ({
+    id: p.id,
+    title: p.title,
+    price: p.buyNowPrice ?? p.currentPrice,
+    url: `${siteUrl}/products/${p.id}`,
+  }));
 }

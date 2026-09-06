@@ -1,3 +1,5 @@
+import { formatVND } from "@/lib/auction";
+
 // Đấu nối actor Apify "scraper-engine/facebook-groups-search-scraper" — actor do
 // người dùng tự chọn/trả phí trên Apify, không phải scraper tự viết. Input/output
 // schema tham khảo trang actor trên Apify Store (apify.com/scraper-engine/
@@ -24,6 +26,22 @@ export const SEARCH_RATE_LIMIT_SECONDS = 20;
 // export async function — export thêm 1 hằng số thường sẽ làm Next.js build lỗi
 // "module has no exports at all".
 export const SAVED_GROUPS_PAGE_SIZE = 50;
+
+export type PromotableProduct = {
+  id: string;
+  title: string;
+  price: number;
+  url: string;
+};
+
+// Meta đã gỡ quyền publish_to_groups khỏi Graph API (từ 4/2024) — không còn API chính thức
+// nào đăng thẳng vào nhóm Facebook được nữa, và mọi công cụ "tự động đăng nhóm" còn lại đều
+// làm bằng cách giả lập phiên đăng nhập thật (vi phạm điều khoản Facebook, rủi ro khoá tài
+// khoản). Vì vậy chỉ soạn sẵn nội dung để người dùng tự dán + tự bấm đăng (hành động thật của
+// con người, không tự động hoá), xem GroupPromoteButton trong FacebookGroupsSearchPanel.tsx.
+export function buildGroupPostCaption(product: PromotableProduct): string {
+  return `🔥 ${product.title}\n💰 Giá: ${formatVND(product.price)}\n👉 Xem chi tiết & đặt mua: ${product.url}`;
+}
 
 export type FacebookGroupItem = {
   id: string;
