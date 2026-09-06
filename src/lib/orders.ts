@@ -49,6 +49,18 @@ export const CANCEL_REASON_OPTIONS = [
   "Thời gian giao hàng quá lâu",
 ] as const;
 
+// 5 lý do dựng sẵn cho người bán/admin tự huỷ đơn ở /admin/orders/[id] KHI đơn chưa gửi qua
+// đơn vị vận chuyển (chưa có ghnOrderCode) — bắt buộc chọn 1 trong số này hoặc "Lý do khác",
+// cùng cơ chế với CANCEL_REASON_OPTIONS phía người mua. Đơn đã có vận đơn GHN thì huỷ như cũ,
+// không bắt buộc lý do (xem OrderActions.tsx).
+export const SELLER_CANCEL_REASON_OPTIONS = [
+  "Hết hàng, không còn sản phẩm để giao",
+  "Sai giá hoặc sai thông tin sản phẩm",
+  "Không liên hệ được với người mua",
+  "Người mua yêu cầu huỷ qua kênh khác (điện thoại, chat...)",
+  "Nghi ngờ đơn ảo/spam",
+] as const;
+
 export const MAX_CANCEL_REASON_LENGTH = 200;
 
 // Đọc lại Order.selectedAttributes ([{name, value}]) ghi bởi buyNowAction (actions/buy-now.ts)
@@ -119,7 +131,7 @@ export function orderDisplayStatusLabel(order: {
 
 export type OrderTrackingStep = { label: string; done: boolean };
 export type OrderTracking =
-  | { kind: "cancelled" }
+  | { kind: "cancelled"; cancelReason: string | null; cancelledBy: string | null }
   | { kind: "steps"; steps: OrderTrackingStep[]; warning?: string; warningSeverity?: "error" | "info" };
 
 // Rút gọn toàn bộ vòng đời đơn (OrderStatus nội bộ + ghnStatus thô, xem orderDisplayStatusLabel
@@ -132,8 +144,12 @@ export function getOrderTracking(order: {
   ghnOrderCode: string | null;
   ghnStatus: string | null;
   ghnStatusReason?: string | null;
+  cancelReason?: string | null;
+  cancelledBy?: string | null;
 }): OrderTracking {
-  if (order.status === "CANCELLED") return { kind: "cancelled" };
+  if (order.status === "CANCELLED") {
+    return { kind: "cancelled", cancelReason: order.cancelReason ?? null, cancelledBy: order.cancelledBy ?? null };
+  }
 
   const ghnStatus = order.ghnStatus;
   const hasShipment = !!order.ghnOrderCode;

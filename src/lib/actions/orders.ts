@@ -664,8 +664,9 @@ export async function getGhnPrintOrderUrl(orderId: string, size: GhnPrintSize = 
 // tự huỷ đơn CỦA CHÍNH MÌNH lúc còn "mới tạo" — nhưng người mua chỉ được phép mỗi việc huỷ,
 // không được sửa/tạo vận đơn/làm mới trạng thái (những action đó vẫn chỉ dành cho seller qua
 // assertOwnsOrder), nên kiểm tra quyền riêng ở đây thay vì mở rộng assertOwnsOrder dùng chung.
-// reason: chỉ gửi từ BuyerOrderCancelButton (người mua tự huỷ, chọn preset hoặc "Lý do khác")
-// — admin/seller huỷ qua OrderActions không gửi, cột cancelReason giữ null.
+// reason: gửi từ BuyerOrderCancelButton (người mua tự huỷ) hoặc từ OrderActions khi seller/admin
+// tự huỷ đơn CHƯA gửi qua đơn vị vận chuyển (bắt buộc chọn lý do ở UI, xem SELLER_CANCEL_REASON_
+// OPTIONS) — đơn đã có vận đơn GHN thì seller/admin huỷ không kèm lý do, cancelReason giữ null.
 export async function cancelOrder(orderId: string, reason?: string): Promise<GhnActionResult> {
   const session = await requireAdmin();
 
@@ -686,6 +687,11 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Ghn
   }
 
   const cancelReason = reason?.trim().slice(0, MAX_CANCEL_REASON_LENGTH) || null;
+  // Chính chủ đơn (buyerId khớp) VÀ không đồng thời là seller của chính đơn đó (trường hợp hiếm
+  // 1 tài khoản vừa bán vừa tự mua) mới tính là buyer tự huỷ — còn lại (seller/SUPERADMIN thao
+  // tác ở /admin/orders) tính là seller huỷ. Chỉ dùng để hiển thị đúng nhãn cho 2 phía, không
+  // ảnh hưởng quyền hạn (đã kiểm tra isOwner ở trên).
+  const cancelledBy = order.buyerId === session.user.id && order.sellerId !== session.user.id ? "BUYER" : "SELLER";
 
   if (order.ghnOrderCode && order.status === "SHIPPING") {
     try {
@@ -696,7 +702,7 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Ghn
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED", cancelReason } });
+    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED", cancelReason, cancelledBy } });
 
     // Dòng nào tạo từ "Mua ngay"/checkout giỏ hàng đã trừ đúng `quantity` đơn vị
     // Product.quantity lúc tạo — huỷ đơn thì hoàn lại đúng số đó cho TỪNG dòng. Dòng tạo thủ

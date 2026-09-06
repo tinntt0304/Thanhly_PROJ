@@ -35,7 +35,8 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
       {order.status === "CANCELLED" && order.cancelReason && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          Lý do người mua huỷ: {order.cancelReason}
+          {order.cancelledBy === "BUYER" ? "Lý do người mua huỷ: " : "Lý do người bán huỷ: "}
+          {order.cancelReason}
         </p>
       )}
 

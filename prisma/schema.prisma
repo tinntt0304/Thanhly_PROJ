@@ -193,7 +193,12 @@ model Order {
   shopPaysShipping Boolean @default(false) // false = người mua trả phí ship khi nhận hàng, true = shop tự trả
 
   status       OrderStatus @default(NEW)
-  cancelReason String? // lý do huỷ — chỉ ghi khi NGƯỜI MUA tự huỷ đơn (chọn 1 trong 5 lý do dựng sẵn hoặc tự nhập "Lý do khác" ở /tai-khoan/don-hang); admin/seller tự huỷ thì để trống
+  cancelReason String? // lý do huỷ — người mua tự huỷ ở /tai-khoan/don-hang HOẶC người bán/admin tự
+  // huỷ ở /admin/orders/[id] khi đơn CHƯA gửi qua đơn vị vận chuyển đều bắt buộc chọn 1 trong 5 lý
+  // do dựng sẵn hoặc tự nhập "Lý do khác"; đơn đã có vận đơn GHN thì seller/admin huỷ không bắt
+  // buộc lý do (giữ nguyên hành vi cũ). Xem cancelledBy để biết ai là người huỷ.
+  cancelledBy String? // "BUYER" | "SELLER" — ai là người bấm huỷ, dùng để hiển thị đúng nhãn
+  // ("Lý do người mua huỷ" / "Lý do người bán huỷ") ở cả 2 phía thay vì đoán mò từ cancelReason.
 
   ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
   ghnStatus          String? // trạng thái thô GHN trả về (picking, delivering, delivered...), cập nhật khi bấm "Làm mới trạng thái"

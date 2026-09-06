@@ -6,8 +6,16 @@ import type { OrderTracking } from "@/lib/orders";
 export function OrderTrackingSteps({ tracking }: { tracking: OrderTracking }) {
   if (tracking.kind === "cancelled") {
     return (
-      <div className="flex items-center gap-1.5 text-sm font-medium text-red-600">
-        <span aria-hidden="true">✕</span> Đơn hàng đã bị huỷ
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 text-sm font-medium text-red-600">
+          <span aria-hidden="true">✕</span> Đơn hàng đã bị huỷ
+        </div>
+        {tracking.cancelReason && (
+          <p className="text-xs text-neutral-600">
+            {tracking.cancelledBy === "SELLER" ? "Người bán đã huỷ đơn — Lý do: " : "Lý do: "}
+            {tracking.cancelReason}
+          </p>
+        )}
       </div>
     );
   }
