@@ -29,7 +29,6 @@ import {
 } from "@/lib/ghn";
 import {
   ORDERS_PAGE_SIZE,
-  deriveOrderStatusFromGhn,
   ORDER_LIST_TABS,
   SHIPPING_GHN_STATUSES,
   RETURNING_GHN_STATUSES,
@@ -617,17 +616,28 @@ export async function refreshGhnStatus(orderId: string): Promise<GhnActionResult
 
   try {
     const detail = await getGhnOrderDetail(order.ghnOrderCode);
+    // ghnStatus/ghnStatusReason luôn ghi được (thông tin tham khảo) — RIÊNG status nội bộ chỉ
+    // chuyển sang DELIVERED khi GHN báo "delivered", và dùng updateMany với điều kiện status ĐỌC
+    // LẠI ngay tại thời điểm ghi (không phải biến `order` đã đọc trước đó) để tránh mất cập nhật
+    // nếu cancelOrder huỷ đơn đúng lúc request này đang xử lý — trước đây luôn ghi lại y hệt
+    // status cũ đã đọc (kể cả khi không đổi), có thể ghi đè lên đúng lúc admin vừa huỷ xong,
+    // làm đơn "sống lại" dù ghnStatus đã lên "cancel".
     await prisma.order.update({
       where: { id: orderId },
       data: {
         ghnStatus: detail.status,
-        status: deriveOrderStatusFromGhn(detail.status, order.status),
         // shipping-order/detail KHÔNG trả kèm lý do (chỉ webhook mới có) — nếu trạng thái vừa
         // đổi khác trước, xoá lý do cũ đi thay vì để nó hiện lẫn với 1 trạng thái mới không
         // liên quan; giữ nguyên (không đụng) nếu trạng thái không đổi.
         ...(detail.status !== order.ghnStatus ? { ghnStatusReason: null } : {}),
       },
     });
+    if (detail.status === "delivered") {
+      await prisma.order.updateMany({
+        where: { id: orderId, status: { notIn: ["CANCELLED", "DELIVERED"] } },
+        data: { status: "DELIVERED" },
+      });
+    }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Không lấy được trạng thái GHN." };
   }

@@ -106,14 +106,6 @@ export const SHIPPING_GHN_STATUSES = [
 export const RETURNING_GHN_STATUSES = ["waiting_to_return", "return", "returned"];
 export const ISSUE_GHN_STATUSES = ["delivery_fail", "exception", "damage", "lost", "return_fail"];
 
-// Dùng chung giữa "Làm mới trạng thái GHN" (thao tác thủ công, actions/orders.ts) và
-// webhook GHN (server tự đẩy về, api/webhooks/ghn) để 2 đường cập nhật trạng thái luôn
-// đồng nhất — chỉ "delivered" mới coi là giao xong, các trạng thái khác giữ nguyên status
-// nội bộ hiện tại (đơn có thể đang SHIPPING hoặc đã CANCELLED thủ công từ trước).
-export function deriveOrderStatusFromGhn(ghnStatus: string, currentStatus: OrderStatus): OrderStatus {
-  return ghnStatus === "delivered" ? "DELIVERED" : currentStatus;
-}
-
 // Nhãn trạng thái hiển thị cho người dùng — ưu tiên trạng thái GHN thật (đã tạo vận đơn) thay
 // vì OrderStatus nội bộ, vì OrderStatus chỉ có 4 mức (NEW/SHIPPING/DELIVERED/CANCELLED) nên
 // không phản ánh được các trạng thái GHN như "Thất lạc"/"Đang hoàn hàng" — dùng chung giữa

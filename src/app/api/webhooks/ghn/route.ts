@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { deriveOrderStatusFromGhn } from "@/lib/orders";
 
 // GHN gọi endpoint này khi vận đơn đổi trạng thái (tài liệu: api.ghn.vn/home/docs/detail?id=47).
 // Khác SePay, GHN KHÔNG có cơ chế ký/xác thực request nào (không header token, không chữ ký
@@ -57,12 +56,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: "no matching order" });
   }
 
+  // ghnStatus/ghnStatusReason luôn ghi được (thông tin tham khảo, luôn ghi lại kể cả null khi sự
+  // kiện này không kèm lý do — lý do luôn gắn với ĐÚNG lần cập nhật trạng thái mới nhất, không
+  // giữ lại lý do cũ của lần trước). RIÊNG status nội bộ chỉ chuyển sang DELIVERED khi GHN báo
+  // "delivered", và dùng updateMany với điều kiện status ĐỌC LẠI ngay tại thời điểm ghi (không
+  // phải biến `order` đã đọc trước đó) — tránh mất cập nhật nếu cancelOrder huỷ đơn đúng lúc
+  // webhook này đang xử lý (đã gặp thật: webhook đọc status cũ "SHIPPING" rồi ghi đè lại y hệt
+  // ngay sau khi admin vừa huỷ xong, làm đơn "sống lại" dù ghnStatus đã lên "cancel").
   await prisma.order.update({
     where: { id: order.id },
-    // Luôn ghi lại ghnStatusReason (kể cả null khi sự kiện này không kèm lý do) — lý do luôn
-    // gắn với ĐÚNG lần cập nhật trạng thái mới nhất, không giữ lại lý do cũ của lần trước.
-    data: { ghnStatus: Status, status: deriveOrderStatusFromGhn(Status, order.status), ghnStatusReason },
+    data: { ghnStatus: Status, ghnStatusReason },
   });
+  if (Status === "delivered") {
+    await prisma.order.updateMany({
+      where: { id: order.id, status: { notIn: ["CANCELLED", "DELIVERED"] } },
+      data: { status: "DELIVERED" },
+    });
+  }
 
   revalidatePath(`/admin/orders/${order.id}`);
   revalidatePath("/admin/orders");
