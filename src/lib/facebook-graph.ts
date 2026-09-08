@@ -118,32 +118,49 @@ export type FbConversation = {
 
 export type FbConversationListResponse = { data: FbConversation[] };
 
+type RawConversation = {
+  id: string;
+  updated_time: string;
+  snippet?: string;
+  participants?: { data: Array<{ id: string; name?: string }> };
+};
+
+function mapConversation(pageId: string, c: RawConversation): FbConversation {
+  const other = c.participants?.data.find((p) => p.id !== pageId);
+  return {
+    id: c.id,
+    updatedAt: c.updated_time,
+    snippet: c.snippet ?? null,
+    participantName: other?.name ?? null,
+    participantPsid: other?.id ?? null,
+  };
+}
+
 // participants trả về CẢ page lẫn người nhắn — lọc bỏ chính page để lấy đúng tên/PSID người
 // nhắn (dùng PSID này làm recipient.id khi gửi trả lời qua Send API).
+//
+// folder mặc định của Graph API là "inbox" — tin nhắn ĐẦU TIÊN của một người lạ chưa từng
+// nhắn cho page thường bị Facebook xếp vào folder "other" (tương đương "Yêu cầu tin nhắn"
+// trên giao diện Facebook), KHÔNG xuất hiện nếu chỉ gọi folder mặc định. Facebook chỉ tự
+// chuyển hội thoại đó sang "inbox" sau khi page trả lời — đây là lý do tin nhắn khách gửi
+// trước không hiện cho tới khi seller nhắn lại. Gọi cả 2 folder rồi gộp để không bỏ sót.
 export async function listConversations(pageId: string, pageAccessToken: string): Promise<FbConversation[]> {
-  const data = await graphFetch<{
-    data: Array<{
-      id: string;
-      updated_time: string;
-      snippet?: string;
-      participants?: { data: Array<{ id: string; name?: string }> };
-    }>;
-  }>(`/${pageId}/conversations`, pageAccessToken, {
-    platform: "messenger",
-    fields: "participants,snippet,updated_time",
-    limit: "50",
-  });
+  const [inbox, other] = await Promise.all(
+    (["inbox", "other"] as const).map((folder) =>
+      graphFetch<{ data: RawConversation[] }>(`/${pageId}/conversations`, pageAccessToken, {
+        platform: "messenger",
+        folder,
+        fields: "participants,snippet,updated_time",
+        limit: "50",
+      })
+    )
+  );
 
-  return data.data.map((c) => {
-    const other = c.participants?.data.find((p) => p.id !== pageId);
-    return {
-      id: c.id,
-      updatedAt: c.updated_time,
-      snippet: c.snippet ?? null,
-      participantName: other?.name ?? null,
-      participantPsid: other?.id ?? null,
-    };
-  });
+  const byId = new Map<string, FbConversation>();
+  for (const c of [...inbox.data, ...other.data]) {
+    byId.set(c.id, mapConversation(pageId, c));
+  }
+  return [...byId.values()].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 export type FbMessage = {
