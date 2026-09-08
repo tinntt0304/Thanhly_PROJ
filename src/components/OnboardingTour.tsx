@@ -194,7 +194,7 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
       <div
         ref={tooltipRef}
-        className="fixed z-50 w-72 rounded-lg bg-surface p-4 shadow-xl"
+        className="fixed z-50 w-80 rounded-lg bg-surface p-4 shadow-xl"
         style={{ top: tooltipStyle.top, left: tooltipStyle.left, visibility: rect ? "visible" : "hidden" }}
       >
         <div className="mb-2 flex items-center justify-between">
@@ -209,23 +209,23 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <button
             type="button"
             onClick={finish}
-            className="text-xs text-neutral-500 hover:text-text hover:underline"
+            className="whitespace-nowrap text-xs text-neutral-500 hover:text-text hover:underline"
           >
             Không cần hướng dẫn
           </button>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <button
               type="button"
               onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
               disabled={isFirst}
-              className="rounded-md border border-neutral-200 px-2.5 py-1 text-xs text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="whitespace-nowrap rounded-md border border-neutral-200 px-2.5 py-1 text-xs text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Quay lại
             </button>
             <button
               type="button"
               onClick={() => (isLast ? finish() : setStepIndex((i) => i + 1))}
-              className="rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-600"
+              className="whitespace-nowrap rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-600"
             >
               {isLast ? "Bắt đầu sử dụng" : "Tiếp theo"}
             </button>
