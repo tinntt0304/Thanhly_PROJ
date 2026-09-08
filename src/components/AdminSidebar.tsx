@@ -10,6 +10,7 @@ type NavItem = {
   icon: ReactNode;
   badge?: number;
   exact?: boolean;
+  tourId?: string;
 };
 
 function ProductsIcon() {
@@ -115,6 +116,7 @@ function NavLink({ item }: { item: NavItem }) {
   return (
     <Link
       href={item.href}
+      data-tour={item.tourId}
       className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
         isActive
           ? "bg-accent-100 font-medium text-accent-700"
@@ -144,18 +146,18 @@ export function AdminSidebar({
   signOutAction: () => Promise<void>;
 }) {
   const productItems: NavItem[] = [
-    { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true },
-    { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon /> },
-    { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon /> },
-    { href: "/admin/thu-vien-anh", label: "Thư viện ảnh", icon: <GalleryIcon /> },
-    { href: "/admin/orders", label: "Quản lý đơn hàng", icon: <OrdersIcon /> },
-    { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon /> },
+    { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true, tourId: "admin" },
+    { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon />, tourId: "products-new" },
+    { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon />, tourId: "products-import" },
+    { href: "/admin/thu-vien-anh", label: "Thư viện ảnh", icon: <GalleryIcon />, tourId: "gallery" },
+    { href: "/admin/orders", label: "Quản lý đơn hàng", icon: <OrdersIcon />, tourId: "orders" },
+    { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon />, tourId: "facebook-groups" },
   ];
 
   const adminItems: NavItem[] = [
-    { href: "/admin/danh-muc", label: "Quản lý danh mục", icon: <MenuIcon /> },
-    { href: "/admin/settings", label: "Bằng chứng uy tín", icon: <StarIcon /> },
-    { href: "/admin/chat", label: "Chat hỗ trợ", icon: <ChatIcon />, badge: awaitingReplyCount },
+    { href: "/admin/danh-muc", label: "Quản lý danh mục", icon: <MenuIcon />, tourId: "categories" },
+    { href: "/admin/settings", label: "Bằng chứng uy tín", icon: <StarIcon />, tourId: "trust" },
+    { href: "/admin/chat", label: "Chat hỗ trợ", icon: <ChatIcon />, badge: awaitingReplyCount, tourId: "chat" },
   ];
 
   return (
@@ -181,7 +183,9 @@ export function AdminSidebar({
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-neutral-200 px-3 py-3">
-        <NavLink item={{ href: "/admin/account", label: "Tài khoản của tôi", icon: <UserIcon /> }} />
+        <NavLink
+          item={{ href: "/admin/account", label: "Tài khoản của tôi", icon: <UserIcon />, tourId: "account" }}
+        />
         {!isSuperAdmin && (
           <Link
             href="/admin/nap-credit"
