@@ -173,7 +173,8 @@ export const ADMIN_WIKI: WikiSection[] = [
         title: "Hộp thư Facebook",
         description: "Xem và trả lời tin nhắn Messenger + bình luận từ fanpage của bạn ngay tại đây.",
         steps: [
-          "Lần đầu dùng: dán Page ID và Page Access Token của fanpage rồi bấm Kết nối.",
+          "Lần đầu dùng: bấm Kết nối với Facebook, đăng nhập và cấp quyền cho đúng fanpage muốn quản lý.",
+          "Quản lý nhiều fanpage thì chọn đúng 1 trang muốn kết nối.",
           "Chọn tab Tin nhắn Messenger hoặc Bình luận.",
           "Bấm vào 1 hội thoại để xem tin nhắn, hoặc trả lời trực tiếp dưới mỗi bình luận.",
           "Nhập nội dung trả lời rồi bấm Gửi / Trả lời.",

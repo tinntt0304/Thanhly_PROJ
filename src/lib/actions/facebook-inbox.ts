@@ -1,12 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { revalidatePath } from "next/cache";
 import {
-  GraphApiError,
-  verifyPageToken,
   listConversations,
   listMessages,
   sendMessengerMessage,
@@ -15,9 +14,11 @@ import {
   type FbConversation,
   type FbMessage,
   type FbComment,
+  type ManagedPage,
 } from "@/lib/facebook-graph";
 
 const WIKI_PATH = "/admin/hop-thu-facebook";
+const PAGES_COOKIE = "fb_oauth_pages";
 
 export type FacebookConnectionStatus = {
   connected: boolean;
@@ -33,35 +34,43 @@ export async function getFacebookConnectionStatus(): Promise<FacebookConnectionS
   return { connected: true, pageId: connection.pageId, pageName: connection.pageName ?? undefined };
 }
 
-const pageIdSchema = z.string().trim().min(1, "Vui lòng nhập Page ID.");
-const tokenSchema = z.string().trim().min(1, "Vui lòng nhập Page Access Token.");
-
-export async function connectFacebookPage(
-  pageId: string,
-  pageAccessToken: string
-): Promise<{ success?: true; error?: string }> {
-  const session = await requireAdmin();
-
-  const parsedPageId = pageIdSchema.safeParse(pageId);
-  if (!parsedPageId.success) return { error: parsedPageId.error.issues[0]?.message };
-  const parsedToken = tokenSchema.safeParse(pageAccessToken);
-  if (!parsedToken.success) return { error: parsedToken.error.issues[0]?.message };
-
-  let pageName: string;
+// Đọc danh sách fanpage đang chờ chọn (route callback OAuth tạm lưu vào cookie khi seller
+// quản lý nhiều hơn 1 trang) — trang /admin/hop-thu-facebook đọc hàm này để hiện danh sách.
+export async function getPendingFacebookPages(): Promise<Array<{ id: string; name: string }>> {
+  await requireAdmin();
+  const raw = (await cookies()).get(PAGES_COOKIE)?.value;
+  if (!raw) return [];
   try {
-    const verified = await verifyPageToken(parsedPageId.data, parsedToken.data);
-    pageName = verified.name;
-  } catch (e) {
-    const message = e instanceof GraphApiError ? e.message : "Không xác thực được Page ID/Token với Facebook.";
-    return { error: message };
+    const pages = JSON.parse(raw) as ManagedPage[];
+    return pages.map((p) => ({ id: p.id, name: p.name }));
+  } catch {
+    return [];
   }
+}
+
+export async function selectFacebookPage(pageId: string): Promise<{ success?: true; error?: string }> {
+  const session = await requireAdmin();
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(PAGES_COOKIE)?.value;
+  if (!raw) return { error: "Danh sách fanpage đã hết hạn, vui lòng kết nối lại." };
+
+  let pages: ManagedPage[];
+  try {
+    pages = JSON.parse(raw) as ManagedPage[];
+  } catch {
+    return { error: "Danh sách fanpage không hợp lệ, vui lòng kết nối lại." };
+  }
+
+  const page = pages.find((p) => p.id === pageId);
+  if (!page) return { error: "Không tìm thấy fanpage đã chọn, vui lòng kết nối lại." };
 
   await prisma.facebookPageConnection.upsert({
     where: { userId: session.user.id },
-    create: { userId: session.user.id, pageId: parsedPageId.data, pageAccessToken: parsedToken.data, pageName },
-    update: { pageId: parsedPageId.data, pageAccessToken: parsedToken.data, pageName },
+    create: { userId: session.user.id, pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
+    update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
   });
 
+  cookieStore.delete(PAGES_COOKIE);
   revalidatePath(WIKI_PATH);
   return { success: true };
 }

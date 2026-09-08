@@ -126,31 +126,39 @@ tra `status` trong 1 transaction DB).
 ### Hộp thư Facebook (Messenger + bình luận qua Meta Graph API)
 
 Trang `/admin/hop-thu-facebook` (mọi tài khoản đã đăng nhập, mỗi seller tự kết nối fanpage
-của mình — không dùng chung 1 fanpage cho cả sàn, khác với các tích hợp khác ở trên). Không
-có flow "Đăng nhập bằng Facebook" (OAuth) trong app — seller tự tạo **Page Access Token** của
-fanpage mình rồi dán trực tiếp vào form kết nối ở trang admin (lưu trong bảng
-`FacebookPageConnection`, riêng theo từng `userId`).
+của mình qua OAuth — không dùng chung 1 fanpage cho cả sàn, khác với các tích hợp khác ở
+trên). Seller bấm "Kết nối với Facebook", đăng nhập + cấp quyền cho **Meta App của chủ sàn**
+(1 App dùng chung cho mọi seller, khác với việc mỗi seller tự tạo App riêng) — app tự đổi
+authorization code lấy Page Access Token qua `/me/accounts`, lưu vào bảng
+`FacebookPageConnection` riêng theo từng `userId`. Xem
+`src/app/api/auth/facebook/{start,callback}/route.ts`.
 
-Cách lấy Page ID + Page Access Token:
+Thiết lập Meta App (làm 1 lần):
 
-1. Tạo Facebook App ở [developers.facebook.com/apps](https://developers.facebook.com/apps).
-2. Vào [Graph API Explorer](https://developers.facebook.com/tools/explorer/), chọn App vừa
-   tạo, chọn "Get Page Access Token" cho đúng fanpage, cấp các quyền:
-   `pages_show_list`, `pages_read_engagement`, `pages_manage_metadata` (đọc thông tin trang),
+1. Tạo Facebook App ở [developers.facebook.com/apps](https://developers.facebook.com/apps) —
+   loại "Business", thêm sản phẩm **Facebook Login**.
+2. Vào App Settings → Basic, lấy **App ID** và **App Secret**.
+3. Vào Facebook Login → Settings, thêm vào **Valid OAuth Redirect URIs** đúng URL callback
+   theo từng môi trường bạn chạy, dạng `https://<domain>/api/auth/facebook/callback` (và
+   `http://localhost:3000/api/auth/facebook/callback` cho dev cục bộ) — sai URL này thì
+   Facebook từ chối redirect thẳng, không vào được app.
+4. Ở App Review → Permissions, xin các quyền: `pages_show_list`, `pages_read_engagement`,
    `pages_messaging` (đọc/gửi tin nhắn Messenger), `pages_manage_engagement` (trả lời bình
    luận).
-3. Page ID xem ở phần "About" của fanpage hoặc cũng lấy được từ Graph API Explorer.
+
+`.env` cần thêm:
+
+- `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` — lấy ở bước 2. Chưa điền thì nút "Kết nối với
+  Facebook" báo lỗi rõ ràng "Chưa cấu hình FACEBOOK_APP_ID", không chặn các tính năng khác.
+- `FACEBOOK_GRAPH_API_VERSION` — tùy chọn, mặc định `v21.0` nếu không đặt. Meta định kỳ
+  deprecate các phiên bản cũ — đổi biến này khi cần nâng phiên bản, không cần sửa code (xem
+  `src/lib/facebook-graph.ts`).
 
 ⚠️ Các quyền `pages_messaging`/`pages_manage_engagement` Meta yêu cầu **App Review** mới dùng
-được cho fanpage ngoài danh sách tester của App — token tạo thử (chưa qua review) chỉ hoạt
-động với chính fanpage của người tạo App hoặc các trang được thêm làm tester. Token hết
-quyền/hết hạn thì Graph API trả lỗi rõ ràng ngay ở trang (không crash các tính năng khác).
-
-`.env` có thể thêm (tùy chọn):
-
-- `FACEBOOK_GRAPH_API_VERSION` — mặc định `v21.0` nếu không đặt. Meta định kỳ deprecate các
-  phiên bản cũ — đổi biến này khi cần nâng phiên bản, không cần sửa code (xem
-  `src/lib/facebook-graph.ts`).
+được cho fanpage ngoài danh sách tester của App — trước khi App qua review, chỉ seller nào
+được thêm làm Tester/Developer/Admin của App (App Dashboard → Roles) mới kết nối được fanpage
+của họ thành công. Token hết quyền/hết hạn thì Graph API trả lỗi rõ ràng ngay ở trang (không
+crash các tính năng khác).
 
 Gửi tin nhắn Messenger chỉ thực hiện được trong vòng **24 giờ** kể từ tin nhắn cuối của
 khách (24-hour messaging window — chính sách của Meta, không phải giới hạn riêng của app).
@@ -294,6 +302,10 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 - `GHN_WEBHOOK_SECRET` — tuỳ chọn, xác thực webhook trạng thái vận đơn (GHN không có cơ
   chế ký request). Webhook phải trỏ về `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/ghn`
   (kèm `?key=<giá trị này>` nếu có đặt).
+- `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` — giống `.env` cục bộ, chỉ cần nếu dùng tính năng
+  Hộp thư Facebook ở `/admin/hop-thu-facebook`. Nhớ thêm
+  `https://thanhly-dau-gia-hifen.vercel.app/api/auth/facebook/callback` vào Valid OAuth
+  Redirect URIs ở Meta App Dashboard.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 - `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback

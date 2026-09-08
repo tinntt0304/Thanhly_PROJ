@@ -1,14 +1,16 @@
 // Đấu nối Meta Graph API (https://developers.facebook.com/docs/graph-api) để lấy hội thoại
 // Messenger + bình luận bài đăng của 1 fanpage, và trả lời trực tiếp — dùng ở
-// /admin/hop-thu-facebook. Mỗi seller tự tạo Page Access Token của trang mình (không có flow
-// OAuth "Đăng nhập bằng Facebook" ở app này) — token cần các quyền: pages_show_list,
-// pages_read_engagement, pages_manage_metadata (đọc), pages_messaging (đọc/gửi tin nhắn
-// Messenger), pages_manage_engagement (trả lời bình luận). Các quyền nhạy cảm này Meta yêu
-// cầu App Review mới dùng được cho page ngoài danh sách tester — nếu token thiếu quyền, Graph
-// API trả lỗi rõ ràng (xem graphError) thay vì crash trang.
+// /admin/hop-thu-facebook. Seller cấp quyền qua flow OAuth "Kết nối với Facebook" (Facebook
+// Login) cho ĐÚNG Meta App của chủ sàn (FACEBOOK_APP_ID/FACEBOOK_APP_SECRET trong .env) — xem
+// src/app/api/auth/facebook/{start,callback}/route.ts. Quyền xin lúc cấp phép: pages_show_list,
+// pages_read_engagement, pages_messaging (đọc/gửi tin nhắn Messenger), pages_manage_engagement
+// (trả lời bình luận). Các quyền nhạy cảm này Meta yêu cầu App Review mới dùng được cho page
+// ngoài danh sách tester của App — nếu token thiếu quyền, Graph API trả lỗi rõ ràng (xem
+// GraphApiError) thay vì crash trang.
 
 const GRAPH_API_VERSION = process.env.FACEBOOK_GRAPH_API_VERSION || "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+export const FACEBOOK_OAUTH_SCOPES = "pages_show_list,pages_read_engagement,pages_messaging,pages_manage_engagement";
 
 export class GraphApiError extends Error {
   constructor(
@@ -53,11 +55,57 @@ async function graphPost<T>(path: string, accessToken: string, body: Record<stri
   return json as T;
 }
 
-// Xác thực Page ID + token khớp nhau và lấy tên trang hiển thị — gọi lúc kết nối để báo lỗi
-// ngay nếu token sai/hết hạn, thay vì để tới lúc tải hội thoại mới phát hiện.
-export async function verifyPageToken(pageId: string, pageAccessToken: string): Promise<{ name: string }> {
-  const data = await graphFetch<{ id: string; name: string }>(`/${pageId}`, pageAccessToken, { fields: "id,name" });
-  return { name: data.name };
+// --- OAuth (Facebook Login) — đổi authorization code lấy token, rồi lấy danh sách fanpage
+// seller quản lý kèm Page Access Token của từng trang. Xem route.ts start/callback.
+
+export async function exchangeCodeForUserToken(code: string, redirectUri: string): Promise<string> {
+  const appId = process.env.FACEBOOK_APP_ID!;
+  const appSecret = process.env.FACEBOOK_APP_SECRET!;
+  const url = new URL(`${GRAPH_BASE}/oauth/access_token`);
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("code", code);
+
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if (!res.ok) {
+    const body = json as GraphErrorBody;
+    throw new GraphApiError(body.error?.message || "Đổi authorization code lấy token thất bại.", body.error?.code);
+  }
+  return (json as { access_token: string }).access_token;
+}
+
+// Đổi user access token ngắn hạn (vài giờ) lấy bản dài hạn (~60 ngày) — Page Access Token suy
+// ra TỪ token dài hạn này (qua listManagedPages) sẽ không tự hết hạn theo thời gian như vậy
+// (chỉ mất hiệu lực nếu seller tự thu hồi quyền hoặc đổi mật khẩu Facebook).
+export async function exchangeForLongLivedToken(shortLivedToken: string): Promise<string> {
+  const appId = process.env.FACEBOOK_APP_ID!;
+  const appSecret = process.env.FACEBOOK_APP_SECRET!;
+  const url = new URL(`${GRAPH_BASE}/oauth/access_token`);
+  url.searchParams.set("grant_type", "fb_exchange_token");
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("fb_exchange_token", shortLivedToken);
+
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if (!res.ok) {
+    const body = json as GraphErrorBody;
+    throw new GraphApiError(body.error?.message || "Đổi token dài hạn thất bại.", body.error?.code);
+  }
+  return (json as { access_token: string }).access_token;
+}
+
+export type ManagedPage = { id: string; name: string; accessToken: string };
+
+export async function listManagedPages(userAccessToken: string): Promise<ManagedPage[]> {
+  const data = await graphFetch<{ data: Array<{ id: string; name: string; access_token: string }> }>(
+    "/me/accounts",
+    userAccessToken,
+    { fields: "id,name,access_token" }
+  );
+  return data.data.map((p) => ({ id: p.id, name: p.name, accessToken: p.access_token }));
 }
 
 export type FbConversation = {

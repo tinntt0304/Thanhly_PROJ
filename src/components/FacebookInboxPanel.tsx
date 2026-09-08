@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   getFacebookConnectionStatus,
-  connectFacebookPage,
+  selectFacebookPage,
   disconnectFacebookPage,
   listFacebookConversations,
   listFacebookMessages,
@@ -15,78 +15,62 @@ import {
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
 import { formatDateTime } from "@/lib/auction";
 
-const inputClass =
-  "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
+function ConnectButton() {
+  return (
+    <div className="flex max-w-lg flex-col gap-3 rounded-lg border border-neutral-200 p-4">
+      <p className="text-sm text-neutral-700">
+        Kết nối fanpage của bạn để xem và trả lời tin nhắn Messenger + bình luận ngay tại đây.
+        Bạn sẽ được chuyển sang Facebook để cấp quyền cho ứng dụng — chỉ cấp quyền cho đúng
+        fanpage bạn chọn, không ảnh hưởng các trang khác.
+      </p>
+      {/* Route Handler tự redirect sang Facebook — cần điều hướng cả trang (không phải soft
+      navigation của next/link), nên cố ý dùng <a> thường ở đây. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      <a
+        href="/api/auth/facebook/start"
+        className="inline-flex w-fit items-center gap-2 rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+      >
+        Kết nối với Facebook
+      </a>
+    </div>
+  );
+}
 
-function ConnectForm({ onConnected }: { onConnected: () => void }) {
-  const [pageId, setPageId] = useState("");
-  const [token, setToken] = useState("");
-  const [pending, setPending] = useState(false);
+function PagePicker({ pages, onSelected }: { pages: Array<{ id: string; name: string }>; onSelected: () => void }) {
+  const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPending(true);
+  async function handleSelect(pageId: string) {
+    setPending(pageId);
     setError(null);
-    const res = await connectFacebookPage(pageId, token);
-    setPending(false);
+    const res = await selectFacebookPage(pageId);
+    setPending(null);
     if (res.error) {
       setError(res.error);
       return;
     }
-    onConnected();
+    onSelected();
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-3 rounded-lg border border-neutral-200 p-4">
-      <p className="text-sm text-neutral-700">
-        Dán Page ID và Page Access Token của fanpage bạn muốn kết nối. Token cần các quyền{" "}
-        <code className="text-xs">pages_read_engagement</code>, <code className="text-xs">pages_messaging</code>,{" "}
-        <code className="text-xs">pages_manage_engagement</code> — tự tạo ở{" "}
-        <a
-          href="https://developers.facebook.com/tools/explorer/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent-600 underline"
-        >
-          Graph API Explorer
-        </a>{" "}
-        của Meta.
-      </p>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="fb-page-id" className="text-sm font-medium text-text">
-          Page ID
-        </label>
-        <input
-          id="fb-page-id"
-          value={pageId}
-          onChange={(e) => setPageId(e.target.value)}
-          required
-          className={inputClass}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="fb-page-token" className="text-sm font-medium text-text">
-          Page Access Token
-        </label>
-        <input
-          id="fb-page-token"
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          required
-          className={inputClass}
-        />
+    <div className="flex max-w-lg flex-col gap-3 rounded-lg border border-neutral-200 p-4">
+      <p className="text-sm text-neutral-700">Bạn quản lý nhiều fanpage — chọn 1 trang để kết nối:</p>
+      <div className="flex flex-col gap-2">
+        {pages.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => handleSelect(p.id)}
+            disabled={pending !== null}
+            className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm text-text transition-colors hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {p.name}
+            <span className="text-xs text-accent-600">{pending === p.id ? "Đang kết nối..." : "Chọn"}</span>
+          </button>
+        ))}
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
-      >
-        {pending ? "Đang kết nối..." : "Kết nối"}
-      </button>
-    </form>
+    </div>
   );
 }
 
@@ -340,9 +324,16 @@ function CommentsTab() {
   );
 }
 
-export function FacebookInboxPanel() {
+export function FacebookInboxPanel({
+  initialError,
+  pendingPages,
+}: {
+  initialError?: string;
+  pendingPages: Array<{ id: string; name: string }>;
+}) {
   const [status, setStatus] = useState<FacebookConnectionStatus | null>(null);
   const [tab, setTab] = useState<"messenger" | "comments">("messenger");
+  const [showPicker, setShowPicker] = useState(pendingPages.length > 0);
 
   async function refreshStatus() {
     setStatus(await getFacebookConnectionStatus());
@@ -361,8 +352,25 @@ export function FacebookInboxPanel() {
 
   if (!status) return <p className="text-sm text-neutral-500">Đang tải...</p>;
 
+  if (showPicker) {
+    return (
+      <PagePicker
+        pages={pendingPages}
+        onSelected={() => {
+          setShowPicker(false);
+          refreshStatus();
+        }}
+      />
+    );
+  }
+
   if (!status.connected) {
-    return <ConnectForm onConnected={refreshStatus} />;
+    return (
+      <div className="flex flex-col gap-3">
+        {initialError && <p className="max-w-lg text-sm text-red-600">{initialError}</p>}
+        <ConnectButton />
+      </div>
+    );
   }
 
   return (
@@ -371,13 +379,19 @@ export function FacebookInboxPanel() {
         <p className="text-sm text-text">
           Đã kết nối fanpage <span className="font-medium">{status.pageName}</span>
         </p>
-        <button
-          type="button"
-          onClick={handleDisconnect}
-          className="text-xs font-medium text-red-600 underline hover:text-red-700"
-        >
-          Ngắt kết nối
-        </button>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Route Handler tự redirect sang Facebook, cần điều hướng cả trang */}
+          <a href="/api/auth/facebook/start" className="text-xs font-medium text-accent-600 underline hover:text-accent-700">
+            Đổi fanpage
+          </a>
+          <button
+            type="button"
+            onClick={handleDisconnect}
+            className="text-xs font-medium text-red-600 underline hover:text-red-700"
+          >
+            Ngắt kết nối
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b border-neutral-200">
