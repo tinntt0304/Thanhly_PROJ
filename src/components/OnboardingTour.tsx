@@ -209,7 +209,7 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <button
             type="button"
             onClick={finish}
-            className="whitespace-nowrap text-xs text-neutral-500 hover:text-text hover:underline"
+            className="whitespace-nowrap rounded text-xs text-neutral-500 hover:text-text hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
           >
             Không cần hướng dẫn
           </button>
@@ -218,14 +218,14 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
               type="button"
               onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
               disabled={isFirst}
-              className="whitespace-nowrap rounded-md border border-neutral-200 px-2.5 py-1 text-xs text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="whitespace-nowrap rounded-md border border-neutral-200 px-2.5 py-1 text-xs text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Quay lại
             </button>
             <button
               type="button"
               onClick={() => (isLast ? finish() : setStepIndex((i) => i + 1))}
-              className="whitespace-nowrap rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-600"
+              className="whitespace-nowrap rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-700 focus-visible:ring-offset-1"
             >
               {isLast ? "Bắt đầu sử dụng" : "Tiếp theo"}
             </button>
