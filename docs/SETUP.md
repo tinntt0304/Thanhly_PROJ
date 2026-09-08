@@ -143,8 +143,8 @@ Thiết lập Meta App (làm 1 lần):
    `http://localhost:3000/api/auth/facebook/callback` cho dev cục bộ) — sai URL này thì
    Facebook từ chối redirect thẳng, không vào được app.
 4. Ở App Review → Permissions, xin các quyền: `pages_show_list`, `pages_read_engagement`,
-   `pages_messaging` (đọc/gửi tin nhắn Messenger), `pages_manage_engagement` (trả lời bình
-   luận).
+   `pages_manage_metadata` (bắt buộc để token có "MESSAGING task"), `pages_messaging`
+   (đọc/gửi tin nhắn Messenger), `pages_manage_engagement` (trả lời bình luận).
 
 `.env` cần thêm:
 
@@ -154,11 +154,15 @@ Thiết lập Meta App (làm 1 lần):
   deprecate các phiên bản cũ — đổi biến này khi cần nâng phiên bản, không cần sửa code (xem
   `src/lib/facebook-graph.ts`).
 
-⚠️ Các quyền `pages_messaging`/`pages_manage_engagement` Meta yêu cầu **App Review** mới dùng
-được cho fanpage ngoài danh sách tester của App — trước khi App qua review, chỉ seller nào
-được thêm làm Tester/Developer/Admin của App (App Dashboard → Roles) mới kết nối được fanpage
-của họ thành công. Token hết quyền/hết hạn thì Graph API trả lỗi rõ ràng ngay ở trang (không
-crash các tính năng khác).
+⚠️ Các quyền `pages_messaging`/`pages_manage_engagement` Meta yêu cầu **App Review (Advanced
+Access)** mới dùng được với NGƯỜI DÙNG BẤT KỲ — trước khi App qua review, không chỉ seller kết
+nối fanpage phải là Tester/Developer/Admin của App (App Dashboard → Vai trò trong ứng dụng),
+mà CẢ những tài khoản Facebook nhắn tin/bình luận thử với fanpage cũng phải nằm trong danh
+sách đó — hội thoại/bình luận từ người ngoài danh sách này sẽ không hiện qua Graph API dù đã
+nhắn thật cho fanpage (đã gặp thật: seller nhắn từ 1 tài khoản Facebook cá nhân chưa thêm vào
+App Roles, tin không hiện ở `/admin/hop-thu-facebook` cho tới khi thêm tài khoản đó làm
+Tester). Token hết quyền/hết hạn thì Graph API trả lỗi rõ ràng ngay ở trang (không crash các
+tính năng khác).
 
 Gửi tin nhắn Messenger chỉ thực hiện được trong vòng **24 giờ** kể từ tin nhắn cuối của
 khách (24-hour messaging window — chính sách của Meta, không phải giới hạn riêng của app).

@@ -3,14 +3,19 @@
 // /admin/hop-thu-facebook. Seller cấp quyền qua flow OAuth "Kết nối với Facebook" (Facebook
 // Login) cho ĐÚNG Meta App của chủ sàn (FACEBOOK_APP_ID/FACEBOOK_APP_SECRET trong .env) — xem
 // src/app/api/auth/facebook/{start,callback}/route.ts. Quyền xin lúc cấp phép: pages_show_list,
-// pages_read_engagement, pages_messaging (đọc/gửi tin nhắn Messenger), pages_manage_engagement
-// (trả lời bình luận). Các quyền nhạy cảm này Meta yêu cầu App Review mới dùng được cho page
-// ngoài danh sách tester của App — nếu token thiếu quyền, Graph API trả lỗi rõ ràng (xem
-// GraphApiError) thay vì crash trang.
+// pages_read_engagement, pages_manage_metadata (bắt buộc để token có "MESSAGING task"),
+// pages_messaging (đọc/gửi tin nhắn Messenger), pages_manage_engagement (trả lời bình luận).
+// Các quyền nhạy cảm này Meta yêu cầu App Review (Advanced Access) mới đọc/trả lời được hội
+// thoại với NGƯỜI DÙNG BẤT KỲ — trước khi qua review, app chỉ đọc/trả lời được hội thoại với
+// những tài khoản Facebook đã được thêm làm Tester/Developer/Admin của App (App Dashboard >
+// Vai trò trong ứng dụng), hội thoại với người ngoài danh sách này sẽ KHÔNG xuất hiện qua
+// Graph API dù trang có nhắn thật cho fanpage. Nếu token thiếu quyền, Graph API trả lỗi rõ
+// ràng (xem GraphApiError) thay vì crash trang.
 
 const GRAPH_API_VERSION = process.env.FACEBOOK_GRAPH_API_VERSION || "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-export const FACEBOOK_OAUTH_SCOPES = "pages_show_list,pages_read_engagement,pages_messaging,pages_manage_engagement";
+export const FACEBOOK_OAUTH_SCOPES =
+  "pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging,pages_manage_engagement";
 
 export class GraphApiError extends Error {
   constructor(
