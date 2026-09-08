@@ -73,6 +73,7 @@ export function TrustProfileForm({
       <button
         type="submit"
         disabled={pending}
+        data-tour="trust-save"
         className="self-start rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
       >
         {pending ? "Đang lưu..." : "Lưu"}

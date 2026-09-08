@@ -240,6 +240,7 @@ function SearchTab({
               name="keywords"
               placeholder="vd. đồ mẹ và bé, đồ sơ sinh"
               required
+              data-tour="facebook-keywords"
               className={inputClass}
             />
           </div>
@@ -263,6 +264,7 @@ function SearchTab({
           </label>
           <button
             type="submit"
+            data-tour="facebook-search"
             className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
           >
             Tìm kiếm

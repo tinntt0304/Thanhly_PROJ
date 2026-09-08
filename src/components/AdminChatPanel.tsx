@@ -178,12 +178,14 @@ export function AdminChatPanel() {
                     }
                   }}
                   placeholder="Nhập phản hồi..."
+                  data-tour="chat-input"
                   className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
                 <button
                   type="button"
                   onClick={handleSend}
                   disabled={sending || draft.trim() === ""}
+                  data-tour="chat-send"
                   className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                 >
                   Gửi

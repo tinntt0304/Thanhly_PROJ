@@ -90,12 +90,14 @@ export function ImportProductsPanel() {
             type="file"
             accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            data-tour="import-file"
             className="text-sm"
           />
           <button
             type="button"
             onClick={handleImport}
             disabled={importing}
+            data-tour="import-submit"
             className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
           >
             {importing ? "Đang import..." : "Import"}

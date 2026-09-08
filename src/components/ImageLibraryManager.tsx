@@ -145,11 +145,13 @@ export function ImageLibraryManager({ initialImages }: { initialImages: LibraryI
           accept="image/jpeg,image/png,image/webp,image/gif"
           multiple
           required
+          data-tour="gallery-choose-file"
           className="text-sm text-neutral-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-accent-500 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-accent-600"
         />
         <button
           type="submit"
           disabled={uploadProgress !== null}
+          data-tour="gallery-upload"
           className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
         >
           {uploadProgress ? "Đang tải lên..." : "Tải ảnh lên"}
