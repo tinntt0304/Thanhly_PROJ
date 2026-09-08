@@ -1,12 +1,14 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "admin_onboarding_seen";
 const PADDING = 6;
 
 type Step = {
   target: string;
+  href: string;
   title: string;
   description: string;
 };
@@ -14,31 +16,37 @@ type Step = {
 const sellerSteps: Step[] = [
   {
     target: "admin",
+    href: "/admin",
     title: "Danh sách sản phẩm",
     description: "Trang chủ quản trị — nơi bạn xem toàn bộ sản phẩm đã đăng và tình trạng bán của từng sản phẩm.",
   },
   {
     target: "products-new",
+    href: "/admin/products/new",
     title: "Đăng sản phẩm",
     description: "Thêm sản phẩm mới lên sàn: hình ảnh, giá bán, mô tả, danh mục.",
   },
   {
     target: "products-import",
+    href: "/admin/products/import",
     title: "Import Excel",
     description: "Đăng hàng loạt sản phẩm nhanh chóng bằng cách nhập từ file Excel.",
   },
   {
     target: "gallery",
+    href: "/admin/thu-vien-anh",
     title: "Thư viện ảnh",
     description: "Lưu trữ và tái sử dụng ảnh sản phẩm cho nhiều lần đăng bán khác nhau.",
   },
   {
     target: "orders",
+    href: "/admin/orders",
     title: "Quản lý đơn hàng",
     description: "Theo dõi trạng thái giao hàng, xử lý và huỷ đơn hàng của khách.",
   },
   {
     target: "facebook-groups",
+    href: "/admin/nhom-facebook",
     title: "Tìm nhóm Facebook",
     description: "Tìm nhóm Facebook phù hợp và soạn sẵn nội dung để đăng bán sản phẩm.",
   },
@@ -47,16 +55,19 @@ const sellerSteps: Step[] = [
 const adminSteps: Step[] = [
   {
     target: "categories",
+    href: "/admin/danh-muc",
     title: "Quản lý danh mục",
     description: "Tạo và sắp xếp danh mục sản phẩm cho toàn sàn.",
   },
   {
     target: "trust",
+    href: "/admin/settings",
     title: "Bằng chứng uy tín",
     description: "Quản lý các bằng chứng, đánh giá giúp tăng độ tin cậy của sàn.",
   },
   {
     target: "chat",
+    href: "/admin/chat",
     title: "Chat hỗ trợ",
     description: "Trả lời tin nhắn hỗ trợ từ khách hàng và người bán trên sàn.",
   },
@@ -64,6 +75,7 @@ const adminSteps: Step[] = [
 
 const accountStep: Step = {
   target: "account",
+  href: "/admin/account",
   title: "Tài khoản của tôi",
   description: "Cập nhật thông tin tài khoản, nạp credit và xem trang công khai của bạn ở đây.",
 };
@@ -71,6 +83,8 @@ const accountStep: Step = {
 type Rect = { top: number; left: number; width: number; height: number };
 
 export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -81,6 +95,15 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const step = steps[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === steps.length - 1;
+
+  // Mỗi bước tự chuyển sang đúng trang của tính năng đang giới thiệu (không chỉ trỏ vào
+  // sidebar) — để người dùng thấy tính năng thật đằng sau spotlight thay vì đứng yên 1 trang.
+  useEffect(() => {
+    if (!open) return;
+    if (pathname !== step.href) {
+      router.push(step.href);
+    }
+  }, [open, step.href, pathname, router]);
 
   // Đọc localStorage lúc mount để quyết định có hiện tour hay không — đồng bộ hoá 1 lần
   // duy nhất với hệ thống bên ngoài (trình duyệt), không có gì để await.
