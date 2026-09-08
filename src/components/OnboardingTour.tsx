@@ -1,151 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { buildTourSteps } from "@/lib/admin-wiki-content";
 
 const STORAGE_KEY = "admin_onboarding_seen";
 const PADDING = 6;
-
-type Step = {
-  target: string;
-  href: string;
-  title: string;
-  description: string;
-};
-
-const sellerSteps: Step[] = [
-  {
-    target: "admin",
-    href: "/admin",
-    title: "Danh sách sản phẩm",
-    description: "Trang chủ quản trị — nơi bạn xem toàn bộ sản phẩm đã đăng và tình trạng bán của từng sản phẩm.",
-  },
-  {
-    target: "products-new",
-    href: "/admin/products/new",
-    title: "Đăng sản phẩm",
-    description: "Thêm sản phẩm mới lên sàn: hình ảnh, giá bán, mô tả, danh mục.",
-  },
-  {
-    target: "product-form-submit",
-    href: "/admin/products/new",
-    title: "Nút Đăng sản phẩm",
-    description: "Điền xong thông tin thì bấm nút này để đăng sản phẩm lên sàn.",
-  },
-  {
-    target: "products-import",
-    href: "/admin/products/import",
-    title: "Import Excel",
-    description: "Đăng hàng loạt sản phẩm nhanh chóng bằng cách nhập từ file Excel.",
-  },
-  {
-    target: "import-file",
-    href: "/admin/products/import",
-    title: "Chọn file Excel",
-    description: "Chọn file Excel đã điền theo mẫu để chuẩn bị import.",
-  },
-  {
-    target: "import-submit",
-    href: "/admin/products/import",
-    title: "Nút Import",
-    description: "Bấm để đăng hàng loạt các sản phẩm trong file đã chọn.",
-  },
-  {
-    target: "gallery",
-    href: "/admin/thu-vien-anh",
-    title: "Thư viện ảnh",
-    description: "Lưu trữ và tái sử dụng ảnh sản phẩm cho nhiều lần đăng bán khác nhau.",
-  },
-  {
-    target: "gallery-choose-file",
-    href: "/admin/thu-vien-anh",
-    title: "Chọn tệp",
-    description: "Chọn 1 hoặc nhiều ảnh từ máy để tải lên thư viện.",
-  },
-  {
-    target: "gallery-upload",
-    href: "/admin/thu-vien-anh",
-    title: "Tải ảnh lên",
-    description: "Bấm để tải các ảnh vừa chọn lên thư viện, dùng lại cho nhiều sản phẩm.",
-  },
-  {
-    target: "orders",
-    href: "/admin/orders",
-    title: "Quản lý đơn hàng",
-    description: "Theo dõi trạng thái giao hàng, xử lý và huỷ đơn hàng của khách.",
-  },
-  {
-    target: "facebook-groups",
-    href: "/admin/nhom-facebook",
-    title: "Tìm nhóm Facebook",
-    description: "Tìm nhóm Facebook phù hợp và soạn sẵn nội dung để đăng bán sản phẩm.",
-  },
-  {
-    target: "facebook-keywords",
-    href: "/admin/nhom-facebook",
-    title: "Ô nhập từ khoá",
-    description: "Nhập từ khoá liên quan đến sản phẩm để tìm nhóm Facebook phù hợp.",
-  },
-  {
-    target: "facebook-search",
-    href: "/admin/nhom-facebook",
-    title: "Nút Tìm kiếm",
-    description: "Bấm để tìm nhóm Facebook theo từ khoá vừa nhập.",
-  },
-];
-
-const adminSteps: Step[] = [
-  {
-    target: "categories",
-    href: "/admin/danh-muc",
-    title: "Quản lý danh mục",
-    description: "Tạo và sắp xếp danh mục sản phẩm cho toàn sàn.",
-  },
-  {
-    target: "trust",
-    href: "/admin/settings",
-    title: "Bằng chứng uy tín",
-    description: "Quản lý các bằng chứng, đánh giá giúp tăng độ tin cậy của sàn.",
-  },
-  {
-    target: "trust-save",
-    href: "/admin/settings",
-    title: "Nút Lưu",
-    description: "Bấm để lưu lại nội dung bằng chứng uy tín vừa chỉnh sửa.",
-  },
-  {
-    target: "chat",
-    href: "/admin/chat",
-    title: "Chat hỗ trợ",
-    description: "Trả lời tin nhắn hỗ trợ từ khách hàng và người bán trên sàn.",
-  },
-  {
-    target: "chat-input",
-    href: "/admin/chat",
-    title: "Ô nhập tin nhắn",
-    description: "Chọn 1 cuộc trò chuyện ở danh sách bên trái rồi nhập nội dung trả lời ở đây.",
-  },
-  {
-    target: "chat-send",
-    href: "/admin/chat",
-    title: "Nút Gửi",
-    description: "Bấm để gửi tin nhắn trả lời cho khách.",
-  },
-];
-
-const accountStep: Step = {
-  target: "account",
-  href: "/admin/account",
-  title: "Tài khoản của tôi",
-  description: "Cập nhật thông tin tài khoản, nạp credit và xem trang công khai của bạn ở đây.",
-};
-
-const accountSaveStep: Step = {
-  target: "account-save",
-  href: "/admin/account",
-  title: "Nút Lưu thay đổi",
-  description: "Bấm để lưu lại thông tin tài khoản vừa chỉnh sửa.",
-};
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -159,7 +19,7 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [tooltipStyle, setTooltipStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [positioned, setPositioned] = useState(false);
 
-  const steps = [...sellerSteps, ...(isSuperAdmin ? adminSteps : []), accountStep, accountSaveStep];
+  const steps = useMemo(() => buildTourSteps(isSuperAdmin), [isSuperAdmin]);
   const step = steps[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === steps.length - 1;
@@ -323,15 +183,15 @@ export function OnboardingTour({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         </div>
         <p className="text-sm text-neutral-700">{step.description}</p>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex flex-col gap-2">
           <button
             type="button"
             onClick={finish}
-            className="whitespace-nowrap rounded text-xs text-neutral-500 hover:text-text hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+            className="self-start whitespace-nowrap rounded text-xs text-neutral-500 hover:text-text hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
           >
             Không cần hướng dẫn
           </button>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setStepIndex((i) => Math.max(0, i - 1))}

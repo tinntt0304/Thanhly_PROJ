@@ -100,6 +100,15 @@ function LogoutIcon() {
     </svg>
   );
 }
+function HelpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+      <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 9a2.5 2.5 0 114.2 1.8c-.7.6-1.7 1-1.7 2.2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 17h.01" />
+    </svg>
+  );
+}
 function UserIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -183,6 +192,7 @@ export function AdminSidebar({
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-neutral-200 px-3 py-3">
+        <NavLink item={{ href: "/admin/huong-dan", label: "Hướng dẫn sử dụng", icon: <HelpIcon /> }} />
         <NavLink
           item={{ href: "/admin/account", label: "Tài khoản của tôi", icon: <UserIcon />, tourId: "account" }}
         />
