@@ -13,6 +13,7 @@ import {
   StarIcon,
   ChatIcon,
   UserIcon,
+  InboxIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
@@ -26,6 +27,7 @@ const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
   star: StarIcon,
   chat: ChatIcon,
   user: UserIcon,
+  inbox: InboxIcon,
 };
 
 export default async function AdminWikiPage() {

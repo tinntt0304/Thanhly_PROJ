@@ -123,6 +123,38 @@ bằng cách tìm `referenceCode` (nhúng trong nội dung chuyển khoản/QR) 
 `content` SePay gửi về — idempotent (gọi lại nhiều lần không cộng tiền 2 lần nhờ kiểm
 tra `status` trong 1 transaction DB).
 
+### Hộp thư Facebook (Messenger + bình luận qua Meta Graph API)
+
+Trang `/admin/hop-thu-facebook` (mọi tài khoản đã đăng nhập, mỗi seller tự kết nối fanpage
+của mình — không dùng chung 1 fanpage cho cả sàn, khác với các tích hợp khác ở trên). Không
+có flow "Đăng nhập bằng Facebook" (OAuth) trong app — seller tự tạo **Page Access Token** của
+fanpage mình rồi dán trực tiếp vào form kết nối ở trang admin (lưu trong bảng
+`FacebookPageConnection`, riêng theo từng `userId`).
+
+Cách lấy Page ID + Page Access Token:
+
+1. Tạo Facebook App ở [developers.facebook.com/apps](https://developers.facebook.com/apps).
+2. Vào [Graph API Explorer](https://developers.facebook.com/tools/explorer/), chọn App vừa
+   tạo, chọn "Get Page Access Token" cho đúng fanpage, cấp các quyền:
+   `pages_show_list`, `pages_read_engagement`, `pages_manage_metadata` (đọc thông tin trang),
+   `pages_messaging` (đọc/gửi tin nhắn Messenger), `pages_manage_engagement` (trả lời bình
+   luận).
+3. Page ID xem ở phần "About" của fanpage hoặc cũng lấy được từ Graph API Explorer.
+
+⚠️ Các quyền `pages_messaging`/`pages_manage_engagement` Meta yêu cầu **App Review** mới dùng
+được cho fanpage ngoài danh sách tester của App — token tạo thử (chưa qua review) chỉ hoạt
+động với chính fanpage của người tạo App hoặc các trang được thêm làm tester. Token hết
+quyền/hết hạn thì Graph API trả lỗi rõ ràng ngay ở trang (không crash các tính năng khác).
+
+`.env` có thể thêm (tùy chọn):
+
+- `FACEBOOK_GRAPH_API_VERSION` — mặc định `v21.0` nếu không đặt. Meta định kỳ deprecate các
+  phiên bản cũ — đổi biến này khi cần nâng phiên bản, không cần sửa code (xem
+  `src/lib/facebook-graph.ts`).
+
+Gửi tin nhắn Messenger chỉ thực hiện được trong vòng **24 giờ** kể từ tin nhắn cuối của
+khách (24-hour messaging window — chính sách của Meta, không phải giới hạn riêng của app).
+
 ### Quản lý đơn hàng + vận chuyển GHN (Giao Hàng Nhanh)
 
 Trang `/admin/orders` (mọi tài khoản đã đăng nhập, mỗi người chỉ thấy đơn của mình —

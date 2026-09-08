@@ -18,6 +18,7 @@ import {
   LogoutIcon,
   HelpIcon,
   UserIcon,
+  InboxIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 type NavItem = {
@@ -72,6 +73,7 @@ export function AdminSidebar({
     { href: "/admin/thu-vien-anh", label: "Thư viện ảnh", icon: <GalleryIcon />, tourId: "gallery" },
     { href: "/admin/orders", label: "Quản lý đơn hàng", icon: <OrdersIcon />, tourId: "orders" },
     { href: "/admin/nhom-facebook", label: "Tìm nhóm Facebook", icon: <SearchIcon />, tourId: "facebook-groups" },
+    { href: "/admin/hop-thu-facebook", label: "Hộp thư Facebook", icon: <InboxIcon />, tourId: "fb-inbox" },
   ];
 
   const adminItems: NavItem[] = [

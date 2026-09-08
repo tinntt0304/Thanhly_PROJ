@@ -108,3 +108,15 @@ export function UserIcon(props: IconProps) {
     </svg>
   );
 }
+export function InboxIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4.5l1.5 3h6l1.5-3H21" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M5.5 5h13l2.5 7v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6l2.5-7z"
+      />
+    </svg>
+  );
+}

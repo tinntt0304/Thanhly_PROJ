@@ -50,17 +50,18 @@ model User {
 
   createdAt DateTime @default(now())
 
-  products              Product[]
-  creditTransactions    CreditTransaction[]
-  topUpRequests         TopUpRequest[]
-  facebookGroups        FacebookGroup[]
-  facebookKeywordSearch FacebookKeywordSearch[]
-  orders                Order[]    @relation("OrderAsSeller") // đơn của những sản phẩm mình bán ra
-  buyerOrders           Order[]    @relation("OrderAsBuyer") // đơn mình tự mua từ người bán khác
-  bids                  Bid[] // lượt trả giá mình đã đặt (kể cả cho sản phẩm của người bán khác)
-  cartItems             CartItem[]
-  phoneReports          PhoneReport[]
-  emailOtp              EmailOtp?
+  products               Product[]
+  creditTransactions     CreditTransaction[]
+  topUpRequests          TopUpRequest[]
+  facebookGroups         FacebookGroup[]
+  facebookKeywordSearch  FacebookKeywordSearch[]
+  orders                 Order[]                 @relation("OrderAsSeller") // đơn của những sản phẩm mình bán ra
+  buyerOrders            Order[]                 @relation("OrderAsBuyer") // đơn mình tự mua từ người bán khác
+  bids                   Bid[] // lượt trả giá mình đã đặt (kể cả cho sản phẩm của người bán khác)
+  cartItems              CartItem[]
+  phoneReports           PhoneReport[]
+  emailOtp               EmailOtp?
+  facebookPageConnection FacebookPageConnection?
 }
 
 // 1 OTP đang hiệu lực/user (unique userId — tạo OTP mới thì ghi đè, không cộng dồn nhiều
@@ -197,7 +198,7 @@ model Order {
   // huỷ ở /admin/orders/[id] khi đơn CHƯA gửi qua đơn vị vận chuyển đều bắt buộc chọn 1 trong 5 lý
   // do dựng sẵn hoặc tự nhập "Lý do khác"; đơn đã có vận đơn GHN thì seller/admin huỷ không bắt
   // buộc lý do (giữ nguyên hành vi cũ). Xem cancelledBy để biết ai là người huỷ.
-  cancelledBy String? // "BUYER" | "SELLER" — ai là người bấm huỷ, dùng để hiển thị đúng nhãn
+  cancelledBy  String? // "BUYER" | "SELLER" — ai là người bấm huỷ, dùng để hiển thị đúng nhãn
   // ("Lý do người mua huỷ" / "Lý do người bán huỷ") ở cả 2 phía thay vì đoán mò từ cancelReason.
 
   ghnOrderCode       String? // mã vận đơn GHN — null tới khi bấm "Tạo vận đơn GHN"
@@ -395,6 +396,26 @@ model FacebookKeywordSearch {
   @@index([userId, keyword, searchedAt])
 }
 
+// Kết nối fanpage Facebook của 1 seller (1-1 với User, giống EmailOtp) — dùng để lấy hội
+// thoại Messenger + bình luận bài đăng, trả lời trực tiếp từ /admin/hop-thu-facebook qua
+// Meta Graph API. Seller tự tạo Page Access Token của trang mình rồi dán vào (không có flow
+// OAuth "Đăng nhập bằng Facebook" — mỗi seller tự chịu trách nhiệm cấp đúng quyền
+// pages_messaging/pages_read_engagement/pages_manage_engagement cho token của họ). Token chỉ
+// đọc/dùng ở server (Server Actions qua requireAdmin() + kiểm tra đúng chủ sở hữu), không bao
+// giờ trả về client.
+model FacebookPageConnection {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  pageId          String
+  pageName        String?
+  pageAccessToken String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum CreditTransactionType {
   TOPUP // nạp tiền qua SePay
   SEARCH_CHARGE // trừ tiền do 1 lượt tìm nhóm Facebook gọi Apify thật
@@ -434,8 +455,8 @@ model TopUpRequest {
   referenceCode String             @unique
   status        TopUpRequestStatus @default(PENDING)
 
-  creditedAmount     Int? // số tiền thực nhận từ SePay (có thể khác amount nếu chuyển dư/thiếu)
-  sepayRawContent    String? // nội dung chuyển khoản thật từ webhook — giữ lại để đối soát khi có tranh chấp
+  creditedAmount  Int? // số tiền thực nhận từ SePay (có thể khác amount nếu chuyển dư/thiếu)
+  sepayRawContent String? // nội dung chuyển khoản thật từ webhook — giữ lại để đối soát khi có tranh chấp
 
   createdAt   DateTime  @default(now())
   completedAt DateTime?
@@ -470,9 +491,9 @@ model PricingConfig {
 // trùng nhiều lần đẩy tỉ lệ ảo — xem combinePhoneRisk (src/lib/orders.ts) cách gộp số lượt
 // báo xấu này với tỉ lệ hoàn hàng GHN (etl/return-rate) thành 1 mức cảnh báo hiển thị.
 model PhoneReport {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   phone      String
-  reporter   User   @relation(fields: [reporterId], references: [id])
+  reporter   User    @relation(fields: [reporterId], references: [id])
   reporterId String
   reason     String?
 

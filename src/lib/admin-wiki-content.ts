@@ -22,7 +22,8 @@ export type IconKey =
   | "menu"
   | "star"
   | "chat"
-  | "user";
+  | "user"
+  | "inbox";
 
 export type WikiFeature = {
   target: string;
@@ -163,6 +164,19 @@ export const ADMIN_WIKI: WikiSection[] = [
             title: "Nút Tìm kiếm",
             description: "Bấm để tìm nhóm Facebook theo từ khoá vừa nhập.",
           },
+        ],
+      },
+      {
+        target: "fb-inbox",
+        href: "/admin/hop-thu-facebook",
+        icon: "inbox",
+        title: "Hộp thư Facebook",
+        description: "Xem và trả lời tin nhắn Messenger + bình luận từ fanpage của bạn ngay tại đây.",
+        steps: [
+          "Lần đầu dùng: dán Page ID và Page Access Token của fanpage rồi bấm Kết nối.",
+          "Chọn tab Tin nhắn Messenger hoặc Bình luận.",
+          "Bấm vào 1 hội thoại để xem tin nhắn, hoặc trả lời trực tiếp dưới mỗi bình luận.",
+          "Nhập nội dung trả lời rồi bấm Gửi / Trả lời.",
         ],
       },
     ],
