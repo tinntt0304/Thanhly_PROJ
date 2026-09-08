@@ -4,6 +4,7 @@ import { Logo } from "@/components/Logo";
 import { listChatSessions } from "@/lib/actions/chat";
 import { getCreditBalance } from "@/lib/credits";
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 export default async function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAdmin();
@@ -29,6 +30,7 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
 
   return (
     <div className="flex flex-1 flex-col">
+      <OnboardingTour isSuperAdmin={isSuperAdmin} />
       <header className="border-b border-neutral-200 bg-surface px-4 py-3">
         <Logo size="sm" href="/admin" />
       </header>
