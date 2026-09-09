@@ -120,6 +120,9 @@ function PagePicker({ pages, onSelected }: { pages: Array<{ id: string; name: st
   );
 }
 
+const MESSAGES_POLL_MS = 5000;
+const CONVERSATIONS_POLL_MS = 15000;
+
 function MessengerTab() {
   const [conversations, setConversations] = useState<FbConversation[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -154,26 +157,59 @@ function MessengerTab() {
     setConversations(res.items ?? []);
   }
 
-  // Tải danh sách hội thoại 1 lần lúc mount — đồng bộ hoá với hệ thống bên ngoài (Graph API),
-  // setState thật sự nằm sau await bên trong loadConversations(), không đồng bộ trong effect.
+  // Poll danh sách hội thoại (giống AdminChatPanel) — khách nhắn mới trên Facebook phải tự
+  // hiện ra, không bắt seller reload cả trang mới thấy. 15s vì mỗi lần tải lại còn kéo theo
+  // ảnh đại diện từng người nhắn (nhiều lệnh gọi Graph API hơn 1 lệnh /messages đơn thuần).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- setState nằm sau await trong loadConversations(), không đồng bộ
-    loadConversations();
+    let cancelled = false;
+    async function poll() {
+      const res = await listFacebookConversations();
+      if (cancelled) return;
+      setLoading(false);
+      if (res.error) {
+        setLoadError(res.error);
+        return;
+      }
+      setLoadError(null);
+      setConversations(res.items ?? []);
+    }
+    poll();
+    const id = setInterval(poll, CONVERSATIONS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
-  async function selectConversation(id: string) {
+  function selectConversation(id: string) {
     setSelectedId(id);
-    setMsgError(null);
-    const res = await listFacebookMessages(id);
-    if (res.error) {
-      setMsgError(res.error);
-      setMessages([]);
-      return;
-    }
-    setMessages(res.items ?? []);
   }
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
+
+  // Poll tin nhắn của hội thoại đang mở — khách nhắn thêm trong lúc seller đang xem cũng phải
+  // tự hiện ra, không cần chọn lại hội thoại hay reload trang.
+  useEffect(() => {
+    if (!selectedId) return;
+    const conversationId = selectedId;
+    let cancelled = false;
+    async function poll() {
+      const res = await listFacebookMessages(conversationId);
+      if (cancelled) return;
+      if (res.error) {
+        setMsgError(res.error);
+        return;
+      }
+      setMsgError(null);
+      setMessages(res.items ?? []);
+    }
+    poll();
+    const id = setInterval(poll, MESSAGES_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [selectedId]);
 
   const filteredConversations = conversations.filter((c) => {
     const q = search.trim().toLowerCase();
