@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getChatMessages,
   listChatSessions,
@@ -10,8 +10,11 @@ import {
   type ChatSessionSummaryDTO,
 } from "@/lib/actions/chat";
 import { formatDateTime } from "@/lib/auction";
+import { useRealtimeBroadcast } from "@/lib/realtime-client";
 
-const POLL_MS = 5000;
+// Realtime (Supabase Broadcast) là đường đi chính — poll ở đây chỉ còn là lưới an toàn khi
+// chưa cấu hình realtime hoặc kết nối realtime bị rớt, nên giãn ra thay vì 5s như trước.
+const POLL_MS = 20000;
 
 export function AdminChatPanel() {
   const [sessions, setSessions] = useState<ChatSessionSummaryDTO[]>([]);
@@ -21,7 +24,10 @@ export function AdminChatPanel() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Poll danh sách phiên chat
+  // Poll danh sách phiên chat + realtime cùng gọi lại đúng 1 closure qua ref (xem giải thích
+  // chi tiết ở ChatWidget.tsx — tránh race khi đổi phiên đang chọn giữa lúc 1 lần tải cũ
+  // chưa xong).
+  const pollSessionsRef = useRef<() => void>(() => {});
   useEffect(() => {
     let cancelled = false;
     async function poll() {
@@ -29,18 +35,26 @@ export function AdminChatPanel() {
       if (cancelled) return;
       setSessions(list);
     }
+    pollSessionsRef.current = poll;
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      pollSessionsRef.current = () => {};
     };
   }, []);
+  const triggerSessionsRefresh = useCallback(() => pollSessionsRef.current(), []);
+  useRealtimeBroadcast("chat-sessions", "updated", triggerSessionsRefresh);
 
   // Poll tin nhắn của phiên đang chọn. Chưa chọn phiên nào thì không cần làm gì —
   // `messages` đã khởi tạo sẵn là [] nên không phải tự reset lại ở đây.
+  const pollMessagesRef = useRef<() => void>(() => {});
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      pollMessagesRef.current = () => {};
+      return;
+    }
     let cancelled = false;
     async function poll() {
       if (!selectedId) return;
@@ -48,13 +62,17 @@ export function AdminChatPanel() {
       if (cancelled) return;
       setMessages(msgs);
     }
+    pollMessagesRef.current = poll;
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      pollMessagesRef.current = () => {};
     };
   }, [selectedId]);
+  const triggerMessagesRefresh = useCallback(() => pollMessagesRef.current(), []);
+  useRealtimeBroadcast(selectedId, "message", triggerMessagesRefresh);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

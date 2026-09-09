@@ -15,5 +15,6 @@ CREATE TABLE "FacebookPageConnection" (
 );
 
 CREATE UNIQUE INDEX "FacebookPageConnection_userId_key" ON "FacebookPageConnection"("userId");
+CREATE INDEX "FacebookPageConnection_pageId_idx" ON "FacebookPageConnection"("pageId");
 
 ALTER TABLE "FacebookPageConnection" ADD CONSTRAINT "FacebookPageConnection_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

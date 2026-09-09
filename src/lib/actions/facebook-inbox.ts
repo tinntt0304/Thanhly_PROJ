@@ -5,20 +5,25 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { revalidatePath } from "next/cache";
+import { broadcast } from "@/lib/realtime";
 import {
-  listConversations,
-  listMessages,
   sendMessengerMessage,
   listRecentComments,
   replyToComment,
+  subscribePageWebhook,
   type FbConversation,
   type FbMessage,
   type FbComment,
   type ManagedPage,
 } from "@/lib/facebook-graph";
+import { getCachedConversations, getCachedMessages, syncFacebookInboxFromGraphApi } from "@/lib/facebook-inbox-store";
 
 const WIKI_PATH = "/admin/hop-thu-facebook";
 const PAGES_COOKIE = "fb_oauth_pages";
+
+function fbChannel(pageId: string): string {
+  return `fb:${pageId}`;
+}
 
 export type FacebookConnectionStatus = {
   connected: boolean;
@@ -70,6 +75,14 @@ export async function selectFacebookPage(pageId: string): Promise<{ success?: tr
     update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
   });
 
+  // Đăng ký nhận Webhook (realtime) — lỗi ở đây không chặn kết nối, seller vẫn dùng được qua
+  // nút "Làm mới" (backfill), chỉ mất phần tin nhắn tự hiện ra. Chạy song song với backfill
+  // lịch sử cũ vào cache, vì đây là 2 việc độc lập.
+  await Promise.all([
+    subscribePageWebhook(page.id, page.accessToken).catch(() => {}),
+    syncFacebookInboxFromGraphApi(page.id, page.accessToken).catch(() => {}),
+  ]);
+
   cookieStore.delete(PAGES_COOKIE);
   revalidatePath(WIKI_PATH);
   return { success: true };
@@ -90,20 +103,43 @@ async function requireOwnConnection() {
   return connection;
 }
 
+// Nguồn dữ liệu Messenger CHÍNH giờ là cache trong DB của chính app (xem
+// src/lib/facebook-inbox-store.ts), đổ vào bởi Webhook + backfill Graph API — không gọi trực
+// tiếp Graph API mỗi lần xem nữa. Đọc DB thì mới đủ nhanh để trả lời realtime (Supabase
+// Broadcast) chỉ là "tiếng chuông", client phải fetch lại được ngay mà không tính đến giới
+// hạn/độ trễ của Graph API.
+
 export async function listFacebookConversations(): Promise<{ items?: FbConversation[]; error?: string }> {
   try {
     const connection = await requireOwnConnection();
-    const items = await listConversations(connection.pageId, connection.pageAccessToken);
+    const items = await getCachedConversations(connection.pageId);
     return { items };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Không tải được danh sách hội thoại." };
   }
 }
 
+// Bấm "Làm mới" ở UI gọi hàm này — đồng bộ lại từ Graph API (phòng webhook rớt sự kiện) rồi
+// mới đọc lại cache, khác với listFacebookConversations() (chỉ đọc cache, dùng cho poll/
+// realtime thường xuyên hơn nên phải rẻ, không gọi Graph API mỗi lần).
+export async function syncFacebookInbox(): Promise<{ items?: FbConversation[]; error?: string }> {
+  try {
+    const connection = await requireOwnConnection();
+    await syncFacebookInboxFromGraphApi(connection.pageId, connection.pageAccessToken);
+    const items = await getCachedConversations(connection.pageId);
+    return { items };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Đồng bộ lại hội thoại thất bại." };
+  }
+}
+
+// Tham số vẫn tên "conversationId" cho khớp phía UI (FacebookInboxPanel.tsx) — thực chất giờ
+// truyền vào là participantPsid, vì "hội thoại" = 1 khách ↔ trang, không còn thread id riêng
+// của Graph API nữa (xem getCachedConversations()).
 export async function listFacebookMessages(conversationId: string): Promise<{ items?: FbMessage[]; error?: string }> {
   try {
     const connection = await requireOwnConnection();
-    const items = await listMessages(conversationId, connection.pageAccessToken);
+    const items = await getCachedMessages(connection.pageId, conversationId);
     return { items };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Không tải được tin nhắn." };
@@ -121,7 +157,27 @@ export async function sendFacebookMessage(
 
   try {
     const connection = await requireOwnConnection();
-    await sendMessengerMessage(connection.pageId, connection.pageAccessToken, recipientPsid, parsed.data);
+    const messageId = await sendMessengerMessage(
+      connection.pageId,
+      connection.pageAccessToken,
+      recipientPsid,
+      parsed.data
+    );
+
+    // Ghi lại ngay vào cache của app — không chờ webhook (webhook không báo lại tin PAGE tự
+    // gửi vì app chỉ đăng ký field "messages", không đăng ký "messaging_echoes").
+    await prisma.facebookMessage.create({
+      data: {
+        id: messageId,
+        pageId: connection.pageId,
+        psid: recipientPsid,
+        direction: "OUT",
+        message: parsed.data,
+        createdAt: new Date(),
+      },
+    });
+    await broadcast(fbChannel(connection.pageId), "message");
+
     return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Gửi tin nhắn thất bại." };

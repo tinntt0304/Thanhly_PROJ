@@ -397,12 +397,11 @@ model FacebookKeywordSearch {
 }
 
 // Kết nối fanpage Facebook của 1 seller (1-1 với User, giống EmailOtp) — dùng để lấy hội
-// thoại Messenger + bình luận bài đăng, trả lời trực tiếp từ /admin/hop-thu-facebook qua
-// Meta Graph API. Seller tự tạo Page Access Token của trang mình rồi dán vào (không có flow
-// OAuth "Đăng nhập bằng Facebook" — mỗi seller tự chịu trách nhiệm cấp đúng quyền
-// pages_messaging/pages_read_engagement/pages_manage_engagement cho token của họ). Token chỉ
-// đọc/dùng ở server (Server Actions qua requireAdmin() + kiểm tra đúng chủ sở hữu), không bao
-// giờ trả về client.
+// thoại Messenger + bình luận bài đăng, trả lời trực tiếp từ /admin/hop-thu-facebook qua Meta
+// Graph API. Seller cấp quyền qua flow OAuth "Kết nối với Facebook" cho Meta App của chủ sàn
+// (xem src/app/api/auth/facebook/{start,callback}/route.ts) — Page Access Token suy ra từ đó,
+// không phải tự dán tay. Token chỉ đọc/dùng ở server (Server Actions qua requireAdmin() +
+// kiểm tra đúng chủ sở hữu), không bao giờ trả về client.
 model FacebookPageConnection {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -414,6 +413,49 @@ model FacebookPageConnection {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Webhook Facebook tra theo pageId (1 trang có thể được subscribe từ webhook mà không biết
+  // userId nào sở hữu) — tách riêng khỏi unique userId ở trên.
+  @@index([pageId])
+}
+
+// Cache tin nhắn Messenger của từng fanpage — nguồn đọc CHÍNH cho /admin/hop-thu-facebook
+// (thay vì gọi Graph API mỗi lần xem, vừa chậm vừa dễ chạm rate limit). Được đổ dữ liệu bởi:
+// (1) Webhook Facebook đẩy tới khi khách nhắn tin (src/app/api/webhooks/facebook/route.ts),
+// (2) app tự ghi lại ngay khi seller gửi tin qua Send API, (3) đồng bộ lại từ Graph API lúc
+// mới kết nối trang hoặc bấm "Làm mới" (backfill lịch sử cũ, trước khi webhook được đăng ký).
+// `psid` (Page-Scoped ID của khách) đóng vai trò "id hội thoại" — 1 khách = 1 luồng chat với
+// trang, khớp cách listConversations() cũ từng gộp participants.
+model FacebookMessage {
+  id String @id // graph message id (mid) — dùng luôn làm khoá chính để tự khử trùng lặp khi webhook gửi lại
+
+  pageId    String
+  psid      String
+  direction FacebookMessageDirection
+  message   String
+  createdAt DateTime
+
+  @@index([pageId, psid, createdAt])
+}
+
+enum FacebookMessageDirection {
+  IN // khách gửi cho trang
+  OUT // trang (seller) gửi cho khách
+}
+
+// Cache tên + ảnh đại diện của khách theo từng trang — tránh gọi lại Graph API mỗi lần hiển
+// thị danh sách hội thoại (trước đây listConversations() gọi 1 lệnh Graph API riêng cho MỖI
+// người nhắn, rất tốn quota khi poll liên tục). updatedAt dùng để làm mới lại sau 1 khoảng
+// thời gian (tên/ảnh khách có thể đổi).
+model FacebookParticipant {
+  pageId String
+  psid   String
+
+  name      String?
+  avatarUrl String?
+  updatedAt DateTime @updatedAt
+
+  @@id([pageId, psid])
 }
 
 enum CreditTransactionType {

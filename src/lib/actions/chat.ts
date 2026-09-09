@@ -5,6 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/admin-guard";
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { broadcast } from "@/lib/realtime";
+
+// "chat-sessions": báo admin panel refresh danh sách phiên (có phiên mới hoặc phiên nào đó có
+// tin nhắn mới, cần cập nhật thứ tự/badge chưa đọc). "chat:<id>": báo đúng 2 phía đang xem
+// phiên đó (widget khách + panel admin) refresh tin nhắn — tách riêng để không phải tải lại
+// TOÀN BỘ danh sách phiên chỉ vì 1 tin nhắn ở 1 phiên cụ thể.
+async function notifyChatUpdate(sessionId: string): Promise<void> {
+  await Promise.all([broadcast("chat-sessions", "updated"), broadcast(`chat:${sessionId}`, "message")]);
+}
 
 export type ChatMessageDTO = {
   id: string;
@@ -54,6 +63,7 @@ export async function createChatSession(
     data: { visitorName: parsedName.data, visitorPhone: parsedPhone.data },
   });
 
+  await broadcast("chat-sessions", "updated");
   revalidatePath("/admin/chat");
   return {
     session: {
@@ -117,6 +127,7 @@ export async function sendVisitorMessage(
     prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } }),
   ]);
 
+  await notifyChatUpdate(sessionId);
   revalidatePath("/admin/chat");
   return {};
 }
@@ -138,6 +149,7 @@ export async function sendAdminMessage(
     prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } }),
   ]);
 
+  await notifyChatUpdate(sessionId);
   revalidatePath("/admin/chat");
   return {};
 }

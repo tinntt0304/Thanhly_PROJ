@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getFacebookConnectionStatus,
   selectFacebookPage,
@@ -10,10 +10,12 @@ import {
   sendFacebookMessage,
   listFacebookComments,
   replyFacebookComment,
+  syncFacebookInbox,
   type FacebookConnectionStatus,
 } from "@/lib/actions/facebook-inbox";
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
 import { formatDateTime } from "@/lib/auction";
+import { useRealtimeBroadcast } from "@/lib/realtime-client";
 
 function Avatar({ url, name, size = 40 }: { url: string | null; name: string | null; size?: number }) {
   if (url) {
@@ -120,10 +122,14 @@ function PagePicker({ pages, onSelected }: { pages: Array<{ id: string; name: st
   );
 }
 
-const MESSAGES_POLL_MS = 5000;
-const CONVERSATIONS_POLL_MS = 15000;
+// Realtime (Supabase Broadcast, xem useRealtimeBroadcast) là đường đi chính — poll ở đây chỉ
+// còn là lưới an toàn khi chưa cấu hình realtime hoặc kết nối bị rớt. Đọc cache DB (không còn
+// gọi Graph API trực tiếp mỗi lần, xem facebook-inbox-store.ts) nên rẻ, không cần giữ 5s/15s
+// như trước.
+const MESSAGES_POLL_MS = 20000;
+const CONVERSATIONS_POLL_MS = 20000;
 
-function MessengerTab() {
+function MessengerTab({ pageId }: { pageId: string }) {
   const [conversations, setConversations] = useState<FbConversation[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +140,7 @@ function MessengerTab() {
   const [sending, setSending] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Mở hội thoại nào cũng phải thấy ngay tin nhắn MỚI NHẤT (ở cuối danh sách) — mặc định
@@ -145,10 +152,14 @@ function MessengerTab() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  async function loadConversations() {
-    setLoading(true);
+  // Nút "Làm mới" — đồng bộ lại từ Graph API (phòng webhook rớt sự kiện/tin nhắn phát sinh
+  // trước khi kết nối) rồi mới đọc lại cache, khác với poll/realtime bên dưới (chỉ đọc cache,
+  // chạy thường xuyên hơn nên phải rẻ, không gọi Graph API mỗi lần).
+  async function handleManualSync() {
+    setSyncing(true);
     setLoadError(null);
-    const res = await listFacebookConversations();
+    const res = await syncFacebookInbox();
+    setSyncing(false);
     setLoading(false);
     if (res.error) {
       setLoadError(res.error);
@@ -157,9 +168,9 @@ function MessengerTab() {
     setConversations(res.items ?? []);
   }
 
-  // Poll danh sách hội thoại (giống AdminChatPanel) — khách nhắn mới trên Facebook phải tự
-  // hiện ra, không bắt seller reload cả trang mới thấy. 15s vì mỗi lần tải lại còn kéo theo
-  // ảnh đại diện từng người nhắn (nhiều lệnh gọi Graph API hơn 1 lệnh /messages đơn thuần).
+  // Poll danh sách hội thoại + realtime cùng gọi lại đúng 1 closure qua ref (xem giải thích
+  // chi tiết ở ChatWidget.tsx — tránh set nhầm state cũ khi effect đã bị dọn).
+  const pollConversationsRef = useRef<() => void>(() => {});
   useEffect(() => {
     let cancelled = false;
     async function poll() {
@@ -173,11 +184,13 @@ function MessengerTab() {
       setLoadError(null);
       setConversations(res.items ?? []);
     }
+    pollConversationsRef.current = poll;
     poll();
     const id = setInterval(poll, CONVERSATIONS_POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      pollConversationsRef.current = () => {};
     };
   }, []);
 
@@ -189,8 +202,12 @@ function MessengerTab() {
 
   // Poll tin nhắn của hội thoại đang mở — khách nhắn thêm trong lúc seller đang xem cũng phải
   // tự hiện ra, không cần chọn lại hội thoại hay reload trang.
+  const pollMessagesRef = useRef<() => void>(() => {});
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      pollMessagesRef.current = () => {};
+      return;
+    }
     const conversationId = selectedId;
     let cancelled = false;
     async function poll() {
@@ -203,13 +220,24 @@ function MessengerTab() {
       setMsgError(null);
       setMessages(res.items ?? []);
     }
+    pollMessagesRef.current = poll;
     poll();
     const id = setInterval(poll, MESSAGES_POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      pollMessagesRef.current = () => {};
     };
   }, [selectedId]);
+
+  // 1 kênh Broadcast riêng cho mỗi trang — khách nhắn mới (qua Webhook) hoặc seller vừa gửi
+  // (từ chính tab này hay 1 tab admin khác) đều bắn sự kiện vào đây, cập nhật cả danh sách và
+  // tin nhắn của hội thoại đang mở (nếu có) cùng lúc.
+  const triggerRefresh = useCallback(() => {
+    pollConversationsRef.current();
+    pollMessagesRef.current();
+  }, []);
+  useRealtimeBroadcast(`fb:${pageId}`, "message", triggerRefresh);
 
   const filteredConversations = conversations.filter((c) => {
     const q = search.trim().toLowerCase();
@@ -261,8 +289,13 @@ function MessengerTab() {
               <span className="flex-1 truncate text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 Hội thoại
               </span>
-              <button type="button" onClick={loadConversations} className="shrink-0 text-xs text-accent-600 underline">
-                Làm mới
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={syncing}
+                className="shrink-0 text-xs text-accent-600 underline disabled:opacity-50"
+              >
+                {syncing ? "Đang đồng bộ..." : "Làm mới"}
               </button>
             </>
           )}
@@ -531,7 +564,7 @@ export function FacebookInboxPanel({
     );
   }
 
-  if (!status.connected) {
+  if (!status.connected || !status.pageId) {
     return (
       <div className="flex flex-col gap-3">
         {initialError && <p className="max-w-lg text-sm text-red-600">{initialError}</p>}
@@ -582,7 +615,7 @@ export function FacebookInboxPanel({
         </button>
       </div>
 
-      {tab === "messenger" ? <MessengerTab /> : <CommentsTab />}
+      {tab === "messenger" ? <MessengerTab pageId={status.pageId} /> : <CommentsTab />}
     </div>
   );
 }

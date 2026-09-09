@@ -167,6 +167,62 @@ tính năng khác).
 Gửi tin nhắn Messenger chỉ thực hiện được trong vòng **24 giờ** kể từ tin nhắn cuối của
 khách (24-hour messaging window — chính sách của Meta, không phải giới hạn riêng của app).
 
+#### Realtime — khách nhắn tin thấy ngay, không cần reload
+
+Tin nhắn Messenger giờ **không** còn gọi trực tiếp Graph API mỗi lần xem trang — app tự cache
+lại vào DB (`FacebookMessage`/`FacebookParticipant`, xem `src/lib/facebook-inbox-store.ts`),
+đổ vào bởi Webhook Facebook (khách nhắn) và ghi trực tiếp lúc gửi (seller nhắn). Đọc trang chỉ
+đọc cache — nhanh, không tính vào rate limit Graph API. Có 2 phần cần cấu hình thêm để tin
+nhắn tự hiện realtime (không cấu hình vẫn dùng được, chỉ rơi về poll 20s):
+
+**1. Webhook Facebook (bắt buộc để có tin nhắn realtime từ khách):**
+
+1. Trên Meta App Dashboard, thêm sản phẩm **Webhooks** (khác với "Facebook Login" đã thêm ở
+   trên).
+2. Callback URL: `https://<domain>/api/webhooks/facebook` (domain production, KHÔNG dùng
+   localhost — Meta phải gọi được URL này từ internet).
+3. Verify Token: tự đặt 1 chuỗi bất kỳ (vd. tạo bằng `openssl rand -hex 20`), điền vào cả Meta
+   Dashboard và biến `FACEBOOK_WEBHOOK_VERIFY_TOKEN` ở `.env`/Vercel — 2 nơi phải khớp nhau
+   y hệt, Meta dùng để xác minh URL trước khi lưu (xem GET handler ở
+   `src/app/api/webhooks/facebook/route.ts`).
+4. Chọn object **Page**, subscribe field **messages** (không cần field nào khác cho tính năng
+   hiện tại).
+5. Sau khi lưu, seller kết nối fanpage như bình thường qua "Kết nối với Facebook" — app **tự
+   động** gọi `/{pageId}/subscribed_apps` để đăng ký trang đó nhận webhook, seller không cần
+   biết khái niệm webhook là gì. Nếu seller đã kết nối TRƯỚC KHI bạn thêm Webhook product ở
+   bước 1, họ cần "Đổi fanpage" (chạy lại OAuth) 1 lần để app gọi lại bước đăng ký này.
+
+`.env` cần thêm: `FACEBOOK_WEBHOOK_VERIFY_TOKEN` (chuỗi tự đặt ở bước 3 — chưa đặt thì GET
+handshake tự trả lỗi 403, Meta không lưu được Webhook URL, nhưng các tính năng khác không bị
+ảnh hưởng gì).
+
+Mọi request POST tới endpoint này được xác minh bằng chữ ký HMAC-SHA256 ký bởi
+`FACEBOOK_APP_SECRET` (header `X-Hub-Signature-256`, xem `verifyWebhookSignature` ở
+`src/lib/facebook-graph.ts`) — request giả mạo không có secret đúng bị từ chối ngay (401),
+không chạm được vào DB.
+
+**2. Supabase Realtime (đẩy tức thời tới trình duyệt đang mở trang — cả Hộp thư Facebook và
+Chat hỗ trợ nội bộ đều dùng chung cơ chế này, xem `src/lib/realtime.ts` +
+`src/lib/realtime-client.ts`):**
+
+`.env` cần thêm — lấy ở Supabase Dashboard → Project Settings → Data API (đã dùng Supabase cho
+Storage ảnh nên chỉ cần lấy thêm 2 giá trị public này, không cần tạo project mới):
+
+- `NEXT_PUBLIC_SUPABASE_URL` — thường giống `SUPABASE_URL` đã có, nhưng PHẢI khai báo lại với
+  tiền tố `NEXT_PUBLIC_` vì cần lộ ra trình duyệt (Next.js chỉ đưa vào bundle client các biến
+  có tiền tố này).
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — khoá "anon public" (KHÔNG phải service_role key đang dùng ở
+  server) — khoá này được thiết kế để lộ ra client, an toàn để commit vào bundle.
+
+Không đặt 2 biến này (hoặc thiếu `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` ở phía server) thì
+`broadcast()`/`useRealtimeBroadcast()` tự tắt êm (không throw, không log lỗi) — Chat hỗ trợ và
+Hộp thư Facebook vẫn hoạt động đầy đủ, chỉ rơi về polling 20s thay vì đẩy tức thời.
+
+Kênh Broadcast dùng ở đây KHÔNG mang nội dung tin nhắn thật (chỉ 1 "tiếng chuông" báo có thay
+đổi), client nhận được thì tự gọi lại Server Action đã kiểm tra quyền để lấy đúng dữ liệu — nên
+không cần cấu hình Row Level Security cho Realtime, không phụ thuộc vào việc app đang dùng
+NextAuth (không phải Supabase Auth).
+
 ### Quản lý đơn hàng + vận chuyển GHN (Giao Hàng Nhanh)
 
 Trang `/admin/orders` (mọi tài khoản đã đăng nhập, mỗi người chỉ thấy đơn của mình —
@@ -310,6 +366,14 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
   Hộp thư Facebook ở `/admin/hop-thu-facebook`. Nhớ thêm
   `https://thanhly-dau-gia-hifen.vercel.app/api/auth/facebook/callback` vào Valid OAuth
   Redirect URIs ở Meta App Dashboard.
+- `FACEBOOK_WEBHOOK_VERIFY_TOKEN` — để có tin nhắn Messenger realtime (không cần reload
+  trang), Webhook Callback URL ở Meta Dashboard phải trỏ về
+  `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/facebook`. Xem hướng dẫn đầy đủ ở
+  mục "Hộp thư Facebook" phía trên.
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — để có realtime (Hộp thư
+  Facebook + Chat hỗ trợ nội bộ) đẩy tức thời tới trình duyệt thay vì chỉ polling. Xem mục
+  "Realtime" phía trên. **Nhớ Redeploy sau khi thêm** — 2 biến `NEXT_PUBLIC_*` được nhúng vào
+  bundle lúc build, thêm env var mới không tự áp dụng cho lần build cũ.
 - `AUTH_SECRET` — **khác** giá trị dev, đã tạo mới bằng `openssl rand -base64 32` riêng
   cho production.
 - `NEXT_PUBLIC_SITE_URL` — **chưa cấu hình trên Vercel** (25/08/2026); code tự fallback

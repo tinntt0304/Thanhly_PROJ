@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChatSession,
   getChatMessages,
@@ -9,10 +9,13 @@ import {
   type ChatMessageDTO,
   type ChatSessionDTO,
 } from "@/lib/actions/chat";
+import { useRealtimeBroadcast } from "@/lib/realtime-client";
 
 const SESSION_KEY = "hifen_chat_session_id";
 const SEEN_KEY = "hifen_chat_last_seen";
-const POLL_MS = 5000;
+// Realtime (Supabase Broadcast) là đường đi chính — poll ở đây chỉ còn là lưới an toàn khi
+// chưa cấu hình realtime hoặc kết nối realtime bị rớt, nên giãn ra thay vì 5s như trước.
+const POLL_MS = 20000;
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
@@ -44,12 +47,20 @@ export function ChatWidget() {
     });
   }, []);
 
-  // Polling tin nhắn + trạng thái phiên (đóng/mở) khi đã có phiên — dùng session?.id
-  // (chuỗi ổn định) làm dependency thay vì cả object session, để việc cập nhật
-  // session.status bên trong poll() không làm effect tự khởi động lại liên tục.
-  const sessionId = session?.id;
+  // Polling (lưới an toàn) + realtime (đường đi chính, xem useRealtimeBroadcast bên dưới) đều
+  // phải chạy ĐÚNG logic tải tin nhắn này — giữ nó trong 1 ref để cả setInterval và sự kiện
+  // realtime cùng gọi lại đúng 1 closure có "cancelled" guard theo sessionId hiện tại, tránh
+  // tình huống đổi phiên giữa lúc 1 lần tải cũ chưa xong rồi ghi đè dữ liệu sai phiên.
+  const pollRef = useRef<() => void>(() => {});
+
+  // dùng session?.id (chuỗi ổn định) làm dependency thay vì cả object session, để việc cập
+  // nhật session.status bên trong poll() không làm effect tự khởi động lại liên tục.
+  const sessionId = session?.id ?? null;
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      pollRef.current = () => {};
+      return;
+    }
 
     let cancelled = false;
     async function poll() {
@@ -70,13 +81,20 @@ export function ChatWidget() {
       }
     }
 
+    pollRef.current = poll;
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
+      pollRef.current = () => {};
     };
   }, [sessionId, open]);
+
+  // Admin vừa trả lời (hoặc khách tự nhắn từ tab khác) thì widget này phải thấy NGAY, không
+  // chờ tới lượt poll 20s tiếp theo.
+  const triggerRefresh = useCallback(() => pollRef.current(), []);
+  useRealtimeBroadcast(sessionId, "message", triggerRefresh);
 
   function toggleOpen() {
     setOpen((prev) => {

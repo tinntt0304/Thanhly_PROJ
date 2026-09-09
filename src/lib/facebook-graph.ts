@@ -113,6 +113,15 @@ export async function listManagedPages(userAccessToken: string): Promise<Managed
   return data.data.map((p) => ({ id: p.id, name: p.name, accessToken: p.access_token }));
 }
 
+// Đăng ký trang nhận Webhook "messages" của App (xem src/app/api/webhooks/facebook/route.ts)
+// — bắt buộc thì mới có tin nhắn realtime, nếu không Facebook không tự đẩy sự kiện cho app.
+// Gọi tự động ngay sau khi seller chọn trang ở OAuth callback, seller không cần biết khái
+// niệm "webhook" là gì. Lỗi ở đây không nên chặn cả flow kết nối — trang vẫn dùng được (chỉ
+// mất phần realtime, còn nút "Làm mới"/backfill vẫn hoạt động), nên bọc try/catch ở nơi gọi.
+export async function subscribePageWebhook(pageId: string, pageAccessToken: string): Promise<void> {
+  await graphPost(`/${pageId}/subscribed_apps`, pageAccessToken, { subscribed_fields: "messages" });
+}
+
 export type FbConversation = {
   id: string;
   updatedAt: string;
@@ -152,6 +161,22 @@ async function getParticipantAvatar(psid: string, pageAccessToken: string): Prom
     return data.profile_pic ?? null;
   } catch {
     return null;
+  }
+}
+
+export type ParticipantProfile = { name: string | null; avatarUrl: string | null };
+
+// Webhook chỉ báo PSID của khách, không kèm tên/ảnh — dùng hàm này để tra tên+avatar 1 lần khi
+// gặp khách mới (cache lại ở FacebookParticipant, xem facebook-inbox.ts), tránh phải gọi lại
+// Graph API mỗi lần hiển thị.
+export async function fetchParticipantProfile(psid: string, pageAccessToken: string): Promise<ParticipantProfile> {
+  try {
+    const data = await graphFetch<{ name?: string; profile_pic?: string }>(`/${psid}`, pageAccessToken, {
+      fields: "name,profile_pic",
+    });
+    return { name: data.name ?? null, avatarUrl: data.profile_pic ?? null };
+  } catch {
+    return { name: null, avatarUrl: null };
   }
 }
 
@@ -247,17 +272,21 @@ export async function listMessages(conversationId: string, pageAccessToken: stri
 // participants ở listConversations, KHÔNG phải conversationId. Meta giới hạn: chỉ gửi được
 // trong vòng 24h kể từ tin nhắn cuối của khách (24-hour messaging window), ngoài khung giờ
 // đó Graph API tự trả lỗi rõ ràng — không có cách né ngoài dùng message tag hợp lệ.
+// Trả về message_id do Facebook cấp — dùng làm khoá chính khi ghi lại tin nhắn này vào cache
+// DB của app (FacebookMessage.id), để nếu về sau có bật thêm webhook field "messaging_echoes"
+// thì việc upsert theo id vẫn tự khử trùng lặp, không hiện 2 lần.
 export async function sendMessengerMessage(
   pageId: string,
   pageAccessToken: string,
   recipientPsid: string,
   text: string
-): Promise<void> {
-  await graphPost(`/${pageId}/messages`, pageAccessToken, {
+): Promise<string> {
+  const res = await graphPost<{ message_id: string }>(`/${pageId}/messages`, pageAccessToken, {
     recipient: JSON.stringify({ id: recipientPsid }),
     message: JSON.stringify({ text }),
     messaging_type: "RESPONSE",
   });
+  return res.message_id;
 }
 
 export type FbComment = {
@@ -313,4 +342,32 @@ export async function listRecentComments(pageId: string, pageAccessToken: string
 
 export async function replyToComment(commentId: string, pageAccessToken: string, text: string): Promise<void> {
   await graphPost(`/${commentId}/comments`, pageAccessToken, { message: text });
+}
+
+// --- Webhook realtime — xem src/app/api/webhooks/facebook/route.ts.
+
+// Xác minh handshake lúc đăng ký Webhook trên Meta App Dashboard (Meta gọi GET với 3 query
+// param này để kiểm tra server có đúng verify token đã cấu hình không, trước khi cho lưu URL).
+export function verifyWebhookChallenge(mode: string | null, token: string | null, challenge: string | null): string | null {
+  const expected = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN;
+  if (!expected || mode !== "subscribe" || token !== expected || !challenge) return null;
+  return challenge;
+}
+
+// Meta ký MỌI request webhook bằng HMAC-SHA256 của App Secret lên phần body gốc (chưa parse
+// JSON) — bắt buộc kiểm tra để chặn giả mạo request tới endpoint công khai này (ai cũng gọi
+// được URL nếu không xác minh signature). Dùng timingSafeEqual thay vì so sánh chuỗi thường
+// để không lộ thông tin qua thời gian so sánh (timing attack).
+export async function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+  if (!appSecret || !signatureHeader?.startsWith("sha256=")) return false;
+
+  const crypto = await import("crypto");
+  const expected = crypto.createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
+  const provided = signatureHeader.slice("sha256=".length);
+
+  const expectedBuf = Buffer.from(expected, "hex");
+  const providedBuf = Buffer.from(provided, "hex");
+  if (expectedBuf.length !== providedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, providedBuf);
 }
