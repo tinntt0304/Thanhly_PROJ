@@ -187,11 +187,18 @@ function MessengerTab() {
     setSending(false);
   }
 
+  // Trên di động không đủ chỗ cho 2 cột list+chat cạnh nhau như desktop — dùng kiểu
+  // "master-detail": chưa chọn hội thoại thì hiện danh sách full màn hình, chọn rồi thì ẩn
+  // danh sách, hiện khung chat full màn hình kèm nút quay lại (chỉ desktop sm+ mới hiện cả 2
+  // cột cùng lúc như trước).
+  const listPanelDisplay = selected ? "hidden sm:flex" : "flex";
+  const chatPanelDisplay = selected ? "flex" : "hidden sm:flex";
+
   return (
-    <div className="flex h-[600px] overflow-hidden rounded-lg border border-neutral-200 bg-surface">
+    <div className="flex h-[70vh] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-surface sm:h-[600px] sm:flex-row">
       <div
-        className={`flex shrink-0 flex-col overflow-y-auto border-r border-neutral-200 transition-[width] duration-150 ${
-          collapsed ? "w-16" : "w-80"
+        className={`${listPanelDisplay} shrink-0 flex-col overflow-y-auto border-neutral-200 border-b sm:border-b-0 sm:border-r transition-[width] duration-150 ${
+          collapsed ? "w-16" : "w-full sm:w-80"
         }`}
       >
         <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
@@ -199,7 +206,7 @@ function MessengerTab() {
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             title={collapsed ? "Mở rộng danh sách hội thoại" : "Thu gọn danh sách hội thoại"}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100"
+            className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 sm:flex"
           >
             <CollapseIcon collapsed={collapsed} />
           </button>
@@ -258,7 +265,7 @@ function MessengerTab() {
         )}
       </div>
 
-      <div className="flex flex-1 flex-col">
+      <div className={`${chatPanelDisplay} flex-1 flex-col`}>
         {!selected ? (
           <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
             Chọn 1 hội thoại để xem tin nhắn.
@@ -266,12 +273,23 @@ function MessengerTab() {
         ) : (
           <>
             <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                title="Quay lại danh sách hội thoại"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 sm:hidden"
+              >
+                <CollapseIcon collapsed={false} />
+              </button>
               <Avatar url={selected.avatarUrl} name={selected.participantName} size={32} />
               <p className="text-sm font-medium text-text">{selected.participantName ?? "Người dùng Facebook"}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {msgError && <p className="mb-2 text-sm text-red-600">{msgError}</p>}
-              <div className="flex flex-col gap-2">
+              {/* min-h-full + justify-end: hội thoại ít tin nhắn dồn về SÁT khung nhập liệu
+              (giống Messenger/Zalo thật), khoảng trắng dư ra nằm ở TRÊN chứ không phải khoảng
+              trống to đùng ngay phía trên nút Gửi. */}
+              <div className="flex min-h-full flex-col justify-end gap-2">
                 {messages.map((m) => (
                   <div
                     key={m.id}
