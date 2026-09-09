@@ -197,30 +197,49 @@ export async function listConversations(pageId: string, pageAccessToken: string)
 
 export type FbMessage = {
   id: string;
-  message: string | null;
+  message: string;
   fromId: string | null;
   fromName: string | null;
   createdAt: string;
 };
 
+// Tin nhắn sticker/ảnh/voice/video không có field "message" (rỗng) — nếu hiển thị thẳng sẽ ra
+// 1 bong bóng chat trống trơn, nhìn như khoảng trắng thừa giữa các tin nhắn có chữ. Gắn nhãn dễ
+// hiểu theo mime_type của tệp đính kèm để luôn có nội dung hiển thị được.
+function attachmentLabel(mimeType?: string): string {
+  if (mimeType?.startsWith("image/")) return "🖼️ Đã gửi hình ảnh";
+  if (mimeType?.startsWith("video/")) return "🎬 Đã gửi video";
+  if (mimeType?.startsWith("audio/")) return "🎤 Đã gửi tin nhắn thoại";
+  return "📎 Đã gửi tệp đính kèm (sticker/ảnh/voice) — mở Facebook để xem";
+}
+
 export async function listMessages(conversationId: string, pageAccessToken: string): Promise<FbMessage[]> {
   const data = await graphFetch<{
-    data: Array<{ id: string; message?: string; from?: { id: string; name?: string }; created_time: string }>;
+    data: Array<{
+      id: string;
+      message?: string;
+      from?: { id: string; name?: string };
+      created_time: string;
+      attachments?: { data: Array<{ mime_type?: string }> };
+    }>;
   }>(`/${conversationId}/messages`, pageAccessToken, {
-    fields: "message,from,created_time",
+    fields: "message,from,created_time,attachments{mime_type}",
     limit: "50",
   });
 
   // Graph API trả tin mới nhất trước — đảo lại để hiển thị theo thứ tự thời gian tăng dần
   // giống mọi khung chat khác trong app (ChatWidget/AdminChatPanel).
   return data.data
-    .map((m) => ({
-      id: m.id,
-      message: m.message ?? null,
-      fromId: m.from?.id ?? null,
-      fromName: m.from?.name ?? null,
-      createdAt: m.created_time,
-    }))
+    .map((m) => {
+      const text = m.message?.trim();
+      return {
+        id: m.id,
+        message: text ? text : attachmentLabel(m.attachments?.data?.[0]?.mime_type),
+        fromId: m.from?.id ?? null,
+        fromName: m.from?.name ?? null,
+        createdAt: m.created_time,
+      };
+    })
     .reverse();
 }
 
