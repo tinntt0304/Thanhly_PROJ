@@ -7,10 +7,17 @@ import type { NextConfig } from "next";
 // next/image tự resize/nén theo kích thước hiển thị thật.
 const supabaseHostname = process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).hostname : undefined;
 
-// Nguồn ảnh thật duy nhất ngoài chính domain của site — Supabase Storage. Không có domain
-// ảnh ngoài nào khác (kể cả icon/favicon đều tự host qua next/font, next/image), nên CSP
-// img-src chỉ cần liệt kê đúng 2 nguồn này.
-const imgSrc = ["'self'", "data:", supabaseHostname ? `https://${supabaseHostname}` : ""]
+// Nguồn ảnh ngoài site: Supabase Storage (ảnh sản phẩm) + CDN của Facebook (ảnh đại diện
+// người nhắn/bình luận ở tính năng Hộp thư Facebook, /admin/hop-thu-facebook) — 2 host CDN
+// của Facebook trả về URL ảnh động (scontent-*.fbcdn.net, platform-lookaside.fbsbx.com) nên
+// phải khai báo wildcard thay vì 1 hostname cố định.
+const imgSrc = [
+  "'self'",
+  "data:",
+  supabaseHostname ? `https://${supabaseHostname}` : "",
+  "https://*.fbcdn.net",
+  "https://platform-lookaside.fbsbx.com",
+]
   .filter(Boolean)
   .join(" ");
 

@@ -15,6 +15,52 @@ import {
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
 import { formatDateTime } from "@/lib/auction";
 
+function Avatar({ url, name, size = 40 }: { url: string | null; name: string | null; size?: number }) {
+  if (url) {
+    return (
+      // Ảnh đại diện lấy trực tiếp từ CDN của Facebook (host động, không khai báo hết được ở
+      // next/image remotePatterns) — CSP img-src đã whitelist riêng 2 host CDN này.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt={name ?? "Người dùng Facebook"}
+        referrerPolicy="no-referrer"
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  const initial = (name ?? "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full bg-accent-100 font-medium text-accent-700"
+      style={{ width: size, height: size, fontSize: Math.max(11, size * 0.4) }}
+    >
+      {initial}
+    </div>
+  );
+}
+
+function CollapseIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
+      <path
+        d={collapsed ? "M8 5l5 5-5 5" : "M12 5l-5 5 5 5"}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function formatShortTime(iso: string): string {
+  const date = new Date(iso);
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return sameDay
+    ? new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(date)
+    : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
 function ConnectButton() {
   return (
     <div className="flex max-w-lg flex-col gap-3 rounded-lg border border-neutral-200 p-4">
@@ -83,6 +129,8 @@ function MessengerTab() {
   const [msgError, setMsgError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function loadConversations() {
     setLoading(true);
@@ -117,6 +165,12 @@ function MessengerTab() {
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
+  const filteredConversations = conversations.filter((c) => {
+    const q = search.trim().toLowerCase();
+    if (q === "") return true;
+    return (c.participantName ?? "").toLowerCase().includes(q) || (c.snippet ?? "").toLowerCase().includes(q);
+  });
+
   async function handleSend() {
     if (!selected?.participantPsid || draft.trim() === "" || sending) return;
     setSending(true);
@@ -135,31 +189,70 @@ function MessengerTab() {
 
   return (
     <div className="flex h-[600px] overflow-hidden rounded-lg border border-neutral-200 bg-surface">
-      <div className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-neutral-200">
-        <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Hội thoại</span>
-          <button type="button" onClick={loadConversations} className="text-xs text-accent-600 underline">
-            Làm mới
+      <div
+        className={`flex shrink-0 flex-col overflow-y-auto border-r border-neutral-200 transition-[width] duration-150 ${
+          collapsed ? "w-16" : "w-80"
+        }`}
+      >
+        <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Mở rộng danh sách hội thoại" : "Thu gọn danh sách hội thoại"}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100"
+          >
+            <CollapseIcon collapsed={collapsed} />
           </button>
+          {!collapsed && (
+            <>
+              <span className="flex-1 truncate text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Hội thoại
+              </span>
+              <button type="button" onClick={loadConversations} className="shrink-0 text-xs text-accent-600 underline">
+                Làm mới
+              </button>
+            </>
+          )}
         </div>
+        {!collapsed && (
+          <div className="border-b border-neutral-100 px-3 py-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm kiếm hội thoại..."
+              className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+            />
+          </div>
+        )}
         {loading ? (
-          <p className="p-4 text-sm text-neutral-500">Đang tải...</p>
+          !collapsed && <p className="p-4 text-sm text-neutral-500">Đang tải...</p>
         ) : loadError ? (
-          <p className="p-4 text-sm text-red-600">{loadError}</p>
-        ) : conversations.length === 0 ? (
-          <p className="p-4 text-sm text-neutral-500">Chưa có hội thoại nào.</p>
+          !collapsed && <p className="p-4 text-sm text-red-600">{loadError}</p>
+        ) : filteredConversations.length === 0 ? (
+          !collapsed && <p className="p-4 text-sm text-neutral-500">Chưa có hội thoại nào.</p>
         ) : (
-          conversations.map((c) => (
+          filteredConversations.map((c) => (
             <button
               key={c.id}
               type="button"
               onClick={() => selectConversation(c.id)}
-              className={`flex flex-col gap-0.5 border-b border-neutral-100 px-3 py-2.5 text-left transition-colors hover:bg-neutral-50 ${
+              title={c.participantName ?? "Người dùng Facebook"}
+              className={`flex items-center gap-2.5 border-b border-neutral-100 px-3 py-2.5 text-left transition-colors hover:bg-neutral-50 ${
                 selectedId === c.id ? "bg-accent-100/50" : ""
-              }`}
+              } ${collapsed ? "justify-center" : ""}`}
             >
-              <span className="truncate text-sm font-medium text-text">{c.participantName ?? "Người dùng Facebook"}</span>
-              {c.snippet && <span className="truncate text-xs text-neutral-500">{c.snippet}</span>}
+              <Avatar url={c.avatarUrl} name={c.participantName} size={collapsed ? 32 : 40} />
+              {!collapsed && (
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium text-text">
+                      {c.participantName ?? "Người dùng Facebook"}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-neutral-400">{formatShortTime(c.updatedAt)}</span>
+                  </div>
+                  {c.snippet && <span className="truncate text-xs text-neutral-500">{c.snippet}</span>}
+                </div>
+              )}
             </button>
           ))
         )}
@@ -172,7 +265,8 @@ function MessengerTab() {
           </div>
         ) : (
           <>
-            <div className="border-b border-neutral-200 px-4 py-3">
+            <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">
+              <Avatar url={selected.avatarUrl} name={selected.participantName} size={32} />
               <p className="text-sm font-medium text-text">{selected.participantName ?? "Người dùng Facebook"}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -288,12 +382,17 @@ function CommentsTab() {
         <div className="flex flex-col gap-3">
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg border border-neutral-200 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-text">{c.fromName ?? "Người dùng Facebook"}</span>
-                <span className="text-xs text-neutral-400">{formatDateTime(new Date(c.createdAt))}</span>
+              <div className="flex items-start gap-2.5">
+                <Avatar url={c.avatarUrl} name={c.fromName} size={32} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium text-text">{c.fromName ?? "Người dùng Facebook"}</span>
+                    <span className="shrink-0 text-xs text-neutral-400">{formatDateTime(new Date(c.createdAt))}</span>
+                  </div>
+                  {c.postMessage && <p className="mt-0.5 truncate text-xs text-neutral-500">Bài đăng: {c.postMessage}</p>}
+                  <p className="mt-1 text-sm text-text">{c.message}</p>
+                </div>
               </div>
-              {c.postMessage && <p className="mt-0.5 truncate text-xs text-neutral-500">Bài đăng: {c.postMessage}</p>}
-              <p className="mt-1 text-sm text-text">{c.message}</p>
 
               {repliedIds.has(c.id) ? (
                 <p className="mt-2 text-xs text-accent-2-700">Đã trả lời.</p>

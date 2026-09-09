@@ -119,6 +119,7 @@ export type FbConversation = {
   snippet: string | null;
   participantName: string | null;
   participantPsid: string | null;
+  avatarUrl: string | null;
 };
 
 export type FbConversationListResponse = { data: FbConversation[] };
@@ -130,7 +131,7 @@ type RawConversation = {
   participants?: { data: Array<{ id: string; name?: string }> };
 };
 
-function mapConversation(pageId: string, c: RawConversation): FbConversation {
+function mapConversation(pageId: string, c: RawConversation): Omit<FbConversation, "avatarUrl"> {
   const other = c.participants?.data.find((p) => p.id !== pageId);
   return {
     id: c.id,
@@ -139,6 +140,19 @@ function mapConversation(pageId: string, c: RawConversation): FbConversation {
     participantName: other?.name ?? null,
     participantPsid: other?.id ?? null,
   };
+}
+
+// Conversations API không trả ảnh đại diện qua participants{} — cách chính thức để lấy avatar
+// của người nhắn (Page-scoped ID) là gọi riêng /{psid}?fields=profile_pic bằng Page Access
+// Token. Trả về null thay vì ném lỗi khi thất bại (vd. do giới hạn Advanced Access) để 1 avatar
+// lỗi không làm hỏng cả danh sách hội thoại.
+async function getParticipantAvatar(psid: string, pageAccessToken: string): Promise<string | null> {
+  try {
+    const data = await graphFetch<{ profile_pic?: string }>(`/${psid}`, pageAccessToken, { fields: "profile_pic" });
+    return data.profile_pic ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // participants trả về CẢ page lẫn người nhắn — lọc bỏ chính page để lấy đúng tên/PSID người
@@ -161,11 +175,24 @@ export async function listConversations(pageId: string, pageAccessToken: string)
     )
   );
 
-  const byId = new Map<string, FbConversation>();
+  const byId = new Map<string, Omit<FbConversation, "avatarUrl">>();
   for (const c of [...inbox.data, ...other.data]) {
     byId.set(c.id, mapConversation(pageId, c));
   }
-  return [...byId.values()].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const merged = [...byId.values()].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  const uniquePsids = [...new Set(merged.map((c) => c.participantPsid).filter((id): id is string => id !== null))];
+  const avatarEntries = await Promise.all(
+    uniquePsids.map(async (psid) => [psid, await getParticipantAvatar(psid, pageAccessToken)] as const)
+  );
+  const avatarByPsid = new Map(avatarEntries);
+
+  return merged.map((c) => ({
+    ...c,
+    avatarUrl: c.participantPsid ? (avatarByPsid.get(c.participantPsid) ?? null) : null,
+  }));
 }
 
 export type FbMessage = {
@@ -218,12 +245,15 @@ export type FbComment = {
   id: string;
   message: string;
   fromName: string | null;
+  avatarUrl: string | null;
   createdAt: string;
   postMessage: string | null;
 };
 
 // Lấy bình luận từ các bài đăng gần nhất của trang (thay vì phải chọn từng bài) — đủ dùng
-// cho việc theo dõi bình luận mới, không cần duyệt toàn bộ lịch sử bài đăng.
+// cho việc theo dõi bình luận mới, không cần duyệt toàn bộ lịch sử bài đăng. `from{picture}` lấy
+// luôn ảnh đại diện người bình luận — đây là dữ liệu công khai của bài đăng công khai (khác
+// với avatar người nhắn Messenger ở trên), không bị giới hạn bởi Advanced Access.
 export async function listRecentComments(pageId: string, pageAccessToken: string): Promise<FbComment[]> {
   const data = await graphFetch<{
     data: Array<{
@@ -231,11 +261,16 @@ export async function listRecentComments(pageId: string, pageAccessToken: string
       message?: string;
       created_time: string;
       comments?: {
-        data: Array<{ id: string; message: string; from?: { name?: string }; created_time: string }>;
+        data: Array<{
+          id: string;
+          message: string;
+          from?: { name?: string; picture?: { data?: { url?: string } } };
+          created_time: string;
+        }>;
       };
     }>;
   }>(`/${pageId}/feed`, pageAccessToken, {
-    fields: "message,created_time,comments{message,from,created_time}",
+    fields: "message,created_time,comments{message,from{name,picture},created_time}",
     limit: "20",
   });
 
@@ -246,6 +281,7 @@ export async function listRecentComments(pageId: string, pageAccessToken: string
         id: c.id,
         message: c.message,
         fromName: c.from?.name ?? null,
+        avatarUrl: c.from?.picture?.data?.url ?? null,
         createdAt: c.created_time,
         postMessage: post.message ?? null,
       });
