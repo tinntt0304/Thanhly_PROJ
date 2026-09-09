@@ -265,7 +265,7 @@ function MessengerTab() {
         )}
       </div>
 
-      <div className={`${chatPanelDisplay} flex-1 flex-col`}>
+      <div className={`${chatPanelDisplay} min-w-0 flex-1 flex-col`}>
         {!selected ? (
           <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
             Chọn 1 hội thoại để xem tin nhắn.
@@ -284,19 +284,23 @@ function MessengerTab() {
               <Avatar url={selected.avatarUrl} name={selected.participantName} size={32} />
               <p className="text-sm font-medium text-text">{selected.participantName ?? "Người dùng Facebook"}</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4">
               {msgError && <p className="mb-2 text-sm text-red-600">{msgError}</p>}
               {/* min-h-full + justify-end: hội thoại ít tin nhắn dồn về SÁT khung nhập liệu
               (giống Messenger/Zalo thật), khoảng trắng dư ra nằm ở TRÊN chứ không phải khoảng
               trống to đùng ngay phía trên nút Gửi. */}
-              <div className="flex min-h-full flex-col justify-end gap-2">
+              <div className="flex min-h-full min-w-0 flex-col justify-end gap-2">
                 {messages.map((m) => (
                   <div
                     key={m.id}
-                    className={`flex flex-col ${m.fromId && m.fromId !== selected.participantPsid ? "items-end" : "items-start"}`}
+                    className={`flex min-w-0 flex-col ${m.fromId && m.fromId !== selected.participantPsid ? "items-end" : "items-start"}`}
                   >
                     <div
-                      className={`max-w-[75%] rounded-lg px-3 py-1.5 text-sm ${
+                      // break-words: tin nhắn dạng URL/mã dài không có khoảng trắng (không có
+                      // điểm ngắt dòng tự nhiên) sẽ đội bong bóng chat rộng ra, đẩy cả khung
+                      // hội thoại tràn ngang phải cuộn ngang mới xem hết — bắt buộc ngắt dòng
+                      // dù giữa từ để luôn nằm gọn trong max-w-[75%].
+                      className={`max-w-[75%] min-w-0 break-words rounded-lg px-3 py-1.5 text-sm ${
                         m.fromId && m.fromId !== selected.participantPsid
                           ? "bg-accent-500 text-white"
                           : "bg-neutral-100 text-text"
@@ -320,7 +324,7 @@ function MessengerTab() {
                   }
                 }}
                 placeholder="Nhập phản hồi... (chỉ gửi được trong vòng 24h kể từ tin nhắn cuối của khách)"
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
               />
               <button
                 type="button"
@@ -408,7 +412,7 @@ function CommentsTab() {
                     <span className="shrink-0 text-xs text-neutral-400">{formatDateTime(new Date(c.createdAt))}</span>
                   </div>
                   {c.postMessage && <p className="mt-0.5 truncate text-xs text-neutral-500">Bài đăng: {c.postMessage}</p>}
-                  <p className="mt-1 text-sm text-text">{c.message}</p>
+                  <p className="mt-1 break-words text-sm text-text">{c.message}</p>
                 </div>
               </div>
 
