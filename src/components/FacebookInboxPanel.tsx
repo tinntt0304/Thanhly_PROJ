@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getFacebookConnectionStatus,
   selectFacebookPage,
@@ -131,6 +131,16 @@ function MessengerTab() {
   const [sending, setSending] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Mở hội thoại nào cũng phải thấy ngay tin nhắn MỚI NHẤT (ở cuối danh sách) — mặc định
+  // trình duyệt cuộn khung overflow về đầu (0), người dùng phải tự kéo xuống mới thấy tin mới.
+  // useLayoutEffect để nhảy xuống cuối trước khi vẽ khung hình, tránh nhoáng lên vị trí đầu
+  // hội thoại rồi mới nhảy xuống.
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   async function loadConversations() {
     setLoading(true);
@@ -284,7 +294,7 @@ function MessengerTab() {
               <Avatar url={selected.avatarUrl} name={selected.participantName} size={32} />
               <p className="text-sm font-medium text-text">{selected.participantName ?? "Người dùng Facebook"}</p>
             </div>
-            <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4">
+            <div ref={messagesContainerRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4">
               {msgError && <p className="mb-2 text-sm text-red-600">{msgError}</p>}
               {/* min-h-full + justify-end: hội thoại ít tin nhắn dồn về SÁT khung nhập liệu
               (giống Messenger/Zalo thật), khoảng trắng dư ra nằm ở TRÊN chứ không phải khoảng
