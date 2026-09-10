@@ -21,6 +21,17 @@ const imgSrc = [
   .filter(Boolean)
   .join(" ");
 
+// Trình duyệt kết nối REALTIME (WebSocket) thẳng tới Supabase để nhận broadcast (xem
+// src/lib/realtime-client.ts) — connect-src mặc định chỉ 'self' sẽ ÂM THẦM chặn kết nối
+// WebSocket này (CSP không throw lỗi JS bắt được, request chỉ đơn giản không bao giờ thành
+// công), khiến client tưởng như đã "bật realtime" nhưng thực chất chưa từng kết nối được lấy
+// nào cả, chỉ luôn rơi về polling — đã gặp thật (seller báo tin nhắn vẫn trễ ~15-20s dù đã
+// cấu hình đủ biến môi trường và tối ưu tốc độ gửi phía server). Phải khai báo cả https:// (để
+// polyfill/REST fallback của supabase-js) lẫn wss:// (kết nối WebSocket thật) cho đúng host.
+const connectSrc = ["'self'", supabaseHostname ? `https://${supabaseHostname}` : "", supabaseHostname ? `wss://${supabaseHostname}` : ""]
+  .filter(Boolean)
+  .join(" ");
+
 // Chặn nhúng iframe (clickjacking, đặc biệt nhắm /admin/login) + hạn chế nguồn ảnh/font/
 // connect chỉ còn chính site + Supabase Storage. script-src/style-src cần 'unsafe-inline':
 // đã thử script-src 'self' nghiêm ngặt (không nonce) và xác nhận bằng Playwright — Next.js
@@ -40,7 +51,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       `img-src ${imgSrc}`,
       "font-src 'self' data:",
-      "connect-src 'self'",
+      `connect-src ${connectSrc}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
