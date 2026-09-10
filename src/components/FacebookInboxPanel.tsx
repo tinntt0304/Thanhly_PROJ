@@ -234,15 +234,30 @@ function MessengerTab({ pageId }: { pageId: string }) {
     return (c.participantName ?? "").toLowerCase().includes(q) || (c.snippet ?? "").toLowerCase().includes(q);
   });
 
+  // Hiện ngay tin nhắn/ảnh vừa gửi trong lúc chờ Graph API (Send API) + ghi DB — 2 bước đó cộng
+  // lại mất vài giây, không hiện ngay thì seller thấy như bị "đứng" cho tới khi xong hết. Tin
+  // giả tạm này bị THAY THẾ HOÀN TOÀN bởi listFacebookMessages() thật ngay sau, nên không cần lo
+  // trùng hay lệch id với tin thật.
+  function appendOptimisticMessage(message: string, attachmentType: FbMessage["attachmentType"], attachmentUrl: string | null) {
+    const id = `optimistic-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id, message, fromId: "page", fromName: null, createdAt: new Date().toISOString(), attachmentType, attachmentUrl },
+    ]);
+    return id;
+  }
+
   async function handleSend() {
     if (!selected?.participantPsid || draft.trim() === "" || sending) return;
     setSending(true);
     const text = draft;
     setDraft("");
+    const optimisticId = appendOptimisticMessage(text, null, null);
     const res = await sendFacebookMessage(pageId, selected.participantPsid, text);
     if (res.error) {
       setMsgError(res.error);
       setDraft(text);
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     } else if (selectedId) {
       const msgs = await listFacebookMessages(pageId, selectedId);
       if (msgs.items) setMessages(msgs.items);
@@ -254,15 +269,19 @@ function MessengerTab({ pageId }: { pageId: string }) {
     if (!selected?.participantPsid || sendingImage) return;
     setSendingImage(true);
     setMsgError(null);
+    const previewUrl = URL.createObjectURL(file);
+    const optimisticId = appendOptimisticMessage("🖼️ Đã gửi hình ảnh", "IMAGE", previewUrl);
     const formData = new FormData();
     formData.append("image", file);
     const res = await sendFacebookImage(pageId, selected.participantPsid, formData);
     if (res.error) {
       setMsgError(res.error);
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     } else if (selectedId) {
       const msgs = await listFacebookMessages(pageId, selectedId);
       if (msgs.items) setMessages(msgs.items);
     }
+    URL.revokeObjectURL(previewUrl);
     setSendingImage(false);
   }
 
