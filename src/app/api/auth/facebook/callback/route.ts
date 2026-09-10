@@ -1,16 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import {
   GraphApiError,
   exchangeCodeForUserToken,
   exchangeForLongLivedToken,
   listManagedPages,
 } from "@/lib/facebook-graph";
+import { connectFacebookPage } from "@/lib/facebook-inbox-store";
 
 const STATE_COOKIE = "fb_oauth_state";
 const PAGES_COOKIE = "fb_oauth_pages";
-const RETURN_PATH = "/admin/hop-thu-facebook";
+// Cấu hình kết nối fanpage sống ở /admin/cai-dat (xem FacebookConnectionSettings.tsx) — trang
+// Hộp thư Facebook (/admin/hop-thu-facebook) giờ chỉ còn hiển thị hội thoại/bình luận.
+const RETURN_PATH = "/admin/cai-dat";
 
 function redirectWithError(request: Request, message: string) {
   const url = new URL(RETURN_PATH, request.url);
@@ -62,11 +64,7 @@ export async function GET(request: NextRequest) {
 
     if (pages.length === 1) {
       const page = pages[0];
-      await prisma.facebookPageConnection.upsert({
-        where: { userId: session.user.id },
-        create: { userId: session.user.id, pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
-        update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
-      });
+      await connectFacebookPage(session.user.id, page);
       const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_connected=1`, request.url));
       res.cookies.delete(STATE_COOKIE);
       return res;

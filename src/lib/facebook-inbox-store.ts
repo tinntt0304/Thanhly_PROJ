@@ -12,12 +12,36 @@ import {
   listConversations,
   listMessages,
   fetchParticipantProfile,
+  subscribePageWebhook,
   type FbConversation,
   type FbMessage,
   type FbAttachmentType,
+  type ManagedPage,
 } from "@/lib/facebook-graph";
 
 type AttachmentInput = { type: FbAttachmentType; url: string } | null;
+
+// Lưu kết nối fanpage + đăng ký webhook + backfill lịch sử cũ — dùng CHUNG cho cả 2 nơi seller
+// có thể kết nối: OAuth callback (tự kết nối luôn khi seller chỉ quản lý đúng 1 trang, xem
+// src/app/api/auth/facebook/callback/route.ts) VÀ màn chọn trang khi quản lý nhiều trang (xem
+// selectFacebookPage ở src/lib/actions/facebook-inbox.ts). Tách hàm chung để tránh lặp lại —
+// trước đây callback route tự upsert riêng, thiếu hẳn 2 bước subscribePageWebhook/backfill,
+// khiến seller chỉ có 1 trang (trường hợp phổ biến nhất) không bao giờ nhận được tin nhắn
+// realtime cho tới khi tự bấm "Đăng ký lại webhook".
+export async function connectFacebookPage(userId: string, page: ManagedPage): Promise<void> {
+  await prisma.facebookPageConnection.upsert({
+    where: { userId },
+    create: { userId, pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
+    update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
+  });
+
+  // Lỗi ở đây không nên chặn việc kết nối — seller vẫn dùng được (chỉ mất phần realtime/lịch
+  // sử cũ), có thể tự sửa lại sau qua nút "Đăng ký lại webhook"/"Làm mới" ở UI.
+  await Promise.all([
+    subscribePageWebhook(page.id, page.accessToken).catch(() => {}),
+    syncFacebookInboxFromGraphApi(page.id, page.accessToken).catch(() => {}),
+  ]);
+}
 
 export async function getCachedConversations(pageId: string): Promise<FbConversation[]> {
   // "Distinct + orderBy" của Prisma trả ĐÚNG 1 dòng mới nhất cho mỗi psid — cách chuẩn để lấy

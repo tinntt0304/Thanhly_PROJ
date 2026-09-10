@@ -5,7 +5,7 @@ import { FACEBOOK_OAUTH_SCOPES } from "@/lib/facebook-graph";
 
 const STATE_COOKIE = "fb_oauth_state";
 
-// Bấm "Kết nối với Facebook" ở /admin/hop-thu-facebook đi tới đây — sinh state chống CSRF,
+// Bấm "Kết nối với Facebook" ở /admin/cai-dat đi tới đây — sinh state chống CSRF,
 // lưu vào cookie httpOnly ngắn hạn, rồi điều hướng sang màn cấp quyền của Facebook cho đúng
 // Meta App của chủ sàn (FACEBOOK_APP_ID). redirect_uri tính TỪ chính request hiện tại (không
 // dùng NEXT_PUBLIC_SITE_URL cố định) để hoạt động đúng ở mọi môi trường (dev/preview/prod) —
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
   const appId = process.env.FACEBOOK_APP_ID;
   if (!appId) {
-    const url = new URL("/admin/hop-thu-facebook", request.url);
+    const url = new URL("/admin/cai-dat", request.url);
     url.searchParams.set("fb_error", "Chưa cấu hình FACEBOOK_APP_ID — liên hệ quản trị viên để hoàn tất thiết lập.");
     return NextResponse.redirect(url);
   }

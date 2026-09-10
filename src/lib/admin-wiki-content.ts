@@ -23,7 +23,8 @@ export type IconKey =
   | "star"
   | "chat"
   | "user"
-  | "inbox";
+  | "inbox"
+  | "settings";
 
 export type WikiFeature = {
   target: string;
@@ -173,11 +174,10 @@ export const ADMIN_WIKI: WikiSection[] = [
         title: "Hộp thư Facebook",
         description: "Xem và trả lời tin nhắn Messenger + bình luận từ fanpage của bạn ngay tại đây.",
         steps: [
-          "Lần đầu dùng: bấm Kết nối với Facebook, đăng nhập và cấp quyền cho đúng fanpage muốn quản lý.",
-          "Quản lý nhiều fanpage thì chọn đúng 1 trang muốn kết nối.",
+          "Lần đầu dùng: vào menu Cài đặt để kết nối fanpage trước (xem mục Cài đặt bên dưới).",
           "Chọn tab Tin nhắn Messenger hoặc Bình luận.",
           "Bấm vào 1 hội thoại để xem tin nhắn, hoặc trả lời trực tiếp dưới mỗi bình luận.",
-          "Nhập nội dung trả lời rồi bấm Gửi / Trả lời.",
+          "Nhập nội dung trả lời (hoặc bấm nút ảnh để gửi ảnh) rồi bấm Gửi / Trả lời.",
         ],
       },
     ],
@@ -247,6 +247,35 @@ export const ADMIN_WIKI: WikiSection[] = [
   {
     label: "Tài khoản",
     features: [
+      {
+        target: "settings",
+        href: "/admin/cai-dat",
+        icon: "settings",
+        title: "Cài đặt",
+        description: "Kết nối fanpage Facebook để dùng ở Hộp thư Facebook.",
+        steps: [
+          "Bấm Kết nối với Facebook, đăng nhập và cấp quyền cho đúng fanpage muốn quản lý.",
+          "Quản lý nhiều fanpage thì chọn đúng 1 trang muốn kết nối.",
+          "Đã kết nối rồi thì có thể bấm Đổi fanpage (chọn trang khác) hoặc Ngắt kết nối bất kỳ lúc nào.",
+        ],
+        buttons: [
+          {
+            target: "settings-connect",
+            title: "Nút Kết nối với Facebook",
+            description: "Bấm để chuyển sang Facebook cấp quyền cho fanpage muốn quản lý.",
+          },
+          {
+            target: "settings-switch",
+            title: "Đổi fanpage",
+            description: "Bấm để chọn kết nối sang 1 fanpage khác.",
+          },
+          {
+            target: "settings-disconnect",
+            title: "Ngắt kết nối",
+            description: "Bấm để ngắt kết nối fanpage hiện tại.",
+          },
+        ],
+      },
       {
         target: "account",
         href: "/admin/account",

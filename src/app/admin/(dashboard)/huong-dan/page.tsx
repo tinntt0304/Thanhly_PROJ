@@ -14,6 +14,7 @@ import {
   ChatIcon,
   UserIcon,
   InboxIcon,
+  SettingsIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
@@ -28,6 +29,7 @@ const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
   chat: ChatIcon,
   user: UserIcon,
   inbox: InboxIcon,
+  settings: SettingsIcon,
 };
 
 export default async function AdminWikiPage() {

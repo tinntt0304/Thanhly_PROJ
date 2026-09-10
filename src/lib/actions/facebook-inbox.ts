@@ -18,11 +18,24 @@ import {
   type FbComment,
   type ManagedPage,
 } from "@/lib/facebook-graph";
-import { getCachedConversations, getCachedMessages, syncFacebookInboxFromGraphApi } from "@/lib/facebook-inbox-store";
+import {
+  getCachedConversations,
+  getCachedMessages,
+  syncFacebookInboxFromGraphApi,
+  connectFacebookPage,
+} from "@/lib/facebook-inbox-store";
 import { uploadFacebookAttachmentImage } from "@/lib/storage";
 
-const WIKI_PATH = "/admin/hop-thu-facebook";
+const INBOX_PATH = "/admin/hop-thu-facebook";
+const SETTINGS_PATH = "/admin/cai-dat";
 const PAGES_COOKIE = "fb_oauth_pages";
+
+// Kết nối/ngắt kết nối làm thay đổi dữ liệu hiển thị ở CẢ 2 trang: /admin/cai-dat (trạng thái
+// kết nối) và /admin/hop-thu-facebook (pageId dùng để tải hội thoại) — revalidate cả 2.
+function revalidateFacebookPaths() {
+  revalidatePath(SETTINGS_PATH);
+  revalidatePath(INBOX_PATH);
+}
 
 function fbChannel(pageId: string): string {
   return `fb:${pageId}`;
@@ -90,29 +103,17 @@ export async function selectFacebookPage(pageId: string): Promise<{ success?: tr
   const page = pages.find((p) => p.id === pageId);
   if (!page) return { error: "Không tìm thấy fanpage đã chọn, vui lòng kết nối lại." };
 
-  await prisma.facebookPageConnection.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
-    update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
-  });
-
-  // Đăng ký nhận Webhook (realtime) — lỗi ở đây không chặn kết nối, seller vẫn dùng được qua
-  // nút "Làm mới" (backfill), chỉ mất phần tin nhắn tự hiện ra. Chạy song song với backfill
-  // lịch sử cũ vào cache, vì đây là 2 việc độc lập.
-  await Promise.all([
-    subscribePageWebhook(page.id, page.accessToken).catch(() => {}),
-    syncFacebookInboxFromGraphApi(page.id, page.accessToken).catch(() => {}),
-  ]);
+  await connectFacebookPage(session.user.id, page);
 
   cookieStore.delete(PAGES_COOKIE);
-  revalidatePath(WIKI_PATH);
+  revalidateFacebookPaths();
   return { success: true };
 }
 
 export async function disconnectFacebookPage(): Promise<void> {
   const session = await requireAdmin();
   await prisma.facebookPageConnection.deleteMany({ where: { userId: session.user.id } });
-  revalidatePath(WIKI_PATH);
+  revalidateFacebookPaths();
 }
 
 // userId luôn lấy từ session hiện tại (không nhận tham số) — ranh giới sở hữu tự nhiên, 1

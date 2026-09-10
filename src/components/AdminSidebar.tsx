@@ -20,6 +20,7 @@ import {
   HelpIcon,
   UserIcon,
   InboxIcon,
+  SettingsIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const SIDEBAR_COLLAPSED_KEY = "admin_sidebar_collapsed";
@@ -173,6 +174,10 @@ export function AdminSidebar({
 
       <div className="mt-auto flex flex-col gap-2 border-t border-neutral-200 px-3 py-3">
         <NavLink item={{ href: "/admin/huong-dan", label: "Hướng dẫn sử dụng", icon: <HelpIcon /> }} collapsed={collapsed} />
+        <NavLink
+          item={{ href: "/admin/cai-dat", label: "Cài đặt", icon: <SettingsIcon />, tourId: "settings" }}
+          collapsed={collapsed}
+        />
         <NavLink
           item={{ href: "/admin/account", label: "Tài khoản của tôi", icon: <UserIcon />, tourId: "account" }}
           collapsed={collapsed}
