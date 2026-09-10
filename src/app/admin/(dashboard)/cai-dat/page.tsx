@@ -7,6 +7,7 @@ export default async function AdminSettingsPage({ searchParams }: PageProps<"/ad
   const sp = await searchParams;
   const fbError = typeof sp.fb_error === "string" ? sp.fb_error : undefined;
   const fbInfo = typeof sp.fb_info === "string" ? sp.fb_info : undefined;
+  const fbTotal = typeof sp.fb_total === "string" ? Number(sp.fb_total) : undefined;
   const showPicker = sp.fb_pick === "1";
   const pendingPages = showPicker ? await getPendingFacebookPages() : [];
 
@@ -28,7 +29,12 @@ export default async function AdminSettingsPage({ searchParams }: PageProps<"/ad
             <span className="font-medium">Hộp thư Facebook</span> — không cần mở Facebook.
           </p>
         </div>
-        <FacebookConnectionSettings initialError={fbError} initialInfo={fbInfo} pendingPages={pendingPages} />
+        <FacebookConnectionSettings
+          initialError={fbError}
+          initialInfo={fbInfo}
+          fbTotal={fbTotal}
+          pendingPages={pendingPages}
+        />
       </section>
     </div>
   );

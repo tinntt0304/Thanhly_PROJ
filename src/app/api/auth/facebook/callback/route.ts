@@ -74,14 +74,18 @@ export async function GET(request: NextRequest) {
     const newPages = allPages.filter((p) => !connectedIds.has(p.id));
 
     if (newPages.length === 0) {
-      const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_info=all_connected`, request.url));
+      const url = new URL(`${RETURN_PATH}?fb_info=all_connected`, request.url);
+      url.searchParams.set("fb_total", String(allPages.length));
+      const res = NextResponse.redirect(url);
       res.cookies.delete(STATE_COOKIE);
       return res;
     }
 
     if (newPages.length === 1) {
       await connectFacebookPage(session.user.id, newPages[0]);
-      const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_connected=1`, request.url));
+      const url = new URL(`${RETURN_PATH}?fb_connected=1`, request.url);
+      url.searchParams.set("fb_total", String(allPages.length));
+      const res = NextResponse.redirect(url);
       res.cookies.delete(STATE_COOKIE);
       return res;
     }
@@ -89,7 +93,12 @@ export async function GET(request: NextRequest) {
     // Nhiều trang mới — tạm lưu để trang hiện danh sách cho seller chọn (chọn được nhiều).
     // Cookie chứa Page Access Token thật (nhạy cảm) nên httpOnly + Secure (production) + TTL
     // ngắn, xoá ngay sau khi seller bấm "Xong" (xem clearPendingFacebookPages).
-    const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_pick=1`, request.url));
+    // fb_total = tổng số trang Graph API /me/accounts trả về (không lọc) — hiện ra để seller tự
+    // đối chiếu với số fanpage thật mình quản lý, phát hiện ngay nếu Facebook chỉ cấp quyền một
+    // phần (thường do app chưa qua App Review / Business Verification, không phải lỗi ở app).
+    const pickUrl = new URL(`${RETURN_PATH}?fb_pick=1`, request.url);
+    pickUrl.searchParams.set("fb_total", String(allPages.length));
+    const res = NextResponse.redirect(pickUrl);
     res.cookies.set(PAGES_COOKIE, JSON.stringify(newPages), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

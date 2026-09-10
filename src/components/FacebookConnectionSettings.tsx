@@ -184,10 +184,12 @@ function ConnectionRow({
 export function FacebookConnectionSettings({
   initialError,
   initialInfo,
+  fbTotal,
   pendingPages,
 }: {
   initialError?: string;
   initialInfo?: string;
+  fbTotal?: number;
   pendingPages: Array<{ id: string; name: string }>;
 }) {
   const [connections, setConnections] = useState<FacebookPageConnectionInfo[] | null>(null);
@@ -204,15 +206,30 @@ export function FacebookConnectionSettings({
 
   if (connections === null) return <p className="text-sm text-neutral-500">Đang tải...</p>;
 
+  // fbTotal = tổng số fanpage Facebook trả về cho tài khoản này (GHI RÕ ra để seller tự đối
+  // chiếu với số fanpage thật mình quản lý) — nếu số này ít hơn thực tế, thường do app chưa qua
+  // App Review/Business Verification nên Facebook chỉ cấp quyền một phần, KHÔNG phải lỗi ở đây.
+  const totalHint =
+    fbTotal !== undefined ? (
+      <p className="text-xs text-neutral-500">
+        Facebook trả về {fbTotal} fanpage bạn quản lý. Thiếu trang nào so với thực tế thì cần vào Meta App
+        Dashboard kiểm tra quyền pages_show_list/pages_messaging cho trang đó (thường do app chưa qua App
+        Review hoặc trang chưa được thêm vào Business Portfolio của app).
+      </p>
+    ) : null;
+
   if (showPicker) {
     return (
-      <PagePicker
-        pages={pendingPages}
-        onDone={() => {
-          setShowPicker(false);
-          refresh();
-        }}
-      />
+      <div className="flex flex-col gap-3">
+        {totalHint}
+        <PagePicker
+          pages={pendingPages}
+          onDone={() => {
+            setShowPicker(false);
+            refresh();
+          }}
+        />
+      </div>
     );
   }
 
@@ -220,7 +237,10 @@ export function FacebookConnectionSettings({
     <div className="flex flex-col gap-3">
       {initialError && <p className="text-sm text-red-600">{initialError}</p>}
       {initialInfo === "all_connected" && (
-        <p className="text-sm text-neutral-600">Bạn đã kết nối hết các fanpage mình quản lý, không có trang mới để thêm.</p>
+        <>
+          <p className="text-sm text-neutral-600">Bạn đã kết nối hết các fanpage mình quản lý, không có trang mới để thêm.</p>
+          {totalHint}
+        </>
       )}
 
       {connections.length > 0 && (
