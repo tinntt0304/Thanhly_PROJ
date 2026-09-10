@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  getFacebookConnectionStatus,
+  listFacebookPageConnections,
   listFacebookConversations,
   listFacebookMessages,
   sendFacebookMessage,
@@ -11,7 +11,7 @@ import {
   replyFacebookComment,
   syncFacebookInbox,
   sendFacebookImage,
-  type FacebookConnectionStatus,
+  type FacebookPageConnectionInfo,
 } from "@/lib/actions/facebook-inbox";
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
 import { formatDateTime } from "@/lib/auction";
@@ -147,7 +147,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
   async function handleManualSync() {
     setSyncing(true);
     setLoadError(null);
-    const res = await syncFacebookInbox();
+    const res = await syncFacebookInbox(pageId);
     setSyncing(false);
     setLoading(false);
     if (res.error) {
@@ -163,7 +163,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
   useEffect(() => {
     let cancelled = false;
     async function poll() {
-      const res = await listFacebookConversations();
+      const res = await listFacebookConversations(pageId);
       if (cancelled) return;
       setLoading(false);
       if (res.error) {
@@ -181,7 +181,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
       clearInterval(id);
       pollConversationsRef.current = () => {};
     };
-  }, []);
+  }, [pageId]);
 
   function selectConversation(id: string) {
     setSelectedId(id);
@@ -200,7 +200,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
     const conversationId = selectedId;
     let cancelled = false;
     async function poll() {
-      const res = await listFacebookMessages(conversationId);
+      const res = await listFacebookMessages(pageId, conversationId);
       if (cancelled) return;
       if (res.error) {
         setMsgError(res.error);
@@ -217,7 +217,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
       clearInterval(id);
       pollMessagesRef.current = () => {};
     };
-  }, [selectedId]);
+  }, [pageId, selectedId]);
 
   // 1 kênh Broadcast riêng cho mỗi trang — khách nhắn mới (qua Webhook) hoặc seller vừa gửi
   // (từ chính tab này hay 1 tab admin khác) đều bắn sự kiện vào đây, cập nhật cả danh sách và
@@ -239,12 +239,12 @@ function MessengerTab({ pageId }: { pageId: string }) {
     setSending(true);
     const text = draft;
     setDraft("");
-    const res = await sendFacebookMessage(selected.participantPsid, text);
+    const res = await sendFacebookMessage(pageId, selected.participantPsid, text);
     if (res.error) {
       setMsgError(res.error);
       setDraft(text);
     } else if (selectedId) {
-      const msgs = await listFacebookMessages(selectedId);
+      const msgs = await listFacebookMessages(pageId, selectedId);
       if (msgs.items) setMessages(msgs.items);
     }
     setSending(false);
@@ -256,11 +256,11 @@ function MessengerTab({ pageId }: { pageId: string }) {
     setMsgError(null);
     const formData = new FormData();
     formData.append("image", file);
-    const res = await sendFacebookImage(selected.participantPsid, formData);
+    const res = await sendFacebookImage(pageId, selected.participantPsid, formData);
     if (res.error) {
       setMsgError(res.error);
     } else if (selectedId) {
-      const msgs = await listFacebookMessages(selectedId);
+      const msgs = await listFacebookMessages(pageId, selectedId);
       if (msgs.items) setMessages(msgs.items);
     }
     setSendingImage(false);
@@ -465,7 +465,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
   );
 }
 
-function CommentsTab() {
+function CommentsTab({ pageId }: { pageId: string }) {
   const [comments, setComments] = useState<FbComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -477,7 +477,7 @@ function CommentsTab() {
   async function loadComments() {
     setLoading(true);
     setLoadError(null);
-    const res = await listFacebookComments();
+    const res = await listFacebookComments(pageId);
     setLoading(false);
     if (res.error) {
       setLoadError(res.error);
@@ -489,6 +489,9 @@ function CommentsTab() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- setState nằm sau await trong loadComments(), không đồng bộ
     loadComments();
+    // pageId không đổi trong 1 lần mount — FacebookInboxPanel dùng key={pageId} để tự remount
+    // hẳn component này mỗi khi đổi tab fanpage, nên [] (chạy 1 lần lúc mount) là đủ đúng.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleReply(commentId: string) {
@@ -496,7 +499,7 @@ function CommentsTab() {
     if (text === "" || replyingId) return;
     setReplyingId(commentId);
     setReplyError(null);
-    const res = await replyFacebookComment(commentId, text);
+    const res = await replyFacebookComment(pageId, commentId, text);
     setReplyingId(null);
     if (res.error) {
       setReplyError(res.error);
@@ -570,18 +573,26 @@ function CommentsTab() {
 
 // Cấu hình kết nối fanpage (connect/đổi/ngắt kết nối) sống ở /admin/cai-dat
 // (FacebookConnectionSettings.tsx) — component này giờ chỉ còn hiển thị hội thoại/bình luận
-// của fanpage đã kết nối, đơn giản hơn để tập trung đúng việc "dùng hàng ngày".
+// của các fanpage đã kết nối, đơn giản hơn để tập trung đúng việc "dùng hàng ngày".
+//
+// 1 seller có thể kết nối NHIỀU fanpage — khi đó hiện thêm 1 dải tab chọn đúng fanpage đang
+// xem (giống Messenger thật khi quản lý nhiều Page), mỗi fanpage có hội thoại/bình luận HOÀN
+// TOÀN riêng, không gộp chung 1 danh sách.
 export function FacebookInboxPanel() {
-  const [status, setStatus] = useState<FacebookConnectionStatus | null>(null);
+  const [connections, setConnections] = useState<FacebookPageConnectionInfo[] | null>(null);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
   const [tab, setTab] = useState<"messenger" | "comments">("messenger");
 
   useEffect(() => {
-    getFacebookConnectionStatus().then(setStatus);
+    listFacebookPageConnections().then((list) => {
+      setConnections(list);
+      setActivePageId((prev) => prev ?? list[0]?.pageId ?? null);
+    });
   }, []);
 
-  if (!status) return <p className="text-sm text-neutral-500">Đang tải...</p>;
+  if (!connections) return <p className="text-sm text-neutral-500">Đang tải...</p>;
 
-  if (!status.connected || !status.pageId) {
+  if (connections.length === 0) {
     return (
       <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4">
         <p className="text-sm text-neutral-700">Chưa kết nối fanpage nào.</p>
@@ -595,13 +606,35 @@ export function FacebookInboxPanel() {
     );
   }
 
+  const active = connections.find((c) => c.pageId === activePageId) ?? connections[0];
+
   return (
     <div className="flex flex-col gap-4">
-      {status.webhookSubscribed === false && (
+      {connections.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {connections.map((c) => (
+            <button
+              key={c.pageId}
+              type="button"
+              onClick={() => setActivePageId(c.pageId)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                active.pageId === c.pageId
+                  ? "bg-accent-500 text-white"
+                  : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+              }`}
+            >
+              {c.pageName ?? c.pageId}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!active.webhookSubscribed && (
         <div className="flex flex-col gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            ⚠️ Trang chưa đăng ký nhận Webhook — tin nhắn khách gửi sẽ{" "}
-            <span className="font-medium">không tự hiện ra</span>, phải bấm &quot;Làm mới&quot; mới thấy.
+            ⚠️ Trang <span className="font-medium">{active.pageName ?? active.pageId}</span> chưa đăng ký nhận
+            Webhook — tin nhắn khách gửi sẽ <span className="font-medium">không tự hiện ra</span>, phải bấm
+            &quot;Làm mới&quot; mới thấy.
           </p>
           <Link href="/admin/cai-dat" className="shrink-0 text-xs font-medium text-red-700 underline">
             Sửa ở Cài đặt →
@@ -630,7 +663,13 @@ export function FacebookInboxPanel() {
         </button>
       </div>
 
-      {tab === "messenger" ? <MessengerTab pageId={status.pageId} /> : <CommentsTab />}
+      {/* key={active.pageId}: đổi tab fanpage thì tạo lại component từ đầu, tránh lẫn state
+      (hội thoại đang chọn, ô tìm kiếm...) của fanpage cũ sang fanpage mới. */}
+      {tab === "messenger" ? (
+        <MessengerTab key={active.pageId} pageId={active.pageId} />
+      ) : (
+        <CommentsTab key={active.pageId} pageId={active.pageId} />
+      )}
     </div>
   );
 }

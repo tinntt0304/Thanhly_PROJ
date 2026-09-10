@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import {
   GraphApiError,
   exchangeCodeForUserToken,
@@ -24,9 +25,12 @@ function redirectWithError(request: Request, message: string) {
 
 // Facebook redirect về đây sau khi seller cấp quyền (hoặc từ chối) ở màn OAuth. Đổi code lấy
 // user access token -> đổi tiếp lấy bản dài hạn -> gọi /me/accounts lấy danh sách fanpage +
-// Page Access Token của từng trang. 1 trang thì tự kết nối luôn; nhiều trang thì tạm lưu
-// (cookie httpOnly ngắn hạn) để trang /admin/hop-thu-facebook hiện danh sách cho seller chọn
-// (xem selectFacebookPage ở lib/actions/facebook-inbox.ts).
+// Page Access Token của từng trang -> LỌC BỎ những trang seller đã kết nối rồi (seller có thể
+// chạy lại OAuth nhiều lần để THÊM fanpage mới, không phải chỉ để thay 1 fanpage duy nhất
+// nữa — xem FacebookPageConnection ở schema.prisma, 1 seller giờ kết nối được nhiều trang).
+// Còn đúng 1 trang MỚI thì tự kết nối luôn; nhiều trang mới thì tạm lưu (cookie httpOnly ngắn
+// hạn) để /admin/cai-dat hiện danh sách cho seller chọn (hỗ trợ chọn nhiều, xem
+// selectFacebookPage ở lib/actions/facebook-inbox.ts).
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) {
@@ -53,28 +57,40 @@ export async function GET(request: NextRequest) {
   try {
     const shortLivedToken = await exchangeCodeForUserToken(code, redirectUri);
     const userToken = await exchangeForLongLivedToken(shortLivedToken);
-    const pages = await listManagedPages(userToken);
+    const allPages = await listManagedPages(userToken);
 
-    if (pages.length === 0) {
+    if (allPages.length === 0) {
       return redirectWithError(
         request,
         "Không tìm thấy fanpage nào bạn quản lý, hoặc chưa cấp đủ quyền pages_show_list."
       );
     }
 
-    if (pages.length === 1) {
-      const page = pages[0];
-      await connectFacebookPage(session.user.id, page);
+    const alreadyConnected = await prisma.facebookPageConnection.findMany({
+      where: { userId: session.user.id },
+      select: { pageId: true },
+    });
+    const connectedIds = new Set(alreadyConnected.map((c) => c.pageId));
+    const newPages = allPages.filter((p) => !connectedIds.has(p.id));
+
+    if (newPages.length === 0) {
+      const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_info=all_connected`, request.url));
+      res.cookies.delete(STATE_COOKIE);
+      return res;
+    }
+
+    if (newPages.length === 1) {
+      await connectFacebookPage(session.user.id, newPages[0]);
       const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_connected=1`, request.url));
       res.cookies.delete(STATE_COOKIE);
       return res;
     }
 
-    // Nhiều trang — tạm lưu để trang hiện danh sách cho seller chọn. Cookie chứa Page Access
-    // Token thật (nhạy cảm) nên httpOnly + Secure (production) + TTL ngắn, xoá ngay sau khi
-    // chọn xong (xem selectFacebookPage).
+    // Nhiều trang mới — tạm lưu để trang hiện danh sách cho seller chọn (chọn được nhiều).
+    // Cookie chứa Page Access Token thật (nhạy cảm) nên httpOnly + Secure (production) + TTL
+    // ngắn, xoá ngay sau khi seller bấm "Xong" (xem clearPendingFacebookPages).
     const res = NextResponse.redirect(new URL(`${RETURN_PATH}?fb_pick=1`, request.url));
-    res.cookies.set(PAGES_COOKIE, JSON.stringify(pages), {
+    res.cookies.set(PAGES_COOKIE, JSON.stringify(newPages), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

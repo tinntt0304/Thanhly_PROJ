@@ -61,7 +61,7 @@ model User {
   cartItems              CartItem[]
   phoneReports           PhoneReport[]
   emailOtp               EmailOtp?
-  facebookPageConnection FacebookPageConnection?
+  facebookPageConnections FacebookPageConnection[]
 }
 
 // 1 OTP đang hiệu lực/user (unique userId — tạo OTP mới thì ghi đè, không cộng dồn nhiều
@@ -396,27 +396,31 @@ model FacebookKeywordSearch {
   @@index([userId, keyword, searchedAt])
 }
 
-// Kết nối fanpage Facebook của 1 seller (1-1 với User, giống EmailOtp) — dùng để lấy hội
-// thoại Messenger + bình luận bài đăng, trả lời trực tiếp từ /admin/hop-thu-facebook qua Meta
-// Graph API. Seller cấp quyền qua flow OAuth "Kết nối với Facebook" cho Meta App của chủ sàn
-// (xem src/app/api/auth/facebook/{start,callback}/route.ts) — Page Access Token suy ra từ đó,
+// Kết nối fanpage Facebook của 1 seller — 1 SELLER CÓ THỂ KẾT NỐI NHIỀU FANPAGE (1-nhiều,
+// không còn 1-1 như trước), dùng để lấy hội thoại Messenger + bình luận bài đăng, trả lời
+// trực tiếp từ /admin/hop-thu-facebook qua Meta Graph API. Seller cấp quyền qua flow OAuth
+// "Kết nối với Facebook" cho Meta App của chủ sàn (xem
+// src/app/api/auth/facebook/{start,callback}/route.ts) — Page Access Token suy ra từ đó,
 // không phải tự dán tay. Token chỉ đọc/dùng ở server (Server Actions qua requireAdmin() +
-// kiểm tra đúng chủ sở hữu), không bao giờ trả về client.
+// kiểm tra đúng chủ sở hữu theo pageId), không bao giờ trả về client.
+//
+// pageId unique TOÀN HỆ THỐNG (không chỉ trong phạm vi 1 user) — 1 fanpage thật ngoài đời chỉ
+// nên do đúng 1 tài khoản trên sàn quản lý, tránh tình huống 2 seller cùng "sở hữu" 1 trang
+// khiến Webhook (tra thẳng theo pageId, không biết trước userId) không rõ nên gán tin nhắn cho
+// ai.
 model FacebookPageConnection {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String @unique
+  userId String
 
-  pageId          String
+  pageId          String  @unique
   pageName        String?
   pageAccessToken String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Webhook Facebook tra theo pageId (1 trang có thể được subscribe từ webhook mà không biết
-  // userId nào sở hữu) — tách riêng khỏi unique userId ở trên.
-  @@index([pageId])
+  @@index([userId])
 }
 
 // Cache tin nhắn Messenger của từng fanpage — nguồn đọc CHÍNH cho /admin/hop-thu-facebook

@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       await broadcast(`fb:${pageId}`, "message");
       console.log(`[fb-webhook] đã gửi broadcast sau ${Date.now() - t0}ms (tổng thời gian xử lý)`);
 
-      const connection = await prisma.facebookPageConnection.findFirst({ where: { pageId } });
+      const connection = await prisma.facebookPageConnection.findUnique({ where: { pageId } });
       if (connection) {
         await upsertParticipantIfStale(pageId, psid, connection.pageAccessToken).catch(() => {});
       }

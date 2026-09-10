@@ -28,11 +28,16 @@ type AttachmentInput = { type: FbAttachmentType; url: string } | null;
 // trước đây callback route tự upsert riêng, thiếu hẳn 2 bước subscribePageWebhook/backfill,
 // khiến seller chỉ có 1 trang (trường hợp phổ biến nhất) không bao giờ nhận được tin nhắn
 // realtime cho tới khi tự bấm "Đăng ký lại webhook".
+//
+// Upsert theo pageId (không phải userId) — 1 seller giờ kết nối được NHIỀU fanpage, pageId mới
+// là khoá duy nhất thật của 1 kết nối (xem FacebookPageConnection ở schema.prisma). "Kết nối
+// lại" đúng 1 trang đã có sẽ tự gán về đúng userId đang thao tác (vd. token cũ hết hạn, seller
+// chạy lại OAuth cho trang đó).
 export async function connectFacebookPage(userId: string, page: ManagedPage): Promise<void> {
   await prisma.facebookPageConnection.upsert({
-    where: { userId },
+    where: { pageId: page.id },
     create: { userId, pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
-    update: { pageId: page.id, pageName: page.name, pageAccessToken: page.accessToken },
+    update: { userId, pageName: page.name, pageAccessToken: page.accessToken },
   });
 
   // Lỗi ở đây không nên chặn việc kết nối — seller vẫn dùng được (chỉ mất phần realtime/lịch

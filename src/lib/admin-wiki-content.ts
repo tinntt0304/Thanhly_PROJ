@@ -175,6 +175,7 @@ export const ADMIN_WIKI: WikiSection[] = [
         description: "Xem và trả lời tin nhắn Messenger + bình luận từ fanpage của bạn ngay tại đây.",
         steps: [
           "Lần đầu dùng: vào menu Cài đặt để kết nối fanpage trước (xem mục Cài đặt bên dưới).",
+          "Quản lý nhiều fanpage thì chọn đúng trang muốn xem ở dải tab phía trên (mỗi trang có hội thoại/bình luận riêng, không gộp chung).",
           "Chọn tab Tin nhắn Messenger hoặc Bình luận.",
           "Bấm vào 1 hội thoại để xem tin nhắn, hoặc trả lời trực tiếp dưới mỗi bình luận.",
           "Nhập nội dung trả lời (hoặc bấm nút ảnh để gửi ảnh) rồi bấm Gửi / Trả lời.",
@@ -252,27 +253,22 @@ export const ADMIN_WIKI: WikiSection[] = [
         href: "/admin/cai-dat",
         icon: "settings",
         title: "Cài đặt",
-        description: "Kết nối fanpage Facebook để dùng ở Hộp thư Facebook.",
+        description: "Kết nối 1 hoặc nhiều fanpage Facebook để dùng ở Hộp thư Facebook.",
         steps: [
-          "Bấm Kết nối với Facebook, đăng nhập và cấp quyền cho đúng fanpage muốn quản lý.",
-          "Quản lý nhiều fanpage thì chọn đúng 1 trang muốn kết nối.",
-          "Đã kết nối rồi thì có thể bấm Đổi fanpage (chọn trang khác) hoặc Ngắt kết nối bất kỳ lúc nào.",
+          "Bấm Kết nối với Facebook (hoặc Kết nối thêm fanpage nếu đã có sẵn trang khác), đăng nhập và cấp quyền.",
+          "Quản lý nhiều fanpage thì tick chọn 1 hoặc nhiều trang muốn kết nối cùng lúc rồi bấm Kết nối.",
+          "Mỗi fanpage đã kết nối hiện thành 1 dòng riêng — bấm Ngắt kết nối ở đúng dòng đó bất kỳ lúc nào.",
         ],
         buttons: [
           {
             target: "settings-connect",
-            title: "Nút Kết nối với Facebook",
-            description: "Bấm để chuyển sang Facebook cấp quyền cho fanpage muốn quản lý.",
-          },
-          {
-            target: "settings-switch",
-            title: "Đổi fanpage",
-            description: "Bấm để chọn kết nối sang 1 fanpage khác.",
+            title: "Nút Kết nối với Facebook / Kết nối thêm fanpage",
+            description: "Bấm để chuyển sang Facebook cấp quyền cho 1 hoặc nhiều fanpage muốn quản lý.",
           },
           {
             target: "settings-disconnect",
             title: "Ngắt kết nối",
-            description: "Bấm để ngắt kết nối fanpage hiện tại.",
+            description: "Bấm để ngắt kết nối đúng fanpage ở dòng đó.",
           },
         ],
       },
