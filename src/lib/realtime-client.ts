@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { normalizeSupabaseUrl } from "@/lib/supabase-url";
 
 let cachedClient: SupabaseClient | null | undefined;
 
@@ -12,7 +13,7 @@ function getSupabaseBrowserClient(): SupabaseClient | null {
   if (cachedClient !== undefined) return cachedClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  cachedClient = url && anonKey ? createClient(url, anonKey) : null;
+  cachedClient = url && anonKey ? createClient(normalizeSupabaseUrl(url), anonKey) : null;
   return cachedClient;
 }
 

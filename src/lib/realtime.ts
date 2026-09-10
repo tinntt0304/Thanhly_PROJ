@@ -1,3 +1,5 @@
+import { normalizeSupabaseUrl } from "@/lib/supabase-url";
+
 // Đẩy 1 sự kiện realtime qua Supabase Realtime Broadcast (kênh pub/sub tạm, KHÔNG phải
 // Postgres CDC/RLS) — dùng làm "tiếng chuông" báo có tin nhắn mới, client nhận được thì tự
 // gọi lại Server Action sẵn có (đã kiểm tra quyền đầy đủ) để lấy đúng dữ liệu. Chủ động không
@@ -15,12 +17,13 @@
 // không throw) — gửi tin nhắn vẫn phải thành công dù không đẩy được realtime, polling chậm ở
 // client vẫn là lưới an toàn.
 export async function broadcast(channel: string, event: string): Promise<void> {
-  const url = process.env.SUPABASE_URL;
+  const rawUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) return;
+  if (!rawUrl || !serviceKey) return;
+  const url = normalizeSupabaseUrl(rawUrl);
 
   try {
-    await fetch(`${url}/realtime/v1/api/broadcast`, {
+    const res = await fetch(`${url}/realtime/v1/api/broadcast`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -29,7 +32,13 @@ export async function broadcast(channel: string, event: string): Promise<void> {
       },
       body: JSON.stringify({ messages: [{ topic: channel, event, payload: {} }] }),
     });
-  } catch {
+    if (!res.ok) {
+      // Chẩn đoán tạm thời — xem Vercel Function Logs để biết broadcast có thực sự gửi
+      // thành công tới Supabase hay không (khác với client có NHẬN được hay không).
+      console.error(`[realtime] broadcast tới "${channel}" thất bại: ${res.status} ${await res.text()}`);
+    }
+  } catch (e) {
+    console.error(`[realtime] broadcast tới "${channel}" lỗi mạng:`, e);
     // Best-effort — lỗi mạng/Realtime service ở đây không nên chặn luồng chính (lưu tin
     // nhắn/gửi Send API vẫn phải coi là thành công dù không đẩy được realtime).
   }
