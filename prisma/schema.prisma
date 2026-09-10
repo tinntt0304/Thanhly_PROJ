@@ -435,12 +435,26 @@ model FacebookMessage {
   message   String
   createdAt DateTime
 
+  // Ảnh/video/voice khách (hoặc seller) gửi kèm — url lấy thẳng từ CDN Facebook
+  // (scontent-*.fbcdn.net), hiển thị trực tiếp <img>/<video>/<audio> thay vì chỉ nhãn chữ.
+  // `message` vẫn giữ nhãn dự phòng (vd. "🖼️ Đã gửi hình ảnh") để chỗ nào chưa kịp render
+  // attachment (email thông báo, snippet danh sách hội thoại...) vẫn có chữ hiển thị được.
+  attachmentType FacebookAttachmentType?
+  attachmentUrl  String?
+
   @@index([pageId, psid, createdAt])
 }
 
 enum FacebookMessageDirection {
   IN // khách gửi cho trang
   OUT // trang (seller) gửi cho khách
+}
+
+enum FacebookAttachmentType {
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
 }
 
 // Cache tên + ảnh đại diện của khách theo từng trang — tránh gọi lại Graph API mỗi lần hiển

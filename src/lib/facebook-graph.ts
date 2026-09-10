@@ -236,22 +236,33 @@ export async function listConversations(pageId: string, pageAccessToken: string)
   }));
 }
 
+export type FbAttachmentType = "IMAGE" | "VIDEO" | "AUDIO" | "FILE";
+
 export type FbMessage = {
   id: string;
   message: string;
   fromId: string | null;
   fromName: string | null;
   createdAt: string;
+  attachmentType: FbAttachmentType | null;
+  attachmentUrl: string | null;
 };
 
-// Tin nhắn sticker/ảnh/voice/video không có field "message" (rỗng) — nếu hiển thị thẳng sẽ ra
-// 1 bong bóng chat trống trơn, nhìn như khoảng trắng thừa giữa các tin nhắn có chữ. Gắn nhãn dễ
-// hiểu theo mime_type của tệp đính kèm để luôn có nội dung hiển thị được.
+// Tin nhắn sticker/ảnh/voice/video không có field "message" (rỗng) — dùng làm chú thích dự
+// phòng khi chỗ hiển thị chưa/không render được attachment thật (vd. snippet ở danh sách hội
+// thoại) — bong bóng chat chính giờ đã hiển thị ảnh/video/voice thật qua attachmentUrl.
 function attachmentLabel(mimeType?: string): string {
   if (mimeType?.startsWith("image/")) return "🖼️ Đã gửi hình ảnh";
   if (mimeType?.startsWith("video/")) return "🎬 Đã gửi video";
   if (mimeType?.startsWith("audio/")) return "🎤 Đã gửi tin nhắn thoại";
-  return "📎 Đã gửi tệp đính kèm (sticker/ảnh/voice) — mở Facebook để xem";
+  return "📎 Đã gửi tệp đính kèm — mở Facebook để xem";
+}
+
+function mapAttachmentType(mimeType?: string): FbAttachmentType {
+  if (mimeType?.startsWith("image/")) return "IMAGE";
+  if (mimeType?.startsWith("video/")) return "VIDEO";
+  if (mimeType?.startsWith("audio/")) return "AUDIO";
+  return "FILE";
 }
 
 export async function listMessages(conversationId: string, pageAccessToken: string): Promise<FbMessage[]> {
@@ -261,10 +272,17 @@ export async function listMessages(conversationId: string, pageAccessToken: stri
       message?: string;
       from?: { id: string; name?: string };
       created_time: string;
-      attachments?: { data: Array<{ mime_type?: string }> };
+      attachments?: {
+        data: Array<{
+          mime_type?: string;
+          image_data?: { url?: string };
+          video_data?: { url?: string };
+          file_url?: string;
+        }>;
+      };
     }>;
   }>(`/${conversationId}/messages`, pageAccessToken, {
-    fields: "message,from,created_time,attachments{mime_type}",
+    fields: "message,from,created_time,attachments{mime_type,image_data,video_data,file_url}",
     limit: "50",
   });
 
@@ -273,12 +291,16 @@ export async function listMessages(conversationId: string, pageAccessToken: stri
   return data.data
     .map((m) => {
       const text = m.message?.trim();
+      const att = m.attachments?.data?.[0];
+      const attachmentUrl = att?.image_data?.url ?? att?.video_data?.url ?? att?.file_url ?? null;
       return {
         id: m.id,
-        message: text ? text : attachmentLabel(m.attachments?.data?.[0]?.mime_type),
+        message: text ? text : attachmentLabel(att?.mime_type),
         fromId: m.from?.id ?? null,
         fromName: m.from?.name ?? null,
         createdAt: m.created_time,
+        attachmentType: attachmentUrl ? mapAttachmentType(att?.mime_type) : null,
+        attachmentUrl,
       };
     })
     .reverse();

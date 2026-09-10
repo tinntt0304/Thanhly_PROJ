@@ -32,6 +32,10 @@ const connectSrc = ["'self'", supabaseHostname ? `https://${supabaseHostname}` :
   .filter(Boolean)
   .join(" ");
 
+// Video/voice khách gửi qua Messenger (<video>/<audio>) đọc theo media-src, KHÔNG phải
+// img-src — 2 directive riêng biệt trong CSP. Cùng 2 host CDN Facebook như img-src ở trên.
+const mediaSrc = ["'self'", "https://*.fbcdn.net", "https://platform-lookaside.fbsbx.com"].join(" ");
+
 // Chặn nhúng iframe (clickjacking, đặc biệt nhắm /admin/login) + hạn chế nguồn ảnh/font/
 // connect chỉ còn chính site + Supabase Storage. script-src/style-src cần 'unsafe-inline':
 // đã thử script-src 'self' nghiêm ngặt (không nonce) và xác nhận bằng Playwright — Next.js
@@ -50,6 +54,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       `img-src ${imgSrc}`,
+      `media-src ${mediaSrc}`,
       "font-src 'self' data:",
       `connect-src ${connectSrc}`,
       "frame-ancestors 'none'",

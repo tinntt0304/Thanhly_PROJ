@@ -8,7 +8,16 @@
 // File này KHÔNG tự kiểm tra quyền — nơi gọi (Server Action qua requireOwnConnection(), hoặc
 // Webhook route đã tự xác minh chữ ký Facebook) chịu trách nhiệm đó.
 import { prisma } from "@/lib/prisma";
-import { listConversations, listMessages, fetchParticipantProfile, type FbConversation, type FbMessage } from "@/lib/facebook-graph";
+import {
+  listConversations,
+  listMessages,
+  fetchParticipantProfile,
+  type FbConversation,
+  type FbMessage,
+  type FbAttachmentType,
+} from "@/lib/facebook-graph";
+
+type AttachmentInput = { type: FbAttachmentType; url: string } | null;
 
 export async function getCachedConversations(pageId: string): Promise<FbConversation[]> {
   // "Distinct + orderBy" của Prisma trả ĐÚNG 1 dòng mới nhất cho mỗi psid — cách chuẩn để lấy
@@ -47,6 +56,8 @@ export async function getCachedMessages(pageId: string, psid: string): Promise<F
     fromId: r.direction === "IN" ? psid : "page",
     fromName: null,
     createdAt: r.createdAt.toISOString(),
+    attachmentType: r.attachmentType,
+    attachmentUrl: r.attachmentUrl,
   }));
 }
 
@@ -57,11 +68,21 @@ export async function recordIncomingMessage(
   psid: string,
   mid: string,
   message: string,
-  createdAt: Date
+  createdAt: Date,
+  attachment: AttachmentInput = null
 ): Promise<void> {
   await prisma.facebookMessage.upsert({
     where: { id: mid },
-    create: { id: mid, pageId, psid, direction: "IN", message, createdAt },
+    create: {
+      id: mid,
+      pageId,
+      psid,
+      direction: "IN",
+      message,
+      createdAt,
+      attachmentType: attachment?.type,
+      attachmentUrl: attachment?.url,
+    },
     update: {},
   });
 }
@@ -112,6 +133,8 @@ export async function syncFacebookInboxFromGraphApi(pageId: string, pageAccessTo
             direction: m.fromId && m.fromId !== psid ? "OUT" : "IN",
             message: m.message,
             createdAt: new Date(m.createdAt),
+            attachmentType: m.attachmentType,
+            attachmentUrl: m.attachmentUrl,
           },
           update: {},
         })

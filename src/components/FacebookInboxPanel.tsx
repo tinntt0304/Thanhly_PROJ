@@ -44,6 +44,42 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string | n
   );
 }
 
+// Nhãn dự phòng tự sinh ở server khi tin nhắn chỉ có đính kèm, không có chữ thật đi kèm (xem
+// attachmentFallbackLabel ở webhook route + attachmentLabel ở facebook-graph.ts) — nhận diện
+// đúng các nhãn này để KHÔNG hiển thị lặp lại chú thích thừa bên dưới ảnh/video đã render.
+const ATTACHMENT_FALLBACK_LABELS = new Set([
+  "🖼️ Đã gửi hình ảnh",
+  "🎬 Đã gửi video",
+  "🎤 Đã gửi tin nhắn thoại",
+  "📎 Đã gửi tệp đính kèm — mở Facebook để xem",
+]);
+
+function MessageAttachment({ type, url }: { type: "IMAGE" | "VIDEO" | "AUDIO" | "FILE" | null; url: string }) {
+  if (type === "IMAGE") {
+    return (
+      // Ảnh lấy trực tiếp từ CDN Facebook (host động) — CSP img-src đã whitelist riêng.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={url} alt="Ảnh đính kèm" referrerPolicy="no-referrer" className="max-h-64 w-auto rounded-lg object-contain" />
+    );
+  }
+  if (type === "VIDEO") {
+    return <video src={url} controls className="max-h-64 w-auto rounded-lg" />;
+  }
+  if (type === "AUDIO") {
+    return <audio src={url} controls className="w-56" />;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-block rounded-lg bg-neutral-100 px-3 py-1.5 text-sm text-accent-600 underline"
+    >
+      📎 Xem tệp đính kèm
+    </a>
+  );
+}
+
 function CollapseIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
@@ -370,27 +406,41 @@ function MessengerTab({ pageId }: { pageId: string }) {
               (giống Messenger/Zalo thật), khoảng trắng dư ra nằm ở TRÊN chứ không phải khoảng
               trống to đùng ngay phía trên nút Gửi. */}
               <div className="flex min-h-full min-w-0 flex-col justify-end gap-2">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex min-w-0 flex-col ${m.fromId && m.fromId !== selected.participantPsid ? "items-end" : "items-start"}`}
-                  >
-                    <div
-                      // break-words: tin nhắn dạng URL/mã dài không có khoảng trắng (không có
-                      // điểm ngắt dòng tự nhiên) sẽ đội bong bóng chat rộng ra, đẩy cả khung
-                      // hội thoại tràn ngang phải cuộn ngang mới xem hết — bắt buộc ngắt dòng
-                      // dù giữa từ để luôn nằm gọn trong max-w-[75%].
-                      className={`max-w-[75%] min-w-0 break-words rounded-lg px-3 py-1.5 text-sm ${
-                        m.fromId && m.fromId !== selected.participantPsid
-                          ? "bg-accent-500 text-white"
-                          : "bg-neutral-100 text-text"
-                      }`}
-                    >
-                      {m.message}
+                {messages.map((m) => {
+                  const isFromPage = !!(m.fromId && m.fromId !== selected.participantPsid);
+                  const hasRealCaption = !ATTACHMENT_FALLBACK_LABELS.has(m.message);
+                  return (
+                    <div key={m.id} className={`flex min-w-0 flex-col ${isFromPage ? "items-end" : "items-start"}`}>
+                      {m.attachmentUrl ? (
+                        <div className="flex max-w-[75%] min-w-0 flex-col gap-1">
+                          <MessageAttachment type={m.attachmentType} url={m.attachmentUrl} />
+                          {hasRealCaption && (
+                            <div
+                              className={`min-w-0 break-words rounded-lg px-3 py-1.5 text-sm ${
+                                isFromPage ? "self-end bg-accent-500 text-white" : "self-start bg-neutral-100 text-text"
+                              }`}
+                            >
+                              {m.message}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          // break-words: tin nhắn dạng URL/mã dài không có khoảng trắng (không
+                          // có điểm ngắt dòng tự nhiên) sẽ đội bong bóng chat rộng ra, đẩy cả
+                          // khung hội thoại tràn ngang phải cuộn ngang mới xem hết — bắt buộc
+                          // ngắt dòng dù giữa từ để luôn nằm gọn trong max-w-[75%].
+                          className={`max-w-[75%] min-w-0 break-words rounded-lg px-3 py-1.5 text-sm ${
+                            isFromPage ? "bg-accent-500 text-white" : "bg-neutral-100 text-text"
+                          }`}
+                        >
+                          {m.message}
+                        </div>
+                      )}
+                      <span className="mt-0.5 text-[10px] text-neutral-400">{formatDateTime(new Date(m.createdAt))}</span>
                     </div>
-                    <span className="mt-0.5 text-[10px] text-neutral-400">{formatDateTime(new Date(m.createdAt))}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <div className="flex gap-2 border-t border-neutral-200 p-3">
