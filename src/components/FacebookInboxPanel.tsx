@@ -306,9 +306,12 @@ function MessengerTab({ pageId }: { pageId: string }) {
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             title={collapsed ? "Mở rộng danh sách hội thoại" : "Thu gọn danh sách hội thoại"}
-            className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 sm:flex"
+            className={`hidden h-7 shrink-0 items-center justify-center gap-1 rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 sm:flex ${
+              collapsed ? "w-7" : "px-1.5"
+            }`}
           >
             <CollapseIcon collapsed={collapsed} />
+            {!collapsed && <span className="text-xs font-medium">Thu gọn</span>}
           </button>
           {!collapsed && (
             <>
