@@ -66,10 +66,14 @@ export async function removeFromCart(productId: string): Promise<void> {
   revalidatePath("/gio-hang");
 }
 
-export type UpdateCartItemQuantityResult = { ok: true; quantity: number } | { ok: false; error: string };
+export type UpdateCartItemQuantityResult =
+  | { ok: true; quantity: number; warning?: string }
+  | { ok: false; error: string };
 
 // Buyer chỉnh số lượng trực tiếp ở trang giỏ hàng — luôn kẹp lại trong [1, Product.quantity]
-// (số lượng thật còn lại) ngay khi lưu, không tin số buyer gửi lên.
+// (số lượng thật còn lại) ngay khi lưu, không tin số buyer gửi lên. Trước đây kẹp âm thầm,
+// buyer nhập vượt tồn kho chỉ thấy số tự nhảy về mà không hiểu vì sao — giờ trả kèm "warning"
+// khi số buyer nhập khác số thực lưu để UI báo rõ lý do.
 export async function updateCartItemQuantity(
   productId: string,
   quantity: number
@@ -80,7 +84,8 @@ export async function updateCartItemQuantity(
   if (!product) return { ok: false, error: "Không tìm thấy sản phẩm." };
   if (product.quantity <= 0) return { ok: false, error: "Sản phẩm đã hết hàng." };
 
-  const clamped = Math.min(Math.max(Math.trunc(quantity) || 1, 1), product.quantity);
+  const requested = Math.trunc(quantity) || 1;
+  const clamped = Math.min(Math.max(requested, 1), product.quantity);
 
   const item = await prisma.cartItem.updateMany({
     where: { buyerId: session.user.id, productId },
@@ -89,7 +94,13 @@ export async function updateCartItemQuantity(
   if (item.count === 0) return { ok: false, error: "Sản phẩm không có trong giỏ." };
 
   revalidatePath("/gio-hang");
-  return { ok: true, quantity: clamped };
+  const warning =
+    requested > product.quantity
+      ? `Chỉ còn tối đa ${product.quantity} sản phẩm trong kho, đã điều chỉnh về ${clamped}.`
+      : requested < 1
+        ? "Số lượng tối thiểu là 1, đã điều chỉnh về 1."
+        : undefined;
+  return { ok: true, quantity: clamped, warning };
 }
 
 export async function getCartItems() {

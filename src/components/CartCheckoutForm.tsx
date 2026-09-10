@@ -49,13 +49,21 @@ export function CartCheckoutForm({
     router.refresh();
   }
 
-  async function handleQuantityChange(productId: string, value: number) {
+  // Báo lỗi NGAY khi gõ vượt tồn kho, không cần chờ blur/gọi server mới biết — server (xem
+  // updateCartItemQuantity) vẫn tự kẹp lại khi lưu nên đây chỉ là phản hồi tức thời cho buyer.
+  function handleQuantityChange(productId: string, value: number, stock: number) {
     setQuantityDrafts((prev) => ({ ...prev, [productId]: value }));
+    if (value > stock) {
+      setQuantityErrors((prev) => ({ ...prev, [productId]: `Chỉ còn tối đa ${stock} sản phẩm trong kho.` }));
+    } else if (value < 1) {
+      setQuantityErrors((prev) => ({ ...prev, [productId]: "Số lượng tối thiểu là 1." }));
+    } else {
+      setQuantityErrors((prev) => ({ ...prev, [productId]: "" }));
+    }
   }
 
   async function handleQuantityCommit(productId: string, value: number) {
     setUpdatingId(productId);
-    setQuantityErrors((prev) => ({ ...prev, [productId]: "" }));
     const res = await updateCartItemQuantity(productId, value);
     setUpdatingId(null);
     if (!res.ok) {
@@ -63,6 +71,7 @@ export function CartCheckoutForm({
       return;
     }
     setQuantityDrafts((prev) => ({ ...prev, [productId]: res.quantity }));
+    setQuantityErrors((prev) => ({ ...prev, [productId]: res.warning ?? "" }));
     router.refresh();
   }
 
@@ -107,7 +116,7 @@ export function CartCheckoutForm({
                       min={1}
                       max={item.stock}
                       value={quantityDrafts[item.productId] ?? item.quantity}
-                      onChange={(e) => handleQuantityChange(item.productId, Number(e.target.value))}
+                      onChange={(e) => handleQuantityChange(item.productId, Number(e.target.value), item.stock)}
                       onBlur={(e) => handleQuantityCommit(item.productId, Number(e.target.value))}
                       disabled={updatingId === item.productId}
                       className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
