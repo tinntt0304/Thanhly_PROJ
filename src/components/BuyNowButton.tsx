@@ -121,25 +121,6 @@ export function BuyNowButton({
                   Giá mua ngay: <span className="font-semibold text-text">{formatVND(buyNowPrice)}</span>
                 </p>
 
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="buyNowQuantity" className="text-sm font-medium text-text">
-                    Số lượng (tối đa {stock})
-                  </label>
-                  <input
-                    id="buyNowQuantity"
-                    name="quantity"
-                    type="number"
-                    min={1}
-                    max={stock}
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-24 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  />
-                  <p className="text-sm text-neutral-700">
-                    Thành tiền: <span className="font-semibold text-text">{formatVND(buyNowPrice * Math.max(quantity, 0))}</span>
-                  </p>
-                </div>
-
                 {attributes.length > 0 && (
                   <div className="flex flex-col gap-2">
                     {attributes.map((attr) => (
@@ -167,6 +148,25 @@ export function BuyNowButton({
                 )}
 
                 <input type="hidden" name="selectedAttributesJson" value={selectedAttributesJson} />
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="buyNowQuantity" className="text-sm font-medium text-text">
+                    Số lượng (tối đa {stock})
+                  </label>
+                  <input
+                    id="buyNowQuantity"
+                    name="quantity"
+                    type="number"
+                    min={1}
+                    max={stock}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-24 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  />
+                  <p className="text-sm text-neutral-700">
+                    Thành tiền: <span className="font-semibold text-text">{formatVND(buyNowPrice * Math.max(quantity, 0))}</span>
+                  </p>
+                </div>
 
                 <BuyerShippingFields
                   idPrefix="buyNow"
