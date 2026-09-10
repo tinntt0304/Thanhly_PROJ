@@ -108,6 +108,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                   buyNowPrice={product.buyNowPrice}
                   attributes={attributes}
                   canBuy={state === "BIDDING"}
+                  stock={product.quantity}
                   defaultBuyerName={session?.user.name ?? undefined}
                   defaultBuyerPhone={session?.user.phone ?? undefined}
                 />

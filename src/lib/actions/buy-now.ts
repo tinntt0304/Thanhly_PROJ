@@ -37,6 +37,7 @@ const buyNowSchema = z.object({
   wardName: z.string().trim().min(1),
   note: z.string().trim().optional(),
   selectedAttributesJson: z.string().optional(),
+  quantity: z.coerce.number().int().min(1, "Số lượng tối thiểu là 1"),
 });
 
 export type BuyNowState = { error?: string; success?: boolean; orderId?: string };
@@ -78,6 +79,7 @@ export async function buyNowAction(
     wardName: formData.get("wardName"),
     note: formData.get("note"),
     selectedAttributesJson: formData.get("selectedAttributesJson"),
+    quantity: formData.get("quantity"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
@@ -103,6 +105,9 @@ export async function buyNowAction(
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return { error: "Không tìm thấy sản phẩm." };
   if (!product.buyNowPrice) return { error: "Sản phẩm này không hỗ trợ mua ngay." };
+  if (data.quantity > product.quantity) {
+    return { error: `Chỉ còn tối đa ${product.quantity} sản phẩm, vui lòng giảm số lượng.` };
+  }
 
   const bidsCount = await prisma.bid.count({ where: { productId } });
   const state = getAuctionState(product, bidsCount > 0);
@@ -126,19 +131,19 @@ export async function buyNowAction(
 
   try {
     const order = await prisma.$transaction(async (tx) => {
-      // Mua ngay chỉ trừ đi 1 đơn vị trong quantity — KHÔNG tự động đóng cả phiên đấu giá
-      // nếu vẫn còn hàng. Người khác vẫn tiếp tục trả giá/mua ngay được thêm cho tới khi hết
-      // hàng thật sự (quantity về 0) mới chuyển status sang SOLD. updateMany có điều kiện
-      // status: "ACTIVE" + quantity: {gt: 0} — 2 người cùng bấm "Mua ngay" gần như đồng thời
-      // khi chỉ còn đúng 1 đơn vị thì chỉ 1 người trừ kho thành công (Postgres khoá dòng lúc
-      // UPDATE, người tới sau đọc lại quantity đã về 0 nên điều kiện gt:0 không còn đúng),
-      // người còn lại nhận lỗi rõ ràng thay vì tạo thêm 1 đơn cho hàng đã hết.
+      // Mua ngay chỉ trừ đi đúng số lượng buyer chọn trong quantity — KHÔNG tự động đóng cả
+      // phiên đấu giá nếu vẫn còn hàng. Người khác vẫn tiếp tục trả giá/mua ngay được thêm cho
+      // tới khi hết hàng thật sự (quantity về 0) mới chuyển status sang SOLD. updateMany có
+      // điều kiện status: "ACTIVE" + quantity: {gte: data.quantity} — 2 người cùng bấm "Mua
+      // ngay" gần như đồng thời khi kho không đủ cho cả 2 thì chỉ 1 người trừ kho thành công
+      // (Postgres khoá dòng lúc UPDATE, người tới sau đọc lại quantity đã giảm nên điều kiện
+      // gte không còn đúng), người còn lại nhận lỗi rõ ràng thay vì tạo đơn cho hàng đã hết.
       const updateResult = await tx.product.updateMany({
-        where: { id: productId, status: "ACTIVE", quantity: { gt: 0 } },
-        data: { quantity: { decrement: 1 } },
+        where: { id: productId, status: "ACTIVE", quantity: { gte: data.quantity } },
+        data: { quantity: { decrement: data.quantity } },
       });
       if (updateResult.count === 0) {
-        throw new Error("Sản phẩm này vừa hết hàng hoặc phiên đấu giá đã kết thúc, vui lòng tải lại trang.");
+        throw new Error("Sản phẩm này vừa hết hàng hoặc không đủ số lượng, vui lòng tải lại trang.");
       }
 
       const remaining = await tx.product.findUniqueOrThrow({
@@ -169,15 +174,23 @@ export async function buyNowAction(
           districtName: data.districtName,
           wardCode: data.wardCode,
           wardName: data.wardName,
-          codAmount: product.buyNowPrice!,
+          codAmount: product.buyNowPrice! * data.quantity,
           weightGram: DEFAULT_WEIGHT_GRAM,
           lengthCm: DEFAULT_LENGTH_CM,
           widthCm: DEFAULT_WIDTH_CM,
           heightCm: DEFAULT_HEIGHT_CM,
           note: data.note || null,
           items: {
-            // đã trừ 1 đơn vị quantity ở trên — huỷ đơn (cancelOrder) sẽ hoàn lại đúng đơn vị này
-            create: [{ productId, quantity: 1, unitPrice: product.buyNowPrice!, selectedAttributes, stockDecremented: true }],
+            // đã trừ đúng data.quantity đơn vị ở trên — huỷ đơn (cancelOrder) sẽ hoàn lại đúng số này
+            create: [
+              {
+                productId,
+                quantity: data.quantity,
+                unitPrice: product.buyNowPrice!,
+                selectedAttributes,
+                stockDecremented: true,
+              },
+            ],
           },
         },
       });

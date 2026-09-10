@@ -18,6 +18,7 @@ export function BuyNowButton({
   buyNowPrice,
   attributes,
   canBuy,
+  stock,
   defaultBuyerName,
   defaultBuyerPhone,
 }: {
@@ -30,6 +31,8 @@ export function BuyNowButton({
   // với canBuy=false NGAY LẬP TỨC; nếu unmount theo canBuy thì modal xác nhận "Đã tạo đơn
   // hàng thành công" biến mất trước khi người mua kịp thấy.
   canBuy: boolean;
+  // Số lượng thật còn lại — trần cho ô nhập số lượng, xem buyNowSchema ở lib/actions/buy-now.ts.
+  stock: number;
   // Điền sẵn nếu đã đăng nhập tài khoản người mua — tuỳ chọn, khách vãng lai vẫn nhập tay được.
   defaultBuyerName?: string;
   defaultBuyerPhone?: string;
@@ -38,6 +41,7 @@ export function BuyNowButton({
   const [state, formAction, pending] = useActionState(buyNowAction.bind(null, productId), initialState);
   const [clientError, setClientError] = useState<string | null>(null);
   const [selectedValues, setSelectedValues] = useState<Record<string, string>>({});
+  const [quantity, setQuantity] = useState(1);
 
   if (!canBuy && !state.success) return null;
 
@@ -46,6 +50,11 @@ export function BuyNowButton({
     if (missing) {
       e.preventDefault();
       setClientError(`Vui lòng chọn "${missing.name}".`);
+      return;
+    }
+    if (quantity < 1 || quantity > stock) {
+      e.preventDefault();
+      setClientError(`Số lượng phải từ 1 đến ${stock}.`);
       return;
     }
     setClientError(null);
@@ -111,6 +120,25 @@ export function BuyNowButton({
                 <p className="text-sm text-neutral-700">
                   Giá mua ngay: <span className="font-semibold text-text">{formatVND(buyNowPrice)}</span>
                 </p>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="buyNowQuantity" className="text-sm font-medium text-text">
+                    Số lượng (tối đa {stock})
+                  </label>
+                  <input
+                    id="buyNowQuantity"
+                    name="quantity"
+                    type="number"
+                    min={1}
+                    max={stock}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-24 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  />
+                  <p className="text-sm text-neutral-700">
+                    Thành tiền: <span className="font-semibold text-text">{formatVND(buyNowPrice * Math.max(quantity, 0))}</span>
+                  </p>
+                </div>
 
                 {attributes.length > 0 && (
                   <div className="flex flex-col gap-2">
