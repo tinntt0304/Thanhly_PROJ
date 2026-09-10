@@ -11,6 +11,7 @@ import {
   listFacebookComments,
   replyFacebookComment,
   syncFacebookInbox,
+  resubscribeFacebookWebhook,
   type FacebookConnectionStatus,
 } from "@/lib/actions/facebook-inbox";
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
@@ -534,6 +535,8 @@ export function FacebookInboxPanel({
   const [status, setStatus] = useState<FacebookConnectionStatus | null>(null);
   const [tab, setTab] = useState<"messenger" | "comments">("messenger");
   const [showPicker, setShowPicker] = useState(pendingPages.length > 0);
+  const [resubscribing, setResubscribing] = useState(false);
+  const [resubscribeError, setResubscribeError] = useState<string | null>(null);
 
   async function refreshStatus() {
     setStatus(await getFacebookConnectionStatus());
@@ -547,6 +550,20 @@ export function FacebookInboxPanel({
   async function handleDisconnect() {
     if (!window.confirm("Ngắt kết nối fanpage này?")) return;
     await disconnectFacebookPage();
+    await refreshStatus();
+  }
+
+  // Bước tự đăng ký webhook lúc kết nối có thể đã âm thầm thất bại (thiếu quyền, App chưa
+  // bật Webhooks product lúc đó...) — nút này gọi lại và trả lỗi thật, khác lúc OAuth connect.
+  async function handleResubscribeWebhook() {
+    setResubscribing(true);
+    setResubscribeError(null);
+    const res = await resubscribeFacebookWebhook();
+    setResubscribing(false);
+    if (res.error) {
+      setResubscribeError(res.error);
+      return;
+    }
     await refreshStatus();
   }
 
@@ -593,6 +610,24 @@ export function FacebookInboxPanel({
           </button>
         </div>
       </div>
+
+      {status.webhookSubscribed === false && (
+        <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            ⚠️ Trang chưa đăng ký nhận Webhook — tin nhắn khách gửi trên Facebook sẽ{" "}
+            <span className="font-medium">không tự hiện ra</span>, phải bấm &quot;Làm mới&quot; mới thấy.
+          </p>
+          <button
+            type="button"
+            onClick={handleResubscribeWebhook}
+            disabled={resubscribing}
+            className="shrink-0 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+          >
+            {resubscribing ? "Đang đăng ký..." : "Đăng ký lại webhook"}
+          </button>
+        </div>
+      )}
+      {resubscribeError && <p className="text-sm text-red-600">{resubscribeError}</p>}
 
       <div className="flex gap-1 border-b border-neutral-200">
         <button

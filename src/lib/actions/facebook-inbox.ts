@@ -11,6 +11,7 @@ import {
   listRecentComments,
   replyToComment,
   subscribePageWebhook,
+  isPageSubscribedToWebhook,
   type FbConversation,
   type FbMessage,
   type FbComment,
@@ -29,14 +30,32 @@ export type FacebookConnectionStatus = {
   connected: boolean;
   pageId?: string;
   pageName?: string;
+  webhookSubscribed?: boolean;
 };
 
 // Không bao giờ trả pageAccessToken về client — chỉ trạng thái kết nối + tên trang hiển thị.
+// webhookSubscribed kiểm tra THẬT với Graph API (không chỉ đọc cờ lưu sẵn) — bước tự đăng ký
+// webhook lúc kết nối (subscribePageWebhook) có thể đã âm thầm thất bại, nên seller cần thấy
+// đúng trạng thái hiện tại để biết có cần bấm "Đăng ký lại" hay không.
 export async function getFacebookConnectionStatus(): Promise<FacebookConnectionStatus> {
   const session = await requireAdmin();
   const connection = await prisma.facebookPageConnection.findUnique({ where: { userId: session.user.id } });
   if (!connection) return { connected: false };
-  return { connected: true, pageId: connection.pageId, pageName: connection.pageName ?? undefined };
+  const webhookSubscribed = await isPageSubscribedToWebhook(connection.pageId, connection.pageAccessToken);
+  return { connected: true, pageId: connection.pageId, pageName: connection.pageName ?? undefined, webhookSubscribed };
+}
+
+// Nút "Đăng ký lại webhook" ở UI khi phát hiện chưa đăng ký — khác subscribePageWebhook() gọi
+// tự động lúc OAuth connect (bọc try/catch nuốt lỗi để không chặn flow kết nối), ở đây phải
+// trả lỗi thật cho seller thấy nếu vẫn thất bại (vd. thiếu quyền pages_manage_metadata).
+export async function resubscribeFacebookWebhook(): Promise<{ success?: true; error?: string }> {
+  try {
+    const connection = await requireOwnConnection();
+    await subscribePageWebhook(connection.pageId, connection.pageAccessToken);
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Đăng ký webhook thất bại." };
+  }
 }
 
 // Đọc danh sách fanpage đang chờ chọn (route callback OAuth tạm lưu vào cookie khi seller

@@ -122,6 +122,22 @@ export async function subscribePageWebhook(pageId: string, pageAccessToken: stri
   await graphPost(`/${pageId}/subscribed_apps`, pageAccessToken, { subscribed_fields: "messages" });
 }
 
+// Kiểm tra lại trang ĐÃ THỰC SỰ được đăng ký nhận webhook chưa — subscribePageWebhook() ở trên
+// gọi tự động lúc kết nối nhưng bọc try/catch nuốt lỗi ở nơi gọi (không chặn flow kết nối),
+// nên seller không có cách nào tự biết nó có thành công hay không nếu chỉ nhìn UI. Dùng hàm
+// này để hiển thị trạng thái thật + cho phép "Đăng ký lại" khi cần (xem
+// FacebookInboxPanel.tsx).
+export async function isPageSubscribedToWebhook(pageId: string, pageAccessToken: string): Promise<boolean> {
+  const appId = process.env.FACEBOOK_APP_ID;
+  if (!appId) return false;
+  try {
+    const data = await graphFetch<{ data: Array<{ id: string }> }>(`/${pageId}/subscribed_apps`, pageAccessToken, {});
+    return data.data.some((app) => app.id === appId);
+  } catch {
+    return false;
+  }
+}
+
 export type FbConversation = {
   id: string;
   updatedAt: string;
