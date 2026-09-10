@@ -119,9 +119,13 @@ export async function selectFacebookPage(pageId: string): Promise<{ success?: tr
   const page = pages.find((p) => p.id === pageId);
   if (!page) return { error: "Không tìm thấy fanpage đã chọn, vui lòng kết nối lại." };
 
-  await connectFacebookPage(session.user.id, page);
-  revalidateFacebookPaths();
-  return { success: true };
+  try {
+    await connectFacebookPage(session.user.id, page);
+    revalidateFacebookPaths();
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Kết nối fanpage thất bại." };
+  }
 }
 
 // Xoá cookie danh sách fanpage đang chờ chọn — gọi sau khi seller đã chọn xong (hết nhu cầu

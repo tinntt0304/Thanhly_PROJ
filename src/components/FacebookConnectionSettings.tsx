@@ -46,16 +46,19 @@ function PagePicker({ pages, onDone }: { pages: Array<{ id: string; name: string
     setConnecting(true);
     setError(null);
     const ids = [...selected];
-    const results = await Promise.all(ids.map((id) => selectFacebookPage(id)));
+    // Kết nối TUẦN TỰ, không dùng Promise.all — mỗi lượt kết nối gọi Graph API + ghi DB, chạy
+    // đồng thời nhiều lượt dễ dính lỗi tranh chấp kết nối DB qua PgBouncer (transaction pooler)
+    // và làm 1 trang lỗi kéo mất kết quả của các trang khác đã thành công.
     const nowConnected = new Set(connectedIds);
-    let firstError: string | null = null;
-    results.forEach((res, i) => {
-      if (res.error) firstError ??= `${pages.find((p) => p.id === ids[i])?.name}: ${res.error}`;
-      else nowConnected.add(ids[i]);
-    });
-    setConnectedIds(nowConnected);
+    const errors: string[] = [];
+    for (const id of ids) {
+      const res = await selectFacebookPage(id);
+      if (res.error) errors.push(`${pages.find((p) => p.id === id)?.name}: ${res.error}`);
+      else nowConnected.add(id);
+      setConnectedIds(new Set(nowConnected));
+    }
     setSelected(new Set());
-    setError(firstError);
+    setError(errors.length > 0 ? errors.join(" • ") : null);
     setConnecting(false);
   }
 
