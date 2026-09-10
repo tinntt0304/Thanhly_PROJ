@@ -5,6 +5,7 @@ import { MAX_IMAGE_BYTES } from "@/lib/product-limits";
 export const PRODUCT_IMAGES_BUCKET = "product-images";
 export const SITE_BANNER_BUCKET = "site-banners";
 export const IMAGE_LIBRARY_BUCKET = "image-library";
+export const FACEBOOK_ATTACHMENTS_BUCKET = "facebook-attachments";
 const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 // Nén ảnh trước khi lưu Supabase Storage — người dùng thường upload thẳng ảnh gốc từ điện
@@ -155,6 +156,14 @@ export async function deleteBannerImage(url: string): Promise<void> {
 // chuẩn bị link.
 export async function uploadLibraryImage(file: File, userId: string): Promise<string> {
   return uploadImage(file, IMAGE_LIBRARY_BUCKET, `${userId}/`);
+}
+
+// Ảnh seller gửi cho khách qua Messenger (/admin/hop-thu-facebook) — cần 1 URL public để đưa
+// vào Send API của Facebook (attachment.payload.url), Facebook tải ảnh về từ chính URL này.
+// Bucket riêng với image-library vì đây là ảnh đã GỬI ĐI thật (nên giữ lại làm lịch sử hội
+// thoại), khác thư viện chỉ là nơi chuẩn bị link để dùng lại nhiều lần.
+export async function uploadFacebookAttachmentImage(file: File, userId: string): Promise<string> {
+  return uploadImage(file, FACEBOOK_ATTACHMENTS_BUCKET, `${userId}/`);
 }
 
 export type LibraryImage = { url: string; name: string; createdAt: string };

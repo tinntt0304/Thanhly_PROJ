@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { broadcast } from "@/lib/realtime";
 import {
   sendMessengerMessage,
+  sendMessengerImage,
   listRecentComments,
   replyToComment,
   subscribePageWebhook,
@@ -18,6 +19,7 @@ import {
   type ManagedPage,
 } from "@/lib/facebook-graph";
 import { getCachedConversations, getCachedMessages, syncFacebookInboxFromGraphApi } from "@/lib/facebook-inbox-store";
+import { uploadFacebookAttachmentImage } from "@/lib/storage";
 
 const WIKI_PATH = "/admin/hop-thu-facebook";
 const PAGES_COOKIE = "fb_oauth_pages";
@@ -200,6 +202,43 @@ export async function sendFacebookMessage(
     return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Gửi tin nhắn thất bại." };
+  }
+}
+
+// Seller chọn ảnh từ máy → upload lên Supabase Storage lấy URL public → đưa URL đó vào Send
+// API (Facebook tự tải ảnh về từ URL này, app không tự làm multipart upload trực tiếp lên
+// Graph API). Ảnh gửi đi được giữ lại (bucket facebook-attachments) làm lịch sử hội thoại,
+// hiển thị y hệt ảnh khách gửi (xem attachmentUrl ở FacebookMessage).
+export async function sendFacebookImage(
+  recipientPsid: string,
+  formData: FormData
+): Promise<{ success?: true; error?: string }> {
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Chưa chọn ảnh." };
+
+  try {
+    const session = await requireAdmin();
+    const connection = await requireOwnConnection();
+    const imageUrl = await uploadFacebookAttachmentImage(file, session.user.id);
+    const messageId = await sendMessengerImage(connection.pageId, connection.pageAccessToken, recipientPsid, imageUrl);
+
+    await prisma.facebookMessage.create({
+      data: {
+        id: messageId,
+        pageId: connection.pageId,
+        psid: recipientPsid,
+        direction: "OUT",
+        message: "🖼️ Đã gửi hình ảnh",
+        attachmentType: "IMAGE",
+        attachmentUrl: imageUrl,
+        createdAt: new Date(),
+      },
+    });
+    await broadcast(fbChannel(connection.pageId), "message");
+
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Gửi ảnh thất bại." };
   }
 }
 

@@ -327,6 +327,23 @@ export async function sendMessengerMessage(
   return res.message_id;
 }
 
+// Gửi ảnh qua Send API bằng URL công khai (ảnh đã upload sẵn lên Supabase Storage trước đó —
+// xem uploadFacebookAttachmentImage ở src/lib/storage.ts) — Facebook tự tải ảnh về từ URL này
+// rồi phân phối, app không cần tự làm multipart upload trực tiếp lên Graph API.
+export async function sendMessengerImage(
+  pageId: string,
+  pageAccessToken: string,
+  recipientPsid: string,
+  imageUrl: string
+): Promise<string> {
+  const res = await graphPost<{ message_id: string }>(`/${pageId}/messages`, pageAccessToken, {
+    recipient: JSON.stringify({ id: recipientPsid }),
+    message: JSON.stringify({ attachment: { type: "image", payload: { url: imageUrl } } }),
+    messaging_type: "RESPONSE",
+  });
+  return res.message_id;
+}
+
 export type FbComment = {
   id: string;
   message: string;

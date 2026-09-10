@@ -12,6 +12,7 @@ import {
   replyFacebookComment,
   syncFacebookInbox,
   resubscribeFacebookWebhook,
+  sendFacebookImage,
   type FacebookConnectionStatus,
 } from "@/lib/actions/facebook-inbox";
 import type { FbConversation, FbMessage, FbComment } from "@/lib/facebook-graph";
@@ -77,6 +78,16 @@ function MessageAttachment({ type, url }: { type: "IMAGE" | "VIDEO" | "AUDIO" | 
     >
       📎 Xem tệp đính kèm
     </a>
+  );
+}
+
+function AttachImageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-5 w-5">
+      <rect x="3" y="3" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -175,10 +186,12 @@ function MessengerTab({ pageId }: { pageId: string }) {
   const [msgError, setMsgError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendingImage, setSendingImage] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Mở hội thoại nào cũng phải thấy ngay tin nhắn MỚI NHẤT (ở cuối danh sách) — mặc định
   // trình duyệt cuộn khung overflow về đầu (0), người dùng phải tự kéo xuống mới thấy tin mới.
@@ -296,6 +309,22 @@ function MessengerTab({ pageId }: { pageId: string }) {
       if (msgs.items) setMessages(msgs.items);
     }
     setSending(false);
+  }
+
+  async function handleSendImage(file: File) {
+    if (!selected?.participantPsid || sendingImage) return;
+    setSendingImage(true);
+    setMsgError(null);
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await sendFacebookImage(selected.participantPsid, formData);
+    if (res.error) {
+      setMsgError(res.error);
+    } else if (selectedId) {
+      const msgs = await listFacebookMessages(selectedId);
+      if (msgs.items) setMessages(msgs.items);
+    }
+    setSendingImage(false);
   }
 
   // Trên di động không đủ chỗ cho 2 cột list+chat cạnh nhau như desktop — dùng kiểu
@@ -445,6 +474,26 @@ function MessengerTab({ pageId }: { pageId: string }) {
             </div>
             <div className="flex gap-2 border-t border-neutral-200 p-3">
               <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = ""; // cho phép chọn lại đúng file này ở lần sau
+                  if (file) handleSendImage(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sendingImage || !selected.participantPsid}
+                title="Gửi ảnh"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+              >
+                <AttachImageIcon />
+              </button>
+              <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -453,8 +502,13 @@ function MessengerTab({ pageId }: { pageId: string }) {
                     handleSend();
                   }
                 }}
-                placeholder="Nhập phản hồi... (chỉ gửi được trong vòng 24h kể từ tin nhắn cuối của khách)"
-                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                placeholder={
+                  sendingImage
+                    ? "Đang gửi ảnh..."
+                    : "Nhập phản hồi... (chỉ gửi được trong vòng 24h kể từ tin nhắn cuối của khách)"
+                }
+                disabled={sendingImage}
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
               />
               <button
                 type="button"
