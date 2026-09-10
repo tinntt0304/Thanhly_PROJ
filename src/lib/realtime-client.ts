@@ -30,12 +30,20 @@ export function useRealtimeBroadcast(channelName: string | null, event: string, 
   useEffect(() => {
     if (!channelName) return;
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn("[realtime] Chưa cấu hình NEXT_PUBLIC_SUPABASE_URL/ANON_KEY — chỉ chạy polling.");
+      return;
+    }
 
     const channel = supabase
       .channel(channelName)
-      .on("broadcast", { event }, () => onEventRef.current())
-      .subscribe();
+      .on("broadcast", { event }, () => {
+        console.log(`[realtime] Nhận sự kiện "${event}" trên kênh "${channelName}"`);
+        onEventRef.current();
+      })
+      .subscribe((status, err) => {
+        console.log(`[realtime] Kênh "${channelName}" -> ${status}`, err ?? "");
+      });
 
     return () => {
       supabase.removeChannel(channel);

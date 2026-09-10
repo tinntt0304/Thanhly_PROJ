@@ -32,6 +32,7 @@ type WebhookPayload = {
 // nhập. Xác thực bằng chữ ký HMAC-SHA256 ký bởi App Secret (verifyWebhookSignature), giống
 // tinh thần webhook SePay/GHN đã có (xem src/app/api/webhooks/sepay, .../ghn).
 export async function POST(request: Request) {
+  const t0 = Date.now();
   const rawBody = await request.text();
   if (!(await verifyWebhookSignature(rawBody, request.headers.get("x-hub-signature-256")))) {
     return NextResponse.json({ error: "invalid signature" }, { status: 401 });
@@ -61,9 +62,16 @@ export async function POST(request: Request) {
 
       const text = event.message?.text?.trim() || "📎 Đã gửi tệp đính kèm (sticker/ảnh/voice) — mở Facebook để xem";
       const createdAt = event.timestamp ? new Date(event.timestamp) : new Date();
+      // Facebook gửi timestamp lúc KHÁCH BẤM GỬI, không phải lúc webhook này chạy — chênh lệch
+      // giữa 2 mốc này là độ trễ nằm ở PHÍA META (ngoài tầm kiểm soát của app), tách bạch với
+      // độ trễ từ recordIncomingMessage/broadcast trở đi (phía app) để biết chỗ nào cần sửa.
+      console.log(`[fb-webhook] nhận sự kiện, trễ từ lúc khách gửi: ${Date.now() - createdAt.getTime()}ms`);
 
       await recordIncomingMessage(pageId, psid, mid, text, createdAt);
+      console.log(`[fb-webhook] đã ghi DB sau ${Date.now() - t0}ms`);
+
       await broadcast(`fb:${pageId}`, "message");
+      console.log(`[fb-webhook] đã gửi broadcast sau ${Date.now() - t0}ms (tổng thời gian xử lý)`);
 
       const connection = await prisma.facebookPageConnection.findFirst({ where: { pageId } });
       if (connection) {
