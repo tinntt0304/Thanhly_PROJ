@@ -124,7 +124,6 @@ function MessengerTab({ pageId }: { pageId: string }) {
   const [messages, setMessages] = useState<FbMessage[]>([]);
   const [msgError, setMsgError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
   const [sendingImage, setSendingImage] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
@@ -247,22 +246,25 @@ function MessengerTab({ pageId }: { pageId: string }) {
     return id;
   }
 
+  // Nút "Gửi" chỉ chặn double-click ngay lúc bấm (draft rỗng lúc đó) — KHÔNG chờ Graph API +
+  // ghi DB xong mới bật lại (mất vài giây), vì tin đã hiện ngay ở appendOptimisticMessage rồi,
+  // giữ nút disable thêm nữa chỉ làm seller tưởng chưa gửi được, cản việc gõ tin kế tiếp ngay.
+  // Gửi lỗi thì báo qua msgError, không cố khôi phục vào ô nhập vì draft có thể đã đổi khác.
   async function handleSend() {
-    if (!selected?.participantPsid || draft.trim() === "" || sending) return;
-    setSending(true);
+    if (!selected?.participantPsid || draft.trim() === "") return;
+    const psid = selected.participantPsid;
+    const conversationId = selectedId;
     const text = draft;
     setDraft("");
     const optimisticId = appendOptimisticMessage(text, null, null);
-    const res = await sendFacebookMessage(pageId, selected.participantPsid, text);
+    const res = await sendFacebookMessage(pageId, psid, text);
     if (res.error) {
       setMsgError(res.error);
-      setDraft(text);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-    } else if (selectedId) {
-      const msgs = await listFacebookMessages(pageId, selectedId);
+    } else if (conversationId) {
+      const msgs = await listFacebookMessages(pageId, conversationId);
       if (msgs.items) setMessages(msgs.items);
     }
-    setSending(false);
   }
 
   async function handleSendImage(file: File) {
@@ -471,7 +473,7 @@ function MessengerTab({ pageId }: { pageId: string }) {
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sending || draft.trim() === "" || !selected.participantPsid}
+                disabled={draft.trim() === "" || !selected.participantPsid}
                 className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
               >
                 Gửi
