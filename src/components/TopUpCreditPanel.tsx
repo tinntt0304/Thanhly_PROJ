@@ -32,16 +32,21 @@ export function TopUpCreditPanel({
   initialBalance,
   minTopUpAmount,
   maxTopUpAmount,
+  initialPending,
 }: {
   initialBalance: number;
   minTopUpAmount: number;
   maxTopUpAmount: number | null;
+  // Yêu cầu nạp credit PENDING chưa hết hạn của chính seller này, nếu có — đọc lại khi seller
+  // rời trang giữa chừng rồi quay lại, để hiện lại đúng mã QR + thời gian còn lại thay vì bắt
+  // họ đụng ngay lỗi "đang có 1 yêu cầu chưa hoàn tất" mà không biết làm sao thử lại.
+  initialPending: PendingTopUp | null;
 }) {
   const router = useRouter();
   const [balance, setBalance] = useState(initialBalance);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<PendingTopUp | null>(null);
+  const [pending, setPending] = useState<PendingTopUp | null>(initialPending);
   const [completed, setCompleted] = useState(false);
   const [expired, setExpired] = useState(false);
   const [transactions, setTransactions] = useState<CreditTransactionDTO[] | null>(null);

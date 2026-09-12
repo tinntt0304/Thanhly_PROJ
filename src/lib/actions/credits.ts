@@ -70,6 +70,38 @@ export async function createTopUpRequest(formData: FormData): Promise<CreateTopU
   return { ok: true, requestId: request.id, referenceCode, qrUrl, amount: parsed.data.amount, expiresAt };
 }
 
+export type PendingTopUpDTO = {
+  requestId: string;
+  referenceCode: string;
+  qrUrl: string | null;
+  amount: number;
+  expiresAt: string;
+};
+
+// Seller rời trang giữa chừng (đóng tab, mất mạng, bấm nhầm link khác...) rồi quay lại trang
+// Nạp credit — nếu không khôi phục, họ chỉ thấy form nhập số tiền mới, bấm "Tạo mã" sẽ bị
+// createTopUpRequest() chặn ngay (chỉ cho 1 PENDING/lần) mà không có cách nào xem lại mã QR/
+// thời gian còn lại của yêu cầu cũ để biết còn quét được không hay phải đợi hết hạn. Gọi từ
+// Server Component (trang /admin/nap-credit) để hiện lại đúng trạng thái ngay lần render đầu,
+// không cần round-trip client mới biết.
+export async function getActivePendingTopUp(): Promise<PendingTopUpDTO | null> {
+  const session = await requireAdmin();
+  const pendingCutoff = new Date(Date.now() - TOPUP_QR_EXPIRY_SECONDS * 1000);
+  const request = await prisma.topUpRequest.findFirst({
+    where: { userId: session.user.id, status: "PENDING", createdAt: { gt: pendingCutoff } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!request) return null;
+
+  return {
+    requestId: request.id,
+    referenceCode: request.referenceCode,
+    qrUrl: buildTopUpQrUrl(request.amount, request.referenceCode),
+    amount: request.amount,
+    expiresAt: new Date(request.createdAt.getTime() + TOPUP_QR_EXPIRY_SECONDS * 1000).toISOString(),
+  };
+}
+
 // Người dùng chủ động huỷ (nút "Huỷ, nhập số tiền khác") — đánh dấu EXPIRED ngay thay vì
 // để PENDING treo tới khi hết hạn tự nhiên, nếu không request này sẽ chặn nhầm việc tạo
 // mã QR mới của chính họ (do giới hạn "chỉ 1 PENDING/lần" ở createTopUpRequest).
