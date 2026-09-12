@@ -11,7 +11,6 @@ import {
   GalleryIcon,
   MenuIcon,
   StarIcon,
-  ChatIcon,
   SearchIcon,
   OrdersIcon,
   WalletIcon,
@@ -79,17 +78,15 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 
 export function AdminSidebar({
   isSuperAdmin,
-  awaitingReplyCount,
   supportAwaitingCount,
   creditBalance,
   signOutAction,
 }: {
   isSuperAdmin: boolean;
-  awaitingReplyCount: number;
-  // Superadmin: số thread hỗ trợ đang chờ trả lời. Seller: 1 nếu superadmin vừa nhắn mà seller
-  // chưa nhắn lại (xem countThreadsAwaitingSuperadminReply/hasUnseenSuperadminReply trong
-  // lib/actions/support.ts), khác ý nghĩa nhau nhưng dùng chung 1 prop vì luôn đúng đúng 1 vai
-  // trên mỗi phiên đăng nhập.
+  // Superadmin: tổng số hội thoại (khách vãng lai + seller) đang chờ trả lời — /admin/ho-tro
+  // gộp cả 2 loại vào chung 1 trang bằng tab, xem SupportPanel.tsx. Seller: 1 nếu superadmin
+  // vừa nhắn mà seller chưa nhắn lại (xem hasUnseenSuperadminReply ở lib/actions/support.ts).
+  // Khác ý nghĩa nhau nhưng dùng chung 1 prop vì luôn đúng đúng 1 vai trên mỗi phiên đăng nhập.
   supportAwaitingCount: number;
   creditBalance: number;
   signOutAction: () => Promise<void>;
@@ -135,7 +132,6 @@ export function AdminSidebar({
   const adminItems: NavItem[] = [
     { href: "/admin/danh-muc", label: "Quản lý danh mục", icon: <MenuIcon />, tourId: "categories" },
     { href: "/admin/settings", label: "Bằng chứng uy tín", icon: <StarIcon />, tourId: "trust" },
-    { href: "/admin/chat", label: "Chat hỗ trợ", icon: <ChatIcon />, badge: awaitingReplyCount, tourId: "chat" },
   ];
 
   return (

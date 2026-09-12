@@ -1,12 +1,6 @@
-import { requireSuperAdmin } from "@/lib/admin-guard";
-import { AdminChatPanel } from "@/components/AdminChatPanel";
+import { redirect } from "next/navigation";
 
-export default async function AdminChatPage() {
-  await requireSuperAdmin();
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-lg font-bold text-text">Chat hỗ trợ khách</h1>
-      <AdminChatPanel />
-    </div>
-  );
+// Đã gộp vào /admin/ho-tro (tab "Khách hàng") — giữ redirect ở đây phòng link/bookmark cũ.
+export default function AdminChatRedirectPage() {
+  redirect("/admin/ho-tro");
 }

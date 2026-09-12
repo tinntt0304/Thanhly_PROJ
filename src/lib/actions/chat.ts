@@ -64,7 +64,7 @@ export async function createChatSession(
   });
 
   await broadcast("chat-sessions", "updated");
-  revalidatePath("/admin/chat");
+  revalidatePath("/admin/ho-tro");
   return {
     session: {
       id: session.id,
@@ -128,7 +128,7 @@ export async function sendVisitorMessage(
   ]);
 
   await notifyChatUpdate(sessionId);
-  revalidatePath("/admin/chat");
+  revalidatePath("/admin/ho-tro");
   return {};
 }
 
@@ -150,7 +150,7 @@ export async function sendAdminMessage(
   ]);
 
   await notifyChatUpdate(sessionId);
-  revalidatePath("/admin/chat");
+  revalidatePath("/admin/ho-tro");
   return {};
 }
 
@@ -183,5 +183,5 @@ export async function setChatSessionStatus(
 ): Promise<void> {
   await requireSuperAdmin();
   await prisma.chatSession.update({ where: { id: sessionId }, data: { status } });
-  revalidatePath("/admin/chat");
+  revalidatePath("/admin/ho-tro");
 }

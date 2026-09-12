@@ -11,18 +11,19 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
   const session = await requireAdmin();
   const isSuperAdmin = session.user.role === "SUPERADMIN";
 
-  // Chat hỗ trợ là hộp thư chung của cả sàn (chỉ superadmin) — không gọi listChatSessions()
-  // (đã đổi sang requireSuperAdmin() trong chat.ts) khi đang là SELLER, tránh bị redirect()
-  // giữa chừng lúc render layout.
-  const [awaitingReplyCount, supportAwaitingCount, creditBalance] = await Promise.all([
+  // Badge "Hỗ trợ" ở sidebar gộp cả 2 loại hội thoại superadmin cần trả lời (khách vãng lai +
+  // seller, xem SupportPanel.tsx ở /admin/ho-tro) — không gọi listChatSessions()/
+  // countThreadsAwaitingSuperadminReply() khi đang là SELLER (đã đổi sang requireSuperAdmin()),
+  // tránh bị redirect() giữa chừng lúc render layout.
+  const [supportAwaitingCount, creditBalance] = await Promise.all([
     isSuperAdmin
-      ? listChatSessions().then(
-          (sessions) =>
-            sessions.filter((s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR").length
-        )
-      : Promise.resolve(0),
-    isSuperAdmin
-      ? countThreadsAwaitingSuperadminReply()
+      ? Promise.all([
+          listChatSessions().then(
+            (sessions) =>
+              sessions.filter((s) => s.status === "OPEN" && s.lastMessageSender === "VISITOR").length
+          ),
+          countThreadsAwaitingSuperadminReply(),
+        ]).then(([customerCount, sellerCount]) => customerCount + sellerCount)
       : hasUnseenSuperadminReply().then((has) => (has ? 1 : 0)),
     getCreditBalance(session.user.id),
   ]);
@@ -41,7 +42,6 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
       <div className="flex flex-1 flex-col sm:flex-row">
         <AdminSidebar
           isSuperAdmin={isSuperAdmin}
-          awaitingReplyCount={awaitingReplyCount}
           supportAwaitingCount={supportAwaitingCount}
           creditBalance={creditBalance}
           signOutAction={signOutAction}

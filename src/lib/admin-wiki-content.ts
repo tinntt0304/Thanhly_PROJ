@@ -21,7 +21,6 @@ export type IconKey =
   | "search"
   | "menu"
   | "star"
-  | "chat"
   | "user"
   | "inbox"
   | "settings"
@@ -220,30 +219,6 @@ export const ADMIN_WIKI: WikiSection[] = [
           },
         ],
       },
-      {
-        target: "chat",
-        href: "/admin/chat",
-        icon: "chat",
-        title: "Chat hỗ trợ",
-        description: "Trả lời tin nhắn hỗ trợ từ khách hàng và người bán trên sàn.",
-        steps: [
-          "Chọn 1 cuộc trò chuyện ở danh sách bên trái.",
-          "Đọc tin nhắn khách vừa gửi.",
-          "Nhập nội dung trả lời rồi bấm nút Gửi.",
-        ],
-        buttons: [
-          {
-            target: "chat-input",
-            title: "Ô nhập tin nhắn",
-            description: "Chọn 1 cuộc trò chuyện ở danh sách bên trái rồi nhập nội dung trả lời ở đây.",
-          },
-          {
-            target: "chat-send",
-            title: "Nút Gửi",
-            description: "Bấm để gửi tin nhắn trả lời cho khách.",
-          },
-        ],
-      },
     ],
   },
   {
@@ -278,21 +253,32 @@ export const ADMIN_WIKI: WikiSection[] = [
         href: "/admin/ho-tro",
         icon: "support",
         title: "Hỗ trợ",
-        description: "Nhắn tin trực tiếp với quản trị sàn khi cần hỗ trợ về 1 tính năng nào đó trên trang admin.",
+        description:
+          "Seller nhắn tin trực tiếp với quản trị sàn khi cần hỗ trợ 1 tính năng nào đó. Superadmin trả lời cả yêu cầu từ seller lẫn tin nhắn từ khách hàng, chia theo 2 tab riêng.",
         steps: [
-          "Nhập nội dung cần hỗ trợ rồi bấm Gửi — quản trị sàn sẽ thấy và trả lời ngay tại đây.",
-          "Không cần tạo lại yêu cầu mới cho lần hỏi tiếp theo, mọi tin nhắn đều nằm chung 1 cuộc trò chuyện.",
+          "Seller: nhập nội dung cần hỗ trợ rồi bấm Gửi — quản trị sàn sẽ thấy và trả lời ngay tại đây, không cần tạo lại yêu cầu mới cho lần hỏi tiếp theo.",
+          "Superadmin: chọn tab Khách hàng hoặc Người bán, chọn 1 cuộc trò chuyện ở danh sách bên trái rồi nhập nội dung trả lời.",
         ],
         buttons: [
           {
             target: "support-input",
-            title: "Ô nhập tin nhắn",
+            title: "Ô nhập tin nhắn (seller)",
             description: "Nhập nội dung thắc mắc hoặc vấn đề cần hỗ trợ ở đây.",
           },
           {
             target: "support-send",
-            title: "Nút Gửi",
+            title: "Nút Gửi (seller)",
             description: "Bấm để gửi tin nhắn cho quản trị sàn.",
+          },
+          {
+            target: "chat-input",
+            title: "Ô nhập tin nhắn (superadmin)",
+            description: "Chọn 1 cuộc trò chuyện ở danh sách bên trái rồi nhập nội dung trả lời ở đây.",
+          },
+          {
+            target: "chat-send",
+            title: "Nút Gửi (superadmin)",
+            description: "Bấm để gửi tin nhắn trả lời.",
           },
         ],
       },
