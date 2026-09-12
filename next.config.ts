@@ -8,15 +8,17 @@ import type { NextConfig } from "next";
 const supabaseHostname = process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).hostname : undefined;
 
 // Nguồn ảnh ngoài site: Supabase Storage (ảnh sản phẩm) + CDN của Facebook (ảnh đại diện
-// người nhắn/bình luận ở tính năng Hộp thư Facebook, /admin/hop-thu-facebook) — 2 host CDN
-// của Facebook trả về URL ảnh động (scontent-*.fbcdn.net, platform-lookaside.fbsbx.com) nên
-// phải khai báo wildcard thay vì 1 hostname cố định.
+// người nhắn/bình luận ở tính năng Hộp thư Facebook, /admin/hop-thu-facebook) + vietqr.app
+// (ảnh mã QR chuyển khoản ở trang Nạp credit, xem buildTopUpQrUrl trong lib/sepay.ts) — 2 host
+// CDN của Facebook trả về URL ảnh động (scontent-*.fbcdn.net, platform-lookaside.fbsbx.com)
+// nên phải khai báo wildcard thay vì 1 hostname cố định.
 const imgSrc = [
   "'self'",
   "data:",
   supabaseHostname ? `https://${supabaseHostname}` : "",
   "https://*.fbcdn.net",
   "https://platform-lookaside.fbsbx.com",
+  "https://vietqr.app",
 ]
   .filter(Boolean)
   .join(" ");
