@@ -21,6 +21,7 @@ import {
   InboxIcon,
   SettingsIcon,
   LifeBuoyIcon,
+  ChartBarIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const SIDEBAR_COLLAPSED_KEY = "admin_sidebar_collapsed";
@@ -120,6 +121,7 @@ export function AdminSidebar({
   }
 
   const productItems: NavItem[] = [
+    { href: "/admin/thong-ke", label: "Thống kê", icon: <ChartBarIcon />, tourId: "stats" },
     { href: "/admin", label: "Danh sách sản phẩm", icon: <ProductsIcon />, exact: true, tourId: "admin" },
     { href: "/admin/products/new", label: "Đăng sản phẩm", icon: <PlusIcon />, tourId: "products-new" },
     { href: "/admin/products/import", label: "Import Excel", icon: <ImportIcon />, tourId: "products-import" },

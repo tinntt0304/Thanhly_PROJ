@@ -132,6 +132,13 @@ export function SettingsIcon(props: IconProps) {
     </svg>
   );
 }
+export function ChartBarIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20V10m6.5 10V4m6.5 16v-7" />
+    </svg>
+  );
+}
 export function LifeBuoyIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5" {...props}>

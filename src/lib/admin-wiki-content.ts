@@ -24,7 +24,8 @@ export type IconKey =
   | "user"
   | "inbox"
   | "settings"
-  | "support";
+  | "support"
+  | "stats";
 
 export type WikiFeature = {
   target: string;
@@ -46,6 +47,18 @@ export const ADMIN_WIKI: WikiSection[] = [
   {
     label: "Sản phẩm",
     features: [
+      {
+        target: "stats",
+        href: "/admin/thong-ke",
+        icon: "stats",
+        title: "Thống kê",
+        description: "Tổng quan sản phẩm đang đấu giá/đã bán, đơn hàng theo trạng thái, và sản phẩm bán chạy nhất.",
+        steps: [
+          "Xem số sản phẩm đang đấu giá, đã bán, và sản phẩm hết giờ chưa xử lý cần đánh dấu.",
+          "Xem số đơn hàng theo từng trạng thái (Mới tạo, Đang giao, Đã giao, Đã huỷ).",
+          "Xem danh sách sản phẩm bán chạy nhất, xếp theo tổng số lượng đã bán qua đơn hàng.",
+        ],
+      },
       {
         target: "admin",
         href: "/admin",
