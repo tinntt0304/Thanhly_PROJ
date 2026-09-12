@@ -142,9 +142,12 @@ export function AdminSidebar({
           type="button"
           onClick={toggleCollapsed}
           title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100"
+          className={`flex h-7 shrink-0 items-center justify-center gap-1 rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 ${
+            collapsed ? "w-7" : "px-1.5"
+          }`}
         >
           <CollapseToggleIcon collapsed={collapsed} />
+          {!collapsed && <span className="text-xs font-medium">Thu gọn</span>}
         </button>
       </div>
 
