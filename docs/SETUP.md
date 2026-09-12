@@ -86,10 +86,14 @@ tạo tay. Giới hạn: JPEG/PNG/WEBP/GIF, tối đa 5MB/ảnh, tối đa 8 ả
 
 Trang `/admin/nhom-facebook` (mọi tài khoản đã đăng nhập — SUPERADMIN lẫn SELLER) gọi
 actor Apify
-[`scraper-engine/facebook-groups-search-scraper`](https://apify.com/scraper-engine/facebook-groups-search-scraper)
+[`easyapi/facebook-groups-search-scraper`](https://apify.com/easyapi/facebook-groups-search-scraper)
 để tìm nhóm Facebook theo từ khóa, phục vụ việc mang sản phẩm sang chia sẻ (không tự
 scrape Facebook — dùng dịch vụ bên thứ ba đã có sẵn, người dùng tự chịu trách nhiệm về
-tài khoản Apify/chi phí credit).
+tài khoản Apify/chi phí credit). Actor cũ (`scraper-engine/facebook-groups-search-scraper`)
+đã bị gỡ khỏi Apify Store (2026-09), đổi sang actor này để thay thế — actor mới chỉ nhận
+1 từ khóa/lượt gọi (không phải mảng), nên tìm nhiều từ khóa cùng lúc sẽ gọi Apify tuần tự
+từng từ khóa một (xem `runFacebookGroupsSearch` ở `src/lib/facebook-groups.ts`), và không
+trả về mô tả nhóm (`description` luôn `null`).
 
 `.env` cần thêm:
 

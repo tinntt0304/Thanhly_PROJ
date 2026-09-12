@@ -218,7 +218,7 @@ function SearchTab({
       <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
         <p className="text-sm text-neutral-600">
           Dùng để tìm nhóm Facebook phù hợp mang sản phẩm sang chia sẻ. Dữ liệu lấy qua actor
-          Apify (<code className="text-xs">scraper-engine/facebook-groups-search-scraper</code>),
+          Apify (<code className="text-xs">easyapi/facebook-groups-search-scraper</code>),
           tốn credit mỗi lần gọi thật. Nhóm tìm được chỉ riêng tài khoản bạn thấy. Từ khóa chính
           bạn vừa tìm trong {SEARCH_CACHE_HOURS} giờ qua sẽ tự dùng lại kết quả đã lưu thay vì gọi
           lại API.
