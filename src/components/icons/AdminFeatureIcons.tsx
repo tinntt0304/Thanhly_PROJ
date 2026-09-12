@@ -132,3 +132,16 @@ export function SettingsIcon(props: IconProps) {
     </svg>
   );
 }
+export function LifeBuoyIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5" {...props}>
+      <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="4" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.9 4.9l4.24 4.24m5.72 5.72l4.24 4.24m0-14.2l-4.24 4.24M9.14 14.86L4.9 19.1"
+      />
+    </svg>
+  );
+}

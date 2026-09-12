@@ -62,6 +62,7 @@ model User {
   phoneReports           PhoneReport[]
   emailOtp               EmailOtp?
   facebookPageConnections FacebookPageConnection[]
+  supportThread           SupportThread?
 }
 
 // 1 OTP đang hiệu lực/user (unique userId — tạo OTP mới thì ghi đè, không cộng dồn nhiều
@@ -319,6 +320,41 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([sessionId, createdAt])
+}
+
+enum SupportSender {
+  SELLER
+  SUPERADMIN
+}
+
+// Kênh nhắn tin riêng giữa 1 SELLER và (các) SUPERADMIN để xin hỗ trợ về 1 tính năng nào đó
+// trên trang admin — khác ChatSession/ChatMessage (khách vãng lai công khai nhắn hỏi mua
+// hàng). 1 seller chỉ có đúng 1 thread duy nhất (sellerId unique) — không cần chọn "phòng ban"
+// hay tạo nhiều cuộc hội thoại, mọi superadmin cùng thấy và trả lời chung 1 thread này.
+model SupportThread {
+  id       String @id @default(cuid())
+  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // cập nhật mỗi khi có tin nhắn mới — dùng để sắp xếp danh sách ở superadmin
+
+  messages SupportMessage[]
+
+  @@index([updatedAt])
+}
+
+model SupportMessage {
+  id       String        @id @default(cuid())
+  thread   SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId String
+
+  sender  SupportSender
+  content String
+
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 // Cấu trúc menu điều hướng công khai (ngoài "Trang chủ" luôn cố định đứng đầu, không

@@ -15,6 +15,7 @@ import {
   UserIcon,
   InboxIcon,
   SettingsIcon,
+  LifeBuoyIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
@@ -30,6 +31,7 @@ const ICON_MAP: Record<IconKey, ComponentType<{ className?: string }>> = {
   user: UserIcon,
   inbox: InboxIcon,
   settings: SettingsIcon,
+  support: LifeBuoyIcon,
 };
 
 export default async function AdminWikiPage() {

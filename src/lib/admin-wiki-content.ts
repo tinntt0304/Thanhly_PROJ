@@ -24,7 +24,8 @@ export type IconKey =
   | "chat"
   | "user"
   | "inbox"
-  | "settings";
+  | "settings"
+  | "support";
 
 export type WikiFeature = {
   target: string;
@@ -269,6 +270,29 @@ export const ADMIN_WIKI: WikiSection[] = [
             target: "settings-disconnect",
             title: "Ngắt kết nối",
             description: "Bấm để ngắt kết nối đúng fanpage ở dòng đó.",
+          },
+        ],
+      },
+      {
+        target: "support",
+        href: "/admin/ho-tro",
+        icon: "support",
+        title: "Hỗ trợ",
+        description: "Nhắn tin trực tiếp với quản trị sàn khi cần hỗ trợ về 1 tính năng nào đó trên trang admin.",
+        steps: [
+          "Nhập nội dung cần hỗ trợ rồi bấm Gửi — quản trị sàn sẽ thấy và trả lời ngay tại đây.",
+          "Không cần tạo lại yêu cầu mới cho lần hỏi tiếp theo, mọi tin nhắn đều nằm chung 1 cuộc trò chuyện.",
+        ],
+        buttons: [
+          {
+            target: "support-input",
+            title: "Ô nhập tin nhắn",
+            description: "Nhập nội dung thắc mắc hoặc vấn đề cần hỗ trợ ở đây.",
+          },
+          {
+            target: "support-send",
+            title: "Nút Gửi",
+            description: "Bấm để gửi tin nhắn cho quản trị sàn.",
           },
         ],
       },

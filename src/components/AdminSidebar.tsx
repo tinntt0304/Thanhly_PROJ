@@ -21,6 +21,7 @@ import {
   UserIcon,
   InboxIcon,
   SettingsIcon,
+  LifeBuoyIcon,
 } from "@/components/icons/AdminFeatureIcons";
 
 const SIDEBAR_COLLAPSED_KEY = "admin_sidebar_collapsed";
@@ -79,11 +80,17 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 export function AdminSidebar({
   isSuperAdmin,
   awaitingReplyCount,
+  supportAwaitingCount,
   creditBalance,
   signOutAction,
 }: {
   isSuperAdmin: boolean;
   awaitingReplyCount: number;
+  // Superadmin: số thread hỗ trợ đang chờ trả lời. Seller: 1 nếu superadmin vừa nhắn mà seller
+  // chưa nhắn lại (xem countThreadsAwaitingSuperadminReply/hasUnseenSuperadminReply trong
+  // lib/actions/support.ts), khác ý nghĩa nhau nhưng dùng chung 1 prop vì luôn đúng đúng 1 vai
+  // trên mỗi phiên đăng nhập.
+  supportAwaitingCount: number;
   creditBalance: number;
   signOutAction: () => Promise<void>;
 }) {
@@ -176,6 +183,16 @@ export function AdminSidebar({
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-neutral-200 px-3 py-3">
+        <NavLink
+          item={{
+            href: "/admin/ho-tro",
+            label: "Hỗ trợ",
+            icon: <LifeBuoyIcon />,
+            badge: supportAwaitingCount,
+            tourId: "support",
+          }}
+          collapsed={collapsed}
+        />
         <NavLink item={{ href: "/admin/huong-dan", label: "Hướng dẫn sử dụng", icon: <HelpIcon /> }} collapsed={collapsed} />
         <NavLink
           item={{ href: "/admin/cai-dat", label: "Cài đặt", icon: <SettingsIcon />, tourId: "settings" }}
