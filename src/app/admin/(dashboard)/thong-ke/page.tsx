@@ -22,8 +22,7 @@ const ORDER_STATUS_ORDER = ["NEW", "SHIPPING", "DELIVERED", "CANCELLED"] as cons
 
 export default async function DashboardPage() {
   const session = await requireAdmin();
-  const isSuperAdmin = session.user.role === "SUPERADMIN";
-  const stats = await getDashboardStats(session.user.id, isSuperAdmin);
+  const stats = await getDashboardStats(session.user.id);
 
   const maxOrderCount = Math.max(1, ...ORDER_STATUS_ORDER.map((s) => stats.orders.byStatus[s]));
 
@@ -31,9 +30,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-heading text-lg font-bold text-text">Thống kê</h1>
-        <p className="mt-1 text-sm text-neutral-700">
-          {isSuperAdmin ? "Tổng quan toàn sàn." : "Tổng quan hoạt động bán hàng của bạn."}
-        </p>
+        <p className="mt-1 text-sm text-neutral-700">Tổng quan hoạt động bán hàng của tài khoản bạn.</p>
       </div>
 
       <div data-tour="stats" className="flex flex-col gap-6">

@@ -25,11 +25,13 @@ export type DashboardStats = {
   }>;
 };
 
-// SUPERADMIN xem thống kê TOÀN SÀN (mọi seller); SELLER chỉ xem thống kê của chính mình — cùng
-// quy ước phân quyền đã dùng ở trang "Danh sách sản phẩm" (/admin) và "Quản lý đơn hàng".
-export async function getDashboardStats(sellerId: string, isSuperAdmin: boolean): Promise<DashboardStats> {
-  const productWhere = isSuperAdmin ? {} : { sellerId };
-  const orderWhere = isSuperAdmin ? {} : { sellerId };
+// Luôn thống kê theo ĐÚNG tài khoản đang đăng nhập — kể cả superadmin cũng chỉ xem số liệu
+// sản phẩm/đơn hàng gắn với chính tài khoản mình (sellerId), không gộp toàn sàn. Khác quy ước
+// ở trang "Danh sách sản phẩm" (/admin, superadmin xem được mọi seller để giám sát) — trang
+// Thống kê là báo cáo CÁ NHÂN của từng tài khoản.
+export async function getDashboardStats(sellerId: string): Promise<DashboardStats> {
+  const productWhere = { sellerId };
+  const orderWhere = { sellerId };
 
   const [productStatusCounts, biddingCount, orderStatusCounts, deliveredAgg, topSellingGroups] = await Promise.all([
     prisma.product.groupBy({ by: ["status"], where: productWhere, _count: { _all: true } }),
