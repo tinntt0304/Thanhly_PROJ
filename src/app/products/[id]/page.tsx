@@ -167,29 +167,6 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           <p className="whitespace-pre-line text-sm text-neutral-800">{product.description}</p>
         </div>
 
-        {attributes.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-2 font-heading text-sm font-bold text-text">Thuộc tính sản phẩm</h2>
-            <dl className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-surface text-sm">
-              {attributes.map((attr, i) => (
-                <div key={i} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
-                  <dt className="text-neutral-700">{attr.name}</dt>
-                  <dd className="flex flex-wrap justify-end gap-1.5">
-                    {attr.values.map((val, vi) => (
-                      <span
-                        key={val + vi}
-                        className="inline-flex items-center rounded-full bg-accent-2-100 px-2.5 py-0.5 text-xs font-medium text-accent-2-700"
-                      >
-                        {val}
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
-
         <div className="mt-6">
           <h2 className="mb-2 font-heading text-sm font-bold text-text">
             Lịch sử trả giá ({product.bids.length})
