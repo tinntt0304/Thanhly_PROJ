@@ -29,10 +29,42 @@ export async function SiteHeader() {
     ? await prisma.cartItem.count({ where: { buyerId: session.user.id } })
     : 0;
 
+  // Cùng 1 khối JSX dùng ở 2 chỗ tuỳ breakpoint (xem bên dưới) — mobile gom vào cụm bên trái
+  // cạnh logo/icon menu, desktop vẫn ở cụm bên phải như cũ.
+  const cartAndAccount = session ? (
+    <div className="flex items-center gap-2">
+      <Link
+        href="/gio-hang"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full text-neutral-200 transition-colors hover:bg-neutral-800 hover:text-white"
+      >
+        <CartIcon />
+        {cartCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold leading-none text-white">
+            {cartCount > 99 ? "99+" : cartCount}
+          </span>
+        )}
+      </Link>
+      <AccountMenu
+        name={session.user.name || session.user.email || "Tài khoản"}
+        onSignOut={async () => {
+          "use server";
+          await signOut({ redirectTo: "/" });
+        }}
+      />
+    </div>
+  ) : (
+    <Link
+      href="/admin/login"
+      className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+    >
+      Đăng nhập / Đăng ký
+    </Link>
+  );
+
   return (
     <header className="relative bg-neutral-900">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-        <div className="flex items-center gap-3 sm:gap-6">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6">
           <MobileNavMenu navLinks={navLinks} />
           <Logo size="sm" onDark />
           <nav className="hidden flex-wrap items-center gap-5 text-sm text-neutral-200 sm:flex">
@@ -42,40 +74,14 @@ export async function SiteHeader() {
               </Link>
             ))}
           </nav>
+          {/* Mobile: giỏ hàng + tài khoản gom về cùng cụm với logo/icon menu, thay vì đẩy sang
+              rìa phải như trước — bản sm:hidden của khối bên dưới. */}
+          <div className="sm:hidden">{cartAndAccount}</div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Clock className="hidden text-neutral-50 sm:block" />
-
-          {session ? (
-            <div className="flex items-center gap-2">
-              <Link
-                href="/gio-hang"
-                className="relative flex h-9 w-9 items-center justify-center rounded-full text-neutral-200 transition-colors hover:bg-neutral-800 hover:text-white"
-              >
-                <CartIcon />
-                {cartCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold leading-none text-white">
-                    {cartCount > 99 ? "99+" : cartCount}
-                  </span>
-                )}
-              </Link>
-              <AccountMenu
-                name={session.user.name || session.user.email || "Tài khoản"}
-                onSignOut={async () => {
-                  "use server";
-                  await signOut({ redirectTo: "/" });
-                }}
-              />
-            </div>
-          ) : (
-            <Link
-              href="/admin/login"
-              className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
-            >
-              Đăng nhập / Đăng ký
-            </Link>
-          )}
+        <div className="hidden items-center gap-4 sm:flex">
+          <Clock className="text-neutral-50" />
+          {cartAndAccount}
         </div>
       </div>
     </header>
