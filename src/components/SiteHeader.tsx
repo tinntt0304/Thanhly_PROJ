@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import { Clock } from "@/components/Clock";
 import { AccountMenu } from "@/components/AccountMenu";
+import { MobileNavMenu } from "@/components/MobileNavMenu";
 
 function CartIcon() {
   return (
@@ -29,11 +30,12 @@ export async function SiteHeader() {
     : 0;
 
   return (
-    <header className="bg-neutral-900">
+    <header className="relative bg-neutral-900">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
+          <MobileNavMenu navLinks={navLinks} />
           <Logo size="sm" onDark />
-          <nav className="flex flex-wrap items-center gap-5 text-sm text-neutral-200">
+          <nav className="hidden flex-wrap items-center gap-5 text-sm text-neutral-200 sm:flex">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href} className="transition-colors hover:text-white">
                 {link.label}
