@@ -131,12 +131,18 @@ model CartItem {
 
   selectedAttributes Json @default("[]")
 
+  // Chuỗi canonical hoá từ selectedAttributes (xem variantKeyFromAttributes ở
+  // lib/actions/cart.ts) — PHẢI có để phân biệt các phân loại KHÁC NHAU của CÙNG 1 sản phẩm
+  // trong giỏ (vd. "Rồng Hồng" và "Thỏ Bunny Hồng" của 1 product buyNowPrice là 2 dòng riêng,
+  // không gộp số lượng vào nhau). Sản phẩm không có thuộc tính thì luôn là "".
+  variantKey String @default("")
+
   quantity Int @default(1) // số lượng buyer muốn mua, chỉnh trực tiếp ở trang giỏ hàng — luôn bị
   // kẹp lại trong khoảng [1, Product.quantity] (số lượng thật còn lại) mỗi khi đổi và lúc checkout
 
   createdAt DateTime @default(now())
 
-  @@unique([buyerId, productId])
+  @@unique([buyerId, productId, variantKey])
 }
 
 enum OrderStatus {
@@ -236,8 +242,8 @@ model OrderItem {
   selectedAttributes Json @default("[]") // thuộc tính người mua chọn cho riêng sản phẩm này: [{ name, value }] — rỗng nếu đơn tạo thủ công từ admin hoặc sản phẩm không có thuộc tính
 
   // true nếu dòng này đã trừ đúng `quantity` đơn vị Product.quantity lúc tạo (hiện chỉ
-  // buyNowAction/checkoutCart làm việc này — đơn tạo thủ công ở admin, kể cả từ người thắng đấu
-  // giá, KHÔNG đụng tới quantity). Dùng để biết chính xác có nên hoàn lại quantity khi huỷ đơn
+  // checkoutCart làm việc này — đơn tạo thủ công ở admin, kể cả từ người thắng đấu giá, KHÔNG
+  // đụng tới quantity). Dùng để biết chính xác có nên hoàn lại quantity khi huỷ đơn
   // hay không — cần 1 cờ tường minh vì không thể suy ngược lại "dòng này có từng trừ kho hay
   // chưa" chỉ từ trạng thái hiện tại của Product (nhiều OrderItem có thể cùng ảnh hưởng 1 Product).
   stockDecremented Boolean @default(false)

@@ -11,8 +11,10 @@ import { isOptimizableProductImage } from "@/lib/image-url";
 const initialState: CheckoutCartState | undefined = undefined;
 
 export type CartItemView = {
+  id: string; // CartItem.id — 1 sản phẩm có thể có nhiều dòng khác phân loại, định danh theo dòng
   productId: string;
   title: string;
+  variantLabel: string; // vd. "Rồng Hồng" — rỗng nếu sản phẩm không có thuộc tính
   image: string | null;
   buyNowPrice: number | null;
   quantity: number; // số lượng buyer đang muốn mua, đã kẹp trong [1, stock]
@@ -37,24 +39,24 @@ export function CartCheckoutForm({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, number>>({});
   const [quantityErrors, setQuantityErrors] = useState<Record<string, string>>({});
-  // Mặc định tick sẵn mọi sản phẩm còn mua được — sản phẩm hết hàng/đã bán không chọn được,
-  // không còn chặn cả giỏ như trước (xem checkoutCart ở actions/cart.ts: chỉ đặt hàng đúng
-  // những sản phẩm được tick, món khác vẫn nằm nguyên trong giỏ).
+  // Mặc định tick sẵn mọi dòng còn mua được — dòng hết hàng/đã bán không chọn được, không còn
+  // chặn cả giỏ như trước (xem checkoutCart ở actions/cart.ts: chỉ đặt hàng đúng những dòng
+  // được tick, dòng khác vẫn nằm nguyên trong giỏ).
   const [selected, setSelected] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(items.map((i) => [i.productId, i.available]))
+    Object.fromEntries(items.map((i) => [i.id, i.available]))
   );
-  // Đồng bộ lại khi danh sách items đổi (xoá món/đổi số lượng khiến server component render
-  // lại với mảng items mới) — giữ nguyên lựa chọn cũ cho món còn tồn tại, món mới mặc định
+  // Đồng bộ lại khi danh sách items đổi (xoá dòng/đổi số lượng khiến server component render
+  // lại với mảng items mới) — giữ nguyên lựa chọn cũ cho dòng còn tồn tại, dòng mới mặc định
   // tick. Tính lại NGAY TRONG RENDER (không dùng useEffect) theo pattern "adjust state while
   // rendering" của React — tránh 1 lượt render thừa với state cũ trước khi effect kịp chạy.
-  const itemsKey = items.map((i) => i.productId).join("|");
+  const itemsKey = items.map((i) => i.id).join("|");
   const [syncedItemsKey, setSyncedItemsKey] = useState(itemsKey);
   if (itemsKey !== syncedItemsKey) {
     setSyncedItemsKey(itemsKey);
     setSelected((prev) => {
       const next: Record<string, boolean> = {};
       for (const item of items) {
-        next[item.productId] = item.productId in prev ? prev[item.productId] && item.available : item.available;
+        next[item.id] = item.id in prev ? prev[item.id] && item.available : item.available;
       }
       return next;
     });
@@ -66,55 +68,55 @@ export function CartCheckoutForm({
     }
   }, [state, router]);
 
-  async function handleRemove(productId: string) {
-    setRemovingId(productId);
-    await removeFromCart(productId);
+  async function handleRemove(cartItemId: string) {
+    setRemovingId(cartItemId);
+    await removeFromCart(cartItemId);
     setRemovingId(null);
     router.refresh();
   }
 
   // Báo lỗi NGAY khi gõ vượt tồn kho, không cần chờ blur/gọi server mới biết — server (xem
   // updateCartItemQuantity) vẫn tự kẹp lại khi lưu nên đây chỉ là phản hồi tức thời cho buyer.
-  function handleQuantityChange(productId: string, value: number, stock: number) {
-    setQuantityDrafts((prev) => ({ ...prev, [productId]: value }));
+  function handleQuantityChange(cartItemId: string, value: number, stock: number) {
+    setQuantityDrafts((prev) => ({ ...prev, [cartItemId]: value }));
     if (value > stock) {
-      setQuantityErrors((prev) => ({ ...prev, [productId]: `Chỉ còn tối đa ${stock} sản phẩm trong kho.` }));
+      setQuantityErrors((prev) => ({ ...prev, [cartItemId]: `Chỉ còn tối đa ${stock} sản phẩm trong kho.` }));
     } else if (value < 1) {
-      setQuantityErrors((prev) => ({ ...prev, [productId]: "Số lượng tối thiểu là 1." }));
+      setQuantityErrors((prev) => ({ ...prev, [cartItemId]: "Số lượng tối thiểu là 1." }));
     } else {
-      setQuantityErrors((prev) => ({ ...prev, [productId]: "" }));
+      setQuantityErrors((prev) => ({ ...prev, [cartItemId]: "" }));
     }
   }
 
-  async function handleQuantityCommit(productId: string, value: number) {
-    setUpdatingId(productId);
-    const res = await updateCartItemQuantity(productId, value);
+  async function handleQuantityCommit(cartItemId: string, value: number) {
+    setUpdatingId(cartItemId);
+    const res = await updateCartItemQuantity(cartItemId, value);
     setUpdatingId(null);
     if (!res.ok) {
-      setQuantityErrors((prev) => ({ ...prev, [productId]: res.error }));
+      setQuantityErrors((prev) => ({ ...prev, [cartItemId]: res.error }));
       return;
     }
-    setQuantityDrafts((prev) => ({ ...prev, [productId]: res.quantity }));
-    setQuantityErrors((prev) => ({ ...prev, [productId]: res.warning ?? "" }));
+    setQuantityDrafts((prev) => ({ ...prev, [cartItemId]: res.quantity }));
+    setQuantityErrors((prev) => ({ ...prev, [cartItemId]: res.warning ?? "" }));
     router.refresh();
   }
 
   // Bấm nút +/- ở bộ đếm — kẹp ngay trong [1, stock] rồi lưu luôn, không cần đợi blur ô nhập.
-  function handleStep(productId: string, nextValue: number, stock: number) {
+  function handleStep(cartItemId: string, nextValue: number, stock: number) {
     const clamped = Math.min(Math.max(nextValue, 1), Math.max(stock, 1));
-    setQuantityDrafts((prev) => ({ ...prev, [productId]: clamped }));
-    void handleQuantityCommit(productId, clamped);
+    setQuantityDrafts((prev) => ({ ...prev, [cartItemId]: clamped }));
+    void handleQuantityCommit(cartItemId, clamped);
   }
 
-  function toggleOne(productId: string, checked: boolean) {
-    setSelected((prev) => ({ ...prev, [productId]: checked }));
+  function toggleOne(cartItemId: string, checked: boolean) {
+    setSelected((prev) => ({ ...prev, [cartItemId]: checked }));
   }
 
   function toggleMany(targetItems: CartItemView[], checked: boolean) {
     setSelected((prev) => {
       const next = { ...prev };
       for (const item of targetItems) {
-        if (item.available) next[item.productId] = checked;
+        if (item.available) next[item.id] = checked;
       }
       return next;
     });
@@ -125,11 +127,11 @@ export function CartCheckoutForm({
   }
 
   const availableItems = items.filter((i) => i.available);
-  const selectedItems = availableItems.filter((i) => selected[i.productId]);
-  const selectedIds = selectedItems.map((i) => i.productId);
+  const selectedItems = availableItems.filter((i) => selected[i.id]);
+  const selectedIds = selectedItems.map((i) => i.id);
   const allSelected = availableItems.length > 0 && selectedItems.length === availableItems.length;
   const total = selectedItems.reduce(
-    (sum, i) => sum + (i.buyNowPrice ?? 0) * (quantityDrafts[i.productId] ?? i.quantity),
+    (sum, i) => sum + (i.buyNowPrice ?? 0) * (quantityDrafts[i.id] ?? i.quantity),
     0
   );
 
@@ -152,7 +154,7 @@ export function CartCheckoutForm({
       <div className="flex flex-col gap-3">
         {groups.map((group) => {
           const groupAvailable = group.items.filter((i) => i.available);
-          const groupSelectedCount = groupAvailable.filter((i) => selected[i.productId]).length;
+          const groupSelectedCount = groupAvailable.filter((i) => selected[i.id]).length;
           const groupAllSelected = groupAvailable.length > 0 && groupSelectedCount === groupAvailable.length;
           return (
             <div key={group.sellerId} className="overflow-hidden rounded-lg border border-neutral-200 bg-surface">
@@ -168,17 +170,17 @@ export function CartCheckoutForm({
               </label>
               <ul className="divide-y divide-neutral-100">
                 {group.items.map((item) => {
-                  const currentQty = quantityDrafts[item.productId] ?? item.quantity;
+                  const currentQty = quantityDrafts[item.id] ?? item.quantity;
                   return (
                     <li
-                      key={item.productId}
+                      key={item.id}
                       className={`flex items-center gap-3 p-3 ${!item.available ? "opacity-60" : ""}`}
                     >
                       <input
                         type="checkbox"
-                        checked={item.available && !!selected[item.productId]}
+                        checked={item.available && !!selected[item.id]}
                         disabled={!item.available}
-                        onChange={(e) => toggleOne(item.productId, e.target.checked)}
+                        onChange={(e) => toggleOne(item.id, e.target.checked)}
                         className="h-4 w-4 shrink-0 rounded border-neutral-300 disabled:opacity-40"
                       />
                       {item.image ? (
@@ -195,6 +197,9 @@ export function CartCheckoutForm({
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-text">{item.title}</p>
+                        {item.variantLabel && (
+                          <p className="truncate text-xs text-neutral-500">Phân loại: {item.variantLabel}</p>
+                        )}
                         {item.available ? (
                           <>
                             <p className="text-sm text-neutral-700">{formatVND(item.buyNowPrice ?? 0)}</p>
@@ -202,28 +207,28 @@ export function CartCheckoutForm({
                               <div className="flex items-center rounded-md border border-neutral-300">
                                 <button
                                   type="button"
-                                  onClick={() => handleStep(item.productId, currentQty - 1, item.stock)}
-                                  disabled={updatingId === item.productId || currentQty <= 1}
+                                  onClick={() => handleStep(item.id, currentQty - 1, item.stock)}
+                                  disabled={updatingId === item.id || currentQty <= 1}
                                   className="px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
                                   aria-label="Giảm số lượng"
                                 >
                                   −
                                 </button>
                                 <input
-                                  id={`qty-${item.productId}`}
+                                  id={`qty-${item.id}`}
                                   type="number"
                                   min={1}
                                   max={item.stock}
                                   value={currentQty}
-                                  onChange={(e) => handleQuantityChange(item.productId, Number(e.target.value), item.stock)}
-                                  onBlur={(e) => handleQuantityCommit(item.productId, Number(e.target.value))}
-                                  disabled={updatingId === item.productId}
+                                  onChange={(e) => handleQuantityChange(item.id, Number(e.target.value), item.stock)}
+                                  onBlur={(e) => handleQuantityCommit(item.id, Number(e.target.value))}
+                                  disabled={updatingId === item.id}
                                   className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none disabled:opacity-50"
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => handleStep(item.productId, currentQty + 1, item.stock)}
-                                  disabled={updatingId === item.productId || currentQty >= item.stock}
+                                  onClick={() => handleStep(item.id, currentQty + 1, item.stock)}
+                                  disabled={updatingId === item.id || currentQty >= item.stock}
                                   className="px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
                                   aria-label="Tăng số lượng"
                                 >
@@ -232,8 +237,8 @@ export function CartCheckoutForm({
                               </div>
                               <span className="text-xs text-neutral-500">Tối đa {item.stock}</span>
                             </div>
-                            {quantityErrors[item.productId] && (
-                              <p className="mt-0.5 text-xs text-red-600">{quantityErrors[item.productId]}</p>
+                            {quantityErrors[item.id] && (
+                              <p className="mt-0.5 text-xs text-red-600">{quantityErrors[item.id]}</p>
                             )}
                           </>
                         ) : (
@@ -242,11 +247,11 @@ export function CartCheckoutForm({
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleRemove(item.productId)}
-                        disabled={removingId === item.productId}
+                        onClick={() => handleRemove(item.id)}
+                        disabled={removingId === item.id}
                         className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
                       >
-                        {removingId === item.productId ? "Đang xoá..." : "Xoá"}
+                        {removingId === item.id ? "Đang xoá..." : "Xoá"}
                       </button>
                     </li>
                   );
@@ -276,7 +281,7 @@ export function CartCheckoutForm({
       <form action={formAction} className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
         <h3 className="font-heading text-sm font-bold text-text">Thông tin nhận hàng</h3>
         <BuyerShippingFields idPrefix="cart" defaultName={defaultName} defaultPhone={defaultPhone} />
-        <input type="hidden" name="selectedProductIds" value={JSON.stringify(selectedIds)} />
+        <input type="hidden" name="selectedCartItemIds" value={JSON.stringify(selectedIds)} />
         {state && !state.ok && <p className="text-sm text-red-600">{state.error}</p>}
         <button
           type="submit"

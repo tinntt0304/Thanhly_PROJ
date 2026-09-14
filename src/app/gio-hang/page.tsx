@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { CartCheckoutForm, type CartItemView } from "@/components/CartCheckoutForm";
 import { Countdown } from "@/components/Countdown";
 import { formatVND } from "@/lib/auction";
+import { parseSelectedAttributes } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,14 @@ export default async function CartPage() {
   const [cartItems, activeBids] = await Promise.all([getCartItems(), listMyActiveBids()]);
 
   const items: CartItemView[] = cartItems.map((item) => ({
+    id: item.id,
     productId: item.productId,
     title: item.product.title,
+    // Hiện rõ phân loại đã chọn ngay trên tên — 1 sản phẩm có thể có nhiều dòng khác phân loại
+    // trong giỏ (xem variantKey ở lib/actions/cart.ts), không hiện thì 2 dòng nhìn giống nhau.
+    variantLabel: parseSelectedAttributes(item.selectedAttributes)
+      .map((a) => a.value)
+      .join(", "),
     image: item.product.images[0] ?? null,
     buyNowPrice: item.product.buyNowPrice,
     quantity: Math.min(Math.max(item.quantity, 1), Math.max(item.product.quantity, 1)),

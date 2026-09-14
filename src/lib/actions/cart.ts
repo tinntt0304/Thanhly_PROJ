@@ -20,14 +20,27 @@ const selectedAttributeSchema = z.object({
   value: z.string().trim().min(1),
 });
 
+// Canonical hoá selectedAttributes thành 1 chuỗi để phân biệt các phân loại (mẫu/thuộc tính)
+// KHÁC NHAU của CÙNG 1 sản phẩm trong giỏ — sort theo tên thuộc tính để thứ tự chọn không ảnh
+// hưởng kết quả. Sản phẩm không có thuộc tính (hoặc chưa chọn gì) → "".
+function variantKeyFromAttributes(attrs: { name: string; value: string }[]): string {
+  if (attrs.length === 0) return "";
+  return attrs
+    .map((a) => `${a.name}:${a.value}`)
+    .sort()
+    .join("|");
+}
+
 export type AddToCartResult = { ok: true } | { ok: false; error: string };
 
 // Chỉ nhận sản phẩm có buyNowPrice (Mua ngay) — sản phẩm chỉ đấu giá không "thêm vào giỏ"
 // được vì giá không cố định, xem CartItem trong schema.prisma.
 //
-// Thêm lại sản phẩm đã có trong giỏ thì CỘNG DỒN số lượng (kiểu Shopee: bấm "Thêm vào giỏ"
-// nhiều lần = tăng dần số lượng), kẹp lại trong [1, Product.quantity] — không ghi đè về đúng
-// `quantity` truyền vào.
+// Thêm lại ĐÚNG sản phẩm + ĐÚNG phân loại đã có trong giỏ thì CỘNG DỒN số lượng (kiểu Shopee:
+// bấm "Thêm vào giỏ" nhiều lần = tăng dần số lượng), kẹp lại trong [1, Product.quantity].
+// Chọn phân loại KHÁC của cùng sản phẩm → tạo dòng CartItem riêng (xem variantKeyFromAttributes
+// + unique [buyerId, productId, variantKey] trong schema.prisma) — không gộp số lượng vào
+// dòng của phân loại khác.
 export async function addToCart(
   productId: string,
   selectedAttributesJson?: string,
@@ -58,26 +71,29 @@ export async function addToCart(
     }
   }
 
+  const variantKey = variantKeyFromAttributes(selectedAttributes);
   const addQty = Math.max(Math.trunc(quantity ?? 1) || 1, 1);
   const existing = await prisma.cartItem.findUnique({
-    where: { buyerId_productId: { buyerId: session.user.id, productId } },
+    where: { buyerId_productId_variantKey: { buyerId: session.user.id, productId, variantKey } },
     select: { quantity: true },
   });
   const nextQuantity = Math.min((existing?.quantity ?? 0) + addQty, Math.max(product.quantity, 1));
 
   await prisma.cartItem.upsert({
-    where: { buyerId_productId: { buyerId: session.user.id, productId } },
+    where: { buyerId_productId_variantKey: { buyerId: session.user.id, productId, variantKey } },
     update: { selectedAttributes, quantity: nextQuantity },
-    create: { buyerId: session.user.id, productId, selectedAttributes, quantity: nextQuantity },
+    create: { buyerId: session.user.id, productId, variantKey, selectedAttributes, quantity: nextQuantity },
   });
 
   revalidatePath("/gio-hang");
   return { ok: true };
 }
 
-export async function removeFromCart(productId: string): Promise<void> {
+// Xoá đúng 1 dòng trong giỏ theo CartItem.id — KHÔNG dùng productId vì 1 sản phẩm có thể có
+// nhiều dòng (nhiều phân loại) trong giỏ, xoá phải đúng dòng buyer bấm, không đụng dòng khác.
+export async function removeFromCart(cartItemId: string): Promise<void> {
   const session = await requireAdmin();
-  await prisma.cartItem.deleteMany({ where: { buyerId: session.user.id, productId } });
+  await prisma.cartItem.deleteMany({ where: { id: cartItemId, buyerId: session.user.id } });
   revalidatePath("/gio-hang");
 }
 
@@ -88,30 +104,34 @@ export type UpdateCartItemQuantityResult =
 // Buyer chỉnh số lượng trực tiếp ở trang giỏ hàng — luôn kẹp lại trong [1, Product.quantity]
 // (số lượng thật còn lại) ngay khi lưu, không tin số buyer gửi lên. Trước đây kẹp âm thầm,
 // buyer nhập vượt tồn kho chỉ thấy số tự nhảy về mà không hiểu vì sao — giờ trả kèm "warning"
-// khi số buyer nhập khác số thực lưu để UI báo rõ lý do.
+// khi số buyer nhập khác số thực lưu để UI báo rõ lý do. Xác định theo CartItem.id (không phải
+// productId) vì 1 sản phẩm có thể có nhiều dòng/phân loại trong giỏ.
 export async function updateCartItemQuantity(
-  productId: string,
+  cartItemId: string,
   quantity: number
 ): Promise<UpdateCartItemQuantityResult> {
   const session = await requireAdmin();
 
-  const product = await prisma.product.findUnique({ where: { id: productId }, select: { quantity: true } });
-  if (!product) return { ok: false, error: "Không tìm thấy sản phẩm." };
-  if (product.quantity <= 0) return { ok: false, error: "Sản phẩm đã hết hàng." };
+  const cartItem = await prisma.cartItem.findFirst({
+    where: { id: cartItemId, buyerId: session.user.id },
+    select: { product: { select: { quantity: true } } },
+  });
+  if (!cartItem) return { ok: false, error: "Sản phẩm không có trong giỏ." };
+  if (cartItem.product.quantity <= 0) return { ok: false, error: "Sản phẩm đã hết hàng." };
 
   const requested = Math.trunc(quantity) || 1;
-  const clamped = Math.min(Math.max(requested, 1), product.quantity);
+  const clamped = Math.min(Math.max(requested, 1), cartItem.product.quantity);
 
   const item = await prisma.cartItem.updateMany({
-    where: { buyerId: session.user.id, productId },
+    where: { id: cartItemId, buyerId: session.user.id },
     data: { quantity: clamped },
   });
   if (item.count === 0) return { ok: false, error: "Sản phẩm không có trong giỏ." };
 
   revalidatePath("/gio-hang");
   const warning =
-    requested > product.quantity
-      ? `Chỉ còn tối đa ${product.quantity} sản phẩm trong kho, đã điều chỉnh về ${clamped}.`
+    requested > cartItem.product.quantity
+      ? `Chỉ còn tối đa ${cartItem.product.quantity} sản phẩm trong kho, đã điều chỉnh về ${clamped}.`
       : requested < 1
         ? "Số lượng tối thiểu là 1, đã điều chỉnh về 1."
         : undefined;
@@ -147,9 +167,10 @@ export type CheckoutCartState =
   | { ok: true; orderIds: string[] }
   | { ok: false; error: string };
 
-// Đặt hàng CHỈ NHỮNG SẢN PHẨM buyer đã tick chọn (checkbox ở trang giỏ hàng, kiểu Shopee) —
-// không còn bắt buộc đặt cả giỏ cùng lúc. Sản phẩm không được chọn vẫn nằm nguyên trong giỏ
-// sau khi đặt hàng xong.
+// Đặt hàng CHỈ NHỮNG DÒNG buyer đã tick chọn (checkbox ở trang giỏ hàng, kiểu Shopee) — xác
+// định theo CartItem.id (không phải productId, vì 1 sản phẩm có thể có nhiều dòng/phân loại
+// trong giỏ). Không còn bắt buộc đặt cả giỏ cùng lúc — dòng không được chọn vẫn nằm nguyên
+// trong giỏ sau khi đặt hàng xong.
 //
 // Trong nhóm ĐÃ CHỌN: tất cả hoặc không gì cả — nếu 1 sản phẩm bất kỳ không còn mua được (hết
 // hàng/đã huỷ/hết phiên) thì rollback toàn bộ nhóm đã chọn, báo lỗi rõ sản phẩm nào (tránh buyer
@@ -165,14 +186,14 @@ export async function checkoutCart(
 ): Promise<CheckoutCartState> {
   const session = await requireAdmin();
 
-  let selectedProductIds: string[];
+  let selectedCartItemIds: string[];
   try {
-    const rawSelected = JSON.parse(formData.get("selectedProductIds")?.toString() ?? "[]");
-    selectedProductIds = z.array(z.string().min(1)).parse(rawSelected);
+    const rawSelected = JSON.parse(formData.get("selectedCartItemIds")?.toString() ?? "[]");
+    selectedCartItemIds = z.array(z.string().min(1)).parse(rawSelected);
   } catch {
     return { ok: false, error: "Dữ liệu chọn sản phẩm không hợp lệ." };
   }
-  if (selectedProductIds.length === 0) {
+  if (selectedCartItemIds.length === 0) {
     return { ok: false, error: "Vui lòng chọn ít nhất 1 sản phẩm để đặt hàng." };
   }
 
@@ -194,7 +215,7 @@ export async function checkoutCart(
   const data = parsed.data;
 
   const cartItems = await prisma.cartItem.findMany({
-    where: { buyerId: session.user.id, productId: { in: selectedProductIds } },
+    where: { buyerId: session.user.id, id: { in: selectedCartItemIds } },
     include: { product: true },
   });
   if (cartItems.length === 0) {
@@ -296,7 +317,7 @@ export async function checkoutCart(
       }
 
       await tx.cartItem.deleteMany({
-        where: { buyerId: session.user.id, productId: { in: selectedProductIds } },
+        where: { buyerId: session.user.id, id: { in: selectedCartItemIds } },
       });
       return ids;
     });
