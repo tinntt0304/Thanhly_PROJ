@@ -8,8 +8,8 @@ import { getAuctionState, isBiddingOpen } from "@/lib/auction";
 import { asAttributes } from "@/lib/attributes";
 import type { Prisma } from "@/generated/prisma/client";
 
-// Kích thước/cân nặng mặc định — giống hệt buyNowAction (actions/buy-now.ts), người bán chỉnh
-// lại đúng số đo thật trước khi tạo vận đơn GHN nếu cần.
+// Kích thước/cân nặng mặc định — người bán chỉnh lại đúng số đo thật trước khi tạo vận đơn
+// GHN nếu cần.
 const DEFAULT_WEIGHT_GRAM = 500;
 const DEFAULT_LENGTH_CM = 20;
 const DEFAULT_WIDTH_CM = 20;
@@ -153,8 +153,7 @@ export type CheckoutCartState =
 //
 // Trong nhóm ĐÃ CHỌN: tất cả hoặc không gì cả — nếu 1 sản phẩm bất kỳ không còn mua được (hết
 // hàng/đã huỷ/hết phiên) thì rollback toàn bộ nhóm đã chọn, báo lỗi rõ sản phẩm nào (tránh buyer
-// hiểu lầm "đã đặt hết" trong khi thiếu vài món). Lặp lại đúng pattern optimistic-lock của
-// buyNowAction (actions/buy-now.ts) cho từng sản phẩm.
+// hiểu lầm "đã đặt hết" trong khi thiếu vài món).
 //
 // Gộp theo người bán: nhiều sản phẩm ĐÃ CHỌN cùng 1 seller → 1 Order duy nhất (nhiều OrderItem)
 // để dễ theo dõi/tạo 1 vận đơn GHN chung — giống cách Shopee tách đơn theo shop lúc checkout.
@@ -225,7 +224,7 @@ export async function checkoutCart(
           throw new Error(`"${product.title}" không còn mở để mua, vui lòng xoá khỏi giỏ.`);
         }
 
-        // Cùng pattern optimistic-lock với buyNowAction: chỉ trừ kho nếu còn ACTIVE + đủ số lượng.
+        // Optimistic-lock: chỉ trừ kho nếu còn ACTIVE + đủ số lượng.
         const updateResult = await tx.product.updateMany({
           where: { id: product.id, status: "ACTIVE", quantity: { gte: wantQuantity } },
           data: { quantity: { decrement: wantQuantity } },

@@ -42,7 +42,7 @@ export async function placeBid(
   const { productId, phone, amount } = parsed.data;
 
   // Public, không đăng nhập — chặn spam trả giá theo IP (1 script gọi liên tục) VÀ theo sản
-  // phẩm (nhiều IP/script cùng nhắm 1 sản phẩm), cùng tinh thần với buyNowAction.
+  // phẩm (nhiều IP/script cùng nhắm 1 sản phẩm).
   const ip = await getClientIp();
   const [ipOk, productOk] = await Promise.all([
     checkRateLimit(`bid-ip:${ip}`, 20, 60),

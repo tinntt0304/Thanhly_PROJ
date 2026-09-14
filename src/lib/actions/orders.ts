@@ -729,7 +729,7 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Ghn
         data: { quantity: { increment: item.quantity } },
       });
       // Chỉ tự mở lại (ACTIVE) đúng trường hợp sản phẩm đang SOLD VÌ hết hàng (quantity đã
-      // về 0 — khớp điều kiện buyNowAction dùng để chuyển SOLD) — không đụng tới trường hợp
+      // về 0 — khớp điều kiện checkoutCart dùng để chuyển SOLD) — không đụng tới trường hợp
       // người bán tự tay đánh dấu đã bán trong khi vẫn còn hàng (quyết định riêng của họ,
       // huỷ 1 đơn khác không nên tự ý đảo ngược). Không reset currentPrice như "Mở lại" thủ
       // công (setProductStatus) — đây chỉ là hoàn lại đơn vị đã trừ, không phải khởi động lại

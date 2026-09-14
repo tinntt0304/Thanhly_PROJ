@@ -6,9 +6,10 @@ import { AddressPicker } from "@/components/AddressPicker";
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text placeholder:text-neutral-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
 
-// Khối field nhận hàng dùng chung giữa BuyNowButton (mua ngay 1 sản phẩm) và CartCheckoutForm
-// (đặt hàng cả giỏ) — tên/SĐT/địa chỉ + AddressPicker bản public (không cần đăng nhập seller)
-// + ghi chú. Tách riêng vì đây là UI thuần (không phải file "use server") nên tái dùng an toàn.
+// Khối field nhận hàng dùng ở CartCheckoutForm (đặt hàng những sản phẩm buyer đã chọn trong
+// giỏ, kể cả khi chỉ chọn 1 sản phẩm từ nút "Mua ngay") — tên/SĐT/địa chỉ + AddressPicker bản
+// public (không cần đăng nhập seller) + ghi chú. Tách riêng vì đây là UI thuần (không phải
+// file "use server") nên tái dùng an toàn.
 export function BuyerShippingFields({
   idPrefix,
   defaultName,

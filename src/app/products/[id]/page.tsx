@@ -14,8 +14,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { Countdown } from "@/components/Countdown";
 import { BidForm } from "@/components/BidForm";
-import { BuyNowButton } from "@/components/BuyNowButton";
-import { AddToCartButton } from "@/components/AddToCartButton";
+import { ProductBuyPanel } from "@/components/ProductBuyPanel";
 import { asAttributes } from "@/lib/attributes";
 import { ProductGallery } from "@/components/ProductGallery";
 import { TagBadges } from "@/components/TagBadges";
@@ -102,24 +101,14 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             {/* Mua ngay đặt TRƯỚC, tách hẳn khỏi khối đấu giá bên dưới — 2 lối mua độc lập,
                 không phải Mua ngay là 1 bước "sau khi đã đấu giá". */}
             {product.buyNowPrice && (
-              <div className="flex flex-col gap-2">
-                <BuyNowButton
-                  productId={product.id}
-                  buyNowPrice={product.buyNowPrice}
-                  attributes={attributes}
-                  canBuy={state === "BIDDING"}
-                  stock={product.quantity}
-                  defaultBuyerName={session?.user.name ?? undefined}
-                  defaultBuyerPhone={session?.user.phone ?? undefined}
-                />
-                <AddToCartButton
-                  productId={product.id}
-                  attributes={attributes}
-                  canBuy={state === "BIDDING"}
-                  isLoggedIn={!!session}
-                  stock={product.quantity}
-                />
-              </div>
+              <ProductBuyPanel
+                productId={product.id}
+                buyNowPrice={product.buyNowPrice}
+                attributes={attributes}
+                canBuy={state === "BIDDING"}
+                isLoggedIn={!!session}
+                stock={product.quantity}
+              />
             )}
 
             {product.buyNowPrice && state === "BIDDING" && (

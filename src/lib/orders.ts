@@ -63,8 +63,8 @@ export const SELLER_CANCEL_REASON_OPTIONS = [
 
 export const MAX_CANCEL_REASON_LENGTH = 200;
 
-// Đọc lại Order.selectedAttributes ([{name, value}]) ghi bởi buyNowAction (actions/buy-now.ts)
-// khi khách chọn thuộc tính lúc bấm "Mua ngay" — không tin dữ liệu JSON thô, lọc bỏ phần tử
+// Đọc lại Order.selectedAttributes ([{name, value}]) ghi bởi checkoutCart (actions/cart.ts)
+// khi khách chọn thuộc tính lúc thêm vào giỏ — không tin dữ liệu JSON thô, lọc bỏ phần tử
 // sai dạng thay vì để lỗi runtime khi hiển thị ở trang chi tiết đơn.
 export function parseSelectedAttributes(value: unknown): { name: string; value: string }[] {
   if (!Array.isArray(value)) return [];
