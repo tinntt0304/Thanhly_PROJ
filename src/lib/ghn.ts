@@ -26,18 +26,6 @@ function assertConfigured() {
   }
 }
 
-// API "available services" và "calculate fee" cần from_district dạng ID (khác
-// shipping-order/create chỉ cần tên) — tách riêng thành biến môi trường của nó thay vì
-// suy ra từ GHN_FROM_DISTRICT_NAME (tránh tra cứu tên mơ hồ, nhiều quận trùng tên khác
-// tỉnh) để việc chọn gói/giá vận chuyển hoạt động.
-function assertHasFromDistrictId(): number {
-  const id = Number(process.env.GHN_FROM_DISTRICT_ID);
-  if (!process.env.GHN_FROM_DISTRICT_ID || Number.isNaN(id)) {
-    throw new Error("Chưa cấu hình GHN_FROM_DISTRICT_ID — liên hệ quản trị viên để hoàn tất thiết lập.");
-  }
-  return id;
-}
-
 // Province/District/Ward chỉ cần Token, không cần ShopId — tách riêng khỏi
 // assertConfigured() (dùng cho các action cần cả ShopId: tạo/huỷ vận đơn).
 function assertHasToken() {
@@ -93,10 +81,11 @@ export type GhnService = { serviceId: number; serviceTypeId: number; shortName: 
 
 // GHN trả về các gói dịch vụ khả dụng cho 1 tuyến từ_quận -> đến_quận (không phải toàn bộ
 // gói GHN có, chỉ những gói thật sự phục vụ được tuyến này) — người bán chọn 1 trong số
-// này trước khi tạo vận đơn, thay vì cố định 1 loại như trước.
-export async function getAvailableServices(toDistrictId: number): Promise<GhnService[]> {
+// này trước khi tạo vận đơn, thay vì cố định 1 loại như trước. fromDistrictId lấy từ địa chỉ
+// lấy hàng CỦA ĐÚNG SELLER sở hữu đơn (xem pickupAddressFromUser ở lib/orders.ts) — không còn
+// đọc từ biến môi trường GHN_FROM_DISTRICT_ID chung 1 địa chỉ cho toàn sàn như trước.
+export async function getAvailableServices(toDistrictId: number, fromDistrictId: number): Promise<GhnService[]> {
   assertConfigured();
-  const fromDistrictId = assertHasFromDistrictId();
   const raw = await ghnFetch<{ service_id: number; service_type_id: number; short_name: string }[]>(
     `${SHIPPING_BASE[env()]}/shipping-order/available-services`,
     { shop_id: Number(process.env.GHN_SHOP_ID), from_district: fromDistrictId, to_district: toDistrictId },
@@ -106,6 +95,7 @@ export async function getAvailableServices(toDistrictId: number): Promise<GhnSer
 }
 
 export type ShippingFeeInput = {
+  fromDistrictId: number;
   toDistrictId: number;
   toWardCode: string;
   serviceId: number;
@@ -118,11 +108,10 @@ export type ShippingFeeInput = {
 
 export async function getShippingFee(input: ShippingFeeInput): Promise<number> {
   assertConfigured();
-  const fromDistrictId = assertHasFromDistrictId();
   const data = await ghnFetch<{ total: number }>(
     `${SHIPPING_BASE[env()]}/shipping-order/fee`,
     {
-      from_district_id: fromDistrictId,
+      from_district_id: input.fromDistrictId,
       to_district_id: input.toDistrictId,
       to_ward_code: input.toWardCode,
       service_id: input.serviceId,
@@ -138,6 +127,14 @@ export async function getShippingFee(input: ShippingFeeInput): Promise<number> {
 }
 
 export type CreateGhnOrderInput = {
+  from: {
+    name: string;
+    phone: string;
+    address: string;
+    wardName: string;
+    districtName: string;
+    provinceName: string;
+  };
   toName: string;
   toPhone: string;
   toAddress: string;
@@ -164,27 +161,21 @@ export type CreateGhnOrderResult = {
   expected_delivery_time: string;
 };
 
+// input.from lấy từ địa chỉ lấy hàng CỦA ĐÚNG SELLER sở hữu đơn (User.pickup*, xem
+// pickupAddressFromUser ở lib/orders.ts) — nơi gọi PHẢI tự kiểm tra đã cấu hình đủ trước khi
+// gọi hàm này, không còn đọc biến môi trường GHN_FROM_* chung 1 địa chỉ cho toàn sàn như trước.
 export async function createGhnOrder(input: CreateGhnOrderInput): Promise<CreateGhnOrderResult> {
   assertConfigured();
-  const fromName = process.env.GHN_FROM_NAME;
-  const fromPhone = process.env.GHN_FROM_PHONE;
-  const fromAddress = process.env.GHN_FROM_ADDRESS;
-  const fromWard = process.env.GHN_FROM_WARD_NAME;
-  const fromDistrict = process.env.GHN_FROM_DISTRICT_NAME;
-  const fromProvince = process.env.GHN_FROM_PROVINCE_NAME;
-  if (!fromName || !fromPhone || !fromAddress || !fromWard || !fromDistrict || !fromProvince) {
-    throw new Error("Chưa cấu hình địa chỉ lấy hàng GHN_FROM_* — liên hệ quản trị viên để hoàn tất thiết lập.");
-  }
 
   return ghnFetch<CreateGhnOrderResult>(
     `${SHIPPING_BASE[env()]}/shipping-order/create`,
     {
-      from_name: fromName,
-      from_phone: fromPhone,
-      from_address: fromAddress,
-      from_ward_name: fromWard,
-      from_district_name: fromDistrict,
-      from_province_name: fromProvince,
+      from_name: input.from.name,
+      from_phone: input.from.phone,
+      from_address: input.from.address,
+      from_ward_name: input.from.wardName,
+      from_district_name: input.from.districtName,
+      from_province_name: input.from.provinceName,
       to_name: input.toName,
       to_phone: input.toPhone,
       to_address: input.toAddress,

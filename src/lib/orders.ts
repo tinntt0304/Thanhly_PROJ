@@ -10,6 +10,58 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const ORDERS_PAGE_SIZE = 30;
 
+// "from_*" cho GHN (available-services/fee/shipping-order/create) — nguồn duy nhất phải LẤY
+// TỪ User.pickup* của đúng seller sở hữu đơn (xem cột pickup* ở schema.prisma), không còn đọc
+// biến môi trường GHN_FROM_* dùng chung 1 địa chỉ cho toàn sàn như trước.
+export type PickupAddress = {
+  name: string;
+  phone: string;
+  address: string;
+  provinceName: string;
+  districtName: string;
+  districtId: number;
+  wardCode: string;
+  wardName: string;
+};
+
+type PickupAddressFields = {
+  pickupName: string | null;
+  pickupPhone: string | null;
+  pickupAddress: string | null;
+  pickupProvinceName: string | null;
+  pickupDistrictName: string | null;
+  pickupDistrictId: number | null;
+  pickupWardCode: string | null;
+  pickupWardName: string | null;
+};
+
+// null nếu seller chưa cấu hình đủ (thiếu bất kỳ trường nào) — chặn tạo đơn/tạo vận đơn ở nơi
+// gọi thay vì để lỗi mơ hồ từ GHN lúc gọi API thiếu from_address.
+export function pickupAddressFromUser(user: PickupAddressFields): PickupAddress | null {
+  if (
+    !user.pickupName ||
+    !user.pickupPhone ||
+    !user.pickupAddress ||
+    !user.pickupProvinceName ||
+    !user.pickupDistrictName ||
+    !user.pickupDistrictId ||
+    !user.pickupWardCode ||
+    !user.pickupWardName
+  ) {
+    return null;
+  }
+  return {
+    name: user.pickupName,
+    phone: user.pickupPhone,
+    address: user.pickupAddress,
+    provinceName: user.pickupProvinceName,
+    districtName: user.pickupDistrictName,
+    districtId: user.pickupDistrictId,
+    wardCode: user.pickupWardCode,
+    wardName: user.pickupWardName,
+  };
+}
+
 // Mã đơn hàng ngắn hiển thị cho người dùng (Order.orderSeq là SERIAL, tăng dần, sinh ngay lúc
 // tạo đơn — xem schema.prisma) — dùng LUÔN mã này làm ClientOrderCode gửi cho GHN lúc tạo vận
 // đơn (createGhnShipment) nên phải là chuỗi ổn định, không đổi ngược lại được theo thời gian.

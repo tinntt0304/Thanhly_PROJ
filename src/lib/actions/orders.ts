@@ -39,6 +39,7 @@ import {
   parseOrderCode,
   getOrdersLookbackFloor,
   formatOrderCode,
+  pickupAddressFromUser,
   type OrderListTab,
   type PhoneRiskDisplay,
 } from "@/lib/orders";
@@ -217,6 +218,15 @@ export async function createOrder(
     return { error: "Bạn không có quyền tạo đơn hàng cho sản phẩm này." };
   }
 
+  // Trang /admin/orders/new đã tự kiểm tra và điều hướng sang /admin/cai-dat trước khi hiện
+  // form nếu thiếu — kiểm lại đây phòng trường hợp form được submit từ 1 tab cũ đã mở sẵn
+  // trước khi seller vừa xoá địa chỉ lấy hàng ở tab khác.
+  const sellerId = product.sellerId ?? session.user.id;
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: sellerId } });
+  if (!pickupAddressFromUser(seller)) {
+    redirect("/admin/cai-dat?pickup_required=1");
+  }
+
   const parsed = orderSchema.safeParse({
     buyerName: formData.get("buyerName"),
     buyerPhone: formData.get("buyerPhone"),
@@ -242,7 +252,7 @@ export async function createOrder(
   const data = parsed.data;
   const order = await prisma.order.create({
     data: {
-      sellerId: product.sellerId ?? session.user.id,
+      sellerId,
       buyerName: data.buyerName,
       buyerPhone: data.buyerPhone,
       buyerAddress: data.buyerAddress,
@@ -497,8 +507,14 @@ export async function getShippingQuote(orderId: string): Promise<ShippingQuoteRe
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "Không tìm thấy đơn hàng." };
 
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } });
+  const pickup = pickupAddressFromUser(seller);
+  if (!pickup) {
+    return { ok: false, error: "PICKUP_ADDRESS_REQUIRED" };
+  }
+
   try {
-    const services = await getAvailableServices(order.districtId);
+    const services = await getAvailableServices(order.districtId, pickup.districtId);
     const insuranceValue = Math.min(order.codAmount, 5_000_000);
     // Promise.all thay vì allSettled ở đây SAI: mỗi gói GHN áp điều kiện cân nặng/kích thước
     // riêng (vd "Hàng nặng" từ chối kiện nhẹ với lỗi "Cân nặng không hợp lệ") — 1 gói không
@@ -508,6 +524,7 @@ export async function getShippingQuote(orderId: string): Promise<ShippingQuoteRe
       services.map(async (s) => ({
         ...s,
         fee: await getShippingFee({
+          fromDistrictId: pickup.districtId,
           toDistrictId: order.districtId,
           toWardCode: order.wardCode,
           serviceId: s.serviceId,
@@ -540,7 +557,10 @@ export async function createGhnShipment(
   orderId: string,
   requiredNote: RequiredNote,
   serviceId: number,
-  serviceTypeId: number
+  serviceTypeId: number,
+  // Chọn ngay lúc tạo vận đơn — không còn bắt buộc phải sửa đơn trước để đổi
+  // Order.shopPaysShipping, ghi đè + lưu lại giá trị này cùng lúc tạo vận đơn thành công.
+  shopPaysShipping: boolean
 ): Promise<GhnActionResult> {
   const session = await requireAdmin();
   try {
@@ -563,8 +583,22 @@ export async function createGhnShipment(
   if (order.ghnOrderCode) return { ok: false, error: "Đơn này đã có vận đơn GHN rồi." };
   if (order.status === "CANCELLED") return { ok: false, error: "Đơn đã huỷ, không tạo vận đơn được." };
 
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } });
+  const pickup = pickupAddressFromUser(seller);
+  if (!pickup) {
+    return { ok: false, error: "PICKUP_ADDRESS_REQUIRED" };
+  }
+
   try {
     const result = await createGhnOrder({
+      from: {
+        name: pickup.name,
+        phone: pickup.phone,
+        address: pickup.address,
+        wardName: pickup.wardName,
+        districtName: pickup.districtName,
+        provinceName: pickup.provinceName,
+      },
       toName: order.buyerName,
       toPhone: order.buyerPhone,
       toAddress: order.buyerAddress,
@@ -578,7 +612,7 @@ export async function createGhnShipment(
       insuranceValue: Math.min(order.codAmount, 5_000_000),
       content: order.items.map((i) => i.product.title).join(", "),
       requiredNote,
-      paymentTypeId: order.shopPaysShipping ? 1 : 2,
+      paymentTypeId: shopPaysShipping ? 1 : 2,
       clientOrderCode: formatOrderCode(order.orderSeq),
       items: order.items.map((i) => ({ name: i.product.title, quantity: i.quantity })),
       serviceId,
@@ -592,6 +626,7 @@ export async function createGhnShipment(
         shippingFee: result.total_fee,
         expectedDeliveryAt: result.expected_delivery_time ? new Date(result.expected_delivery_time) : null,
         status: "SHIPPING",
+        shopPaysShipping,
       },
     });
   } catch (e) {

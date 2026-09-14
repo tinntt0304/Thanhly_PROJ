@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   createGhnShipment,
   refreshGhnStatus,
@@ -119,38 +120,53 @@ export function OrderActions({
   status,
   hasGhnOrderCode,
   cancellable,
+  pickupConfigured,
+  defaultShopPaysShipping,
 }: {
   orderId: string;
   status: OrderStatus;
   hasGhnOrderCode: boolean;
   cancellable: boolean;
+  // Seller sở hữu đơn này đã cấu hình địa chỉ lấy hàng ở /admin/cai-dat chưa — GHN cần địa chỉ
+  // này để tính phí/tạo vận đơn (xem pickupAddressFromUser ở lib/orders.ts). Chưa có thì hiện
+  // lối đi sang Cài đặt thay vì gọi getShippingQuote (chắc chắn lỗi).
+  pickupConfigured: boolean;
+  defaultShopPaysShipping: boolean;
 }) {
   const router = useRouter();
   const [requiredNote, setRequiredNote] = useState<RequiredNote>("KHONGCHOXEMHANG");
+  const [shopPaysShipping, setShopPaysShipping] = useState(defaultShopPaysShipping);
   const [pending, setPending] = useState<"create" | "refresh" | "cancel" | "print" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [quotes, setQuotes] = useState<ShippingQuote[] | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [loadingQuotes, setLoadingQuotes] = useState(hasGhnOrderCode ? false : true);
+  const [loadingQuotes, setLoadingQuotes] = useState(hasGhnOrderCode || !pickupConfigured ? false : true);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Tự động lấy giá + gói vận chuyển khả dụng ngay khi vào trang (đơn đã có đủ địa
-  // chỉ/cân nặng từ lúc tạo) — chỉ cần khi chưa có vận đơn, không phụ thuộc input nào của
-  // người dùng nên chạy 1 lần lúc mount là đủ, không cần debounce theo input.
+  // chỉ/cân nặng từ lúc tạo) — chỉ cần khi chưa có vận đơn VÀ đã cấu hình địa chỉ lấy hàng,
+  // không phụ thuộc input nào của người dùng nên chạy 1 lần lúc mount là đủ, không cần
+  // debounce theo input.
   useEffect(() => {
-    if (hasGhnOrderCode) return;
+    if (hasGhnOrderCode || !pickupConfigured) return;
     getShippingQuote(orderId).then((res) => {
       if (res.ok) {
         setQuotes(res.quotes);
         setSelectedServiceId(res.quotes[0]?.serviceId ?? null);
       } else {
-        setQuoteError(res.error);
+        // Trường hợp hiếm: pickupConfigured đúng lúc trang tải nhưng seller vừa xoá địa chỉ ở
+        // tab khác trước khi effect này chạy xong — vẫn báo đúng lý do thay vì hiện mã lỗi thô.
+        setQuoteError(
+          res.error === "PICKUP_ADDRESS_REQUIRED"
+            ? "Chưa cấu hình địa chỉ lấy hàng — vào Cài đặt để thêm rồi tải lại trang."
+            : res.error
+        );
       }
       setLoadingQuotes(false);
     });
-  }, [orderId, hasGhnOrderCode]);
+  }, [orderId, hasGhnOrderCode, pickupConfigured]);
 
   async function run(kind: "create" | "refresh" | "cancel", fn: () => Promise<{ ok: boolean; error?: string }>) {
     setPending(kind);
@@ -158,7 +174,11 @@ export function OrderActions({
     const res = await fn();
     setPending(null);
     if (!res.ok) {
-      setError(res.error ?? "Có lỗi xảy ra.");
+      setError(
+        res.error === "PICKUP_ADDRESS_REQUIRED"
+          ? "Chưa cấu hình địa chỉ lấy hàng — vào Cài đặt để thêm rồi tải lại trang."
+          : res.error ?? "Có lỗi xảy ra."
+      );
       return res;
     }
     router.refresh();
@@ -190,7 +210,19 @@ export function OrderActions({
 
   return (
     <div className="flex flex-col gap-3">
-      {!hasGhnOrderCode && status !== "CANCELLED" && (
+      {!hasGhnOrderCode && status !== "CANCELLED" && !pickupConfigured && (
+        <div className="flex flex-col gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+          <p>Cần cấu hình địa chỉ lấy hàng trước khi tạo vận đơn GHN cho đơn này.</p>
+          <Link
+            href="/admin/cai-dat?pickup_required=1"
+            className="self-start rounded-md bg-accent-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+          >
+            Đến trang Cài đặt để thêm địa chỉ lấy hàng →
+          </Link>
+        </div>
+      )}
+
+      {!hasGhnOrderCode && status !== "CANCELLED" && pickupConfigured && (
         <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-3">
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-text">Gói vận chuyển</span>
@@ -228,6 +260,32 @@ export function OrderActions({
             )}
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-text">Ai trả phí ship</span>
+            <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-1.5 text-sm text-neutral-700">
+                <input
+                  type="radio"
+                  name="ghnShopPaysShipping"
+                  checked={!shopPaysShipping}
+                  onChange={() => setShopPaysShipping(false)}
+                  className="h-4 w-4"
+                />
+                Người nhận trả phí ship
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-neutral-700">
+                <input
+                  type="radio"
+                  name="ghnShopPaysShipping"
+                  checked={shopPaysShipping}
+                  onChange={() => setShopPaysShipping(true)}
+                  className="h-4 w-4"
+                />
+                Shop tự trả phí ship
+              </label>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-text">Cho xem hàng</label>
@@ -249,7 +307,9 @@ export function OrderActions({
               onClick={() => {
                 const service = quotes?.find((q) => q.serviceId === selectedServiceId);
                 if (!service) return;
-                run("create", () => createGhnShipment(orderId, requiredNote, service.serviceId, service.serviceTypeId));
+                run("create", () =>
+                  createGhnShipment(orderId, requiredNote, service.serviceId, service.serviceTypeId, shopPaysShipping)
+                );
               }}
               className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
             >

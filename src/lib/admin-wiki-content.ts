@@ -151,7 +151,8 @@ export const ADMIN_WIKI: WikiSection[] = [
         steps: [
           "Lọc đơn theo tab trạng thái (Mới, Đang giao, Đã giao...) hoặc tìm theo mã đơn/SĐT.",
           "Bấm vào 1 đơn để xem chi tiết.",
-          "Ở trang chi tiết, chọn gói vận chuyển phù hợp rồi bấm Tạo vận đơn GHN.",
+          "Cần có địa chỉ lấy hàng ở Cài đặt trước — chưa có thì tự điều hướng sang đó để thêm.",
+          "Ở trang chi tiết, chọn gói vận chuyển, chọn ai trả phí ship (người nhận/shop) rồi bấm Tạo vận đơn GHN.",
           "Bấm Làm mới trạng thái GHN để cập nhật tình trạng giao hàng mới nhất, hoặc Huỷ đơn nếu cần.",
         ],
       },
@@ -242,13 +243,20 @@ export const ADMIN_WIKI: WikiSection[] = [
         href: "/admin/cai-dat",
         icon: "settings",
         title: "Cài đặt",
-        description: "Kết nối 1 hoặc nhiều fanpage Facebook để dùng ở Hộp thư Facebook.",
+        description:
+          "Cấu hình địa chỉ lấy hàng cho đơn vị vận chuyển và kết nối 1 hoặc nhiều fanpage Facebook để dùng ở Hộp thư Facebook.",
         steps: [
+          "Điền địa chỉ lấy hàng (tên/SĐT liên hệ, địa chỉ, tỉnh/quận/phường) rồi bấm Lưu — bắt buộc phải có trước khi tạo đơn hàng hoặc tạo vận đơn GHN.",
           "Bấm Kết nối với Facebook (hoặc Kết nối thêm fanpage nếu đã có sẵn trang khác), đăng nhập và cấp quyền.",
           "Quản lý nhiều fanpage thì tick chọn 1 hoặc nhiều trang muốn kết nối cùng lúc rồi bấm Kết nối.",
           "Mỗi fanpage đã kết nối hiện thành 1 dòng riêng — bấm Ngắt kết nối ở đúng dòng đó bất kỳ lúc nào.",
         ],
         buttons: [
+          {
+            target: "settings-pickup-save",
+            title: "Nút Lưu địa chỉ lấy hàng",
+            description: "Bấm để lưu địa chỉ lấy hàng — GHN dùng địa chỉ này mỗi lần tạo vận đơn cho đơn của bạn.",
+          },
           {
             target: "settings-connect",
             title: "Nút Kết nối với Facebook / Kết nối thêm fanpage",

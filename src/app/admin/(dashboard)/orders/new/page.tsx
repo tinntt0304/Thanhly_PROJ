@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { createOrder } from "@/lib/actions/orders";
 import { getWinningBid } from "@/lib/auction";
+import { pickupAddressFromUser } from "@/lib/orders";
 import { OrderForm } from "@/components/OrderForm";
 
 export default async function NewOrderPage({ searchParams }: PageProps<"/admin/orders/new">) {
@@ -16,6 +17,15 @@ export default async function NewOrderPage({ searchParams }: PageProps<"/admin/o
   });
   if (!product) notFound();
   if (session.user.role !== "SUPERADMIN" && product.sellerId !== session.user.id) notFound();
+
+  // GHN cần địa chỉ lấy hàng để tính phí/tạo vận đơn cho đơn sắp tạo — bắt buộc phải cấu hình
+  // trước, chặn ngay ở đây (không chờ tới lúc bấm "Tạo vận đơn GHN" ở trang chi tiết đơn mới
+  // báo lỗi), xem PickupAddressForm ở /admin/cai-dat.
+  const sellerId = product.sellerId ?? session.user.id;
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: sellerId } });
+  if (!pickupAddressFromUser(seller)) {
+    redirect("/admin/cai-dat?pickup_required=1");
+  }
 
   const winningBid = getWinningBid(product.bids);
   const boundCreate = createOrder.bind(null, product.id);

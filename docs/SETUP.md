@@ -242,22 +242,18 @@ trạng thái giao hàng (không tự viết logic vận chuyển).
 - `GHN_TOKEN`, `GHN_SHOP_ID` — lấy tài khoản test ở
   [5sao.ghn.dev](https://5sao.ghn.dev): đăng nhập → tab "Chủ cửa hàng" → "Xem" để copy
   Token → tab "Quản lý cửa hàng" điền địa chỉ shop để lấy ShopId. Tài khoản production lấy
-  tương tự ở [khachhang.ghn.vn](https://khachhang.ghn.vn).
-- `GHN_FROM_NAME`, `GHN_FROM_PHONE`, `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`,
-  `GHN_FROM_DISTRICT_NAME`, `GHN_FROM_PROVINCE_NAME` — địa chỉ **lấy hàng** (shop/kho của
-  bạn). GHN nhận địa chỉ người **gửi** dạng tên tỉnh/quận/phường (text), khác với địa chỉ
-  người **nhận** trong mỗi đơn — bắt buộc chọn theo mã GHN (3 select phụ thuộc ở form tạo
-  đơn, gọi trực tiếp API GHN nên cũng cần `GHN_TOKEN` mới hoạt động được).
-- `GHN_FROM_DISTRICT_ID` — **ID số** của quận/huyện lấy hàng (khác `GHN_FROM_DISTRICT_NAME`
-  ở trên vốn là text) — 2 API "danh sách gói vận chuyển khả dụng" và "tính phí" bắt buộc
-  nhận dạng ID, không nhận tên. Lấy ID bằng cách gọi thử API GHN
-  `master-data/district?province_id=<id tỉnh>` hoặc xem trực tiếp trong trang quản lý shop
-  GHN. Chưa điền thì phần chọn gói/xem giá ở bước "Tạo vận đơn GHN" báo lỗi rõ ràng, không
-  chặn phần tạo vận đơn theo cách cũ nếu tự truyền được `serviceId`/`serviceTypeId` khác.
+  tương tự ở [khachhang.ghn.vn](https://khachhang.ghn.vn). Dùng CHUNG 1 cặp Token/ShopId cho
+  toàn sàn (mọi seller cùng gọi qua 1 tài khoản GHN).
 
-Chưa điền `GHN_*` thì `/admin/orders` vẫn xem/tạo đơn được (chỉ lưu nội bộ), riêng 3 select
-địa chỉ người nhận và nút "Tạo vận đơn GHN" sẽ báo lỗi rõ ràng "chưa cấu hình", không crash
-trang — không chặn tính năng khác.
+Địa chỉ **lấy hàng** (shop/kho của từng seller) KHÔNG còn cấu hình qua biến môi trường — mỗi
+seller tự điền ở trang **Cài đặt** (`/admin/cai-dat`, xem `PickupAddressForm`), lưu vào
+`User.pickup*` (schema.prisma). Bắt buộc phải có trước khi tạo đơn thủ công
+(`/admin/orders/new`) hoặc tạo vận đơn GHN — chưa cấu hình thì tự điều hướng sang trang Cài
+đặt để thêm.
+
+Chưa điền `GHN_TOKEN`/`GHN_SHOP_ID` thì `/admin/orders` vẫn xem/tạo đơn được (chỉ lưu nội
+bộ, sau khi đã có địa chỉ lấy hàng), riêng 3 select địa chỉ người nhận và nút "Tạo vận đơn
+GHN" sẽ báo lỗi rõ ràng "chưa cấu hình", không crash trang — không chặn tính năng khác.
 
 Vòng đời 1 đơn: tạo đơn (nội bộ, chưa gọi GHN) → trang chi tiết đơn tự động gọi
 `POST shipping-order/available-services` + `POST shipping-order/fee` cho từng gói khả dụng
@@ -359,10 +355,9 @@ Production) — **không cần `DIRECT_URL`** ở đây (chỉ dùng khi chạy 
 - `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_HOLDER`, `SEPAY_WEBHOOK_API_KEY`
   — giống `.env` cục bộ, chỉ cần nếu dùng nạp credit qua SePay. Webhook SePay phải trỏ về
   `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/sepay`.
-- `GHN_ENV`, `GHN_TOKEN`, `GHN_SHOP_ID`, `GHN_FROM_NAME`, `GHN_FROM_PHONE`,
-  `GHN_FROM_ADDRESS`, `GHN_FROM_WARD_NAME`, `GHN_FROM_DISTRICT_NAME`,
-  `GHN_FROM_PROVINCE_NAME`, `GHN_FROM_DISTRICT_ID` — giống `.env` cục bộ, chỉ cần nếu dùng
-  tạo vận đơn GHN ở `/admin/orders`.
+- `GHN_ENV`, `GHN_TOKEN`, `GHN_SHOP_ID` — giống `.env` cục bộ, chỉ cần nếu dùng tạo vận đơn
+  GHN ở `/admin/orders`. Địa chỉ lấy hàng từng seller tự điền ở `/admin/cai-dat`, không phải
+  biến môi trường.
 - `GHN_WEBHOOK_SECRET` — tuỳ chọn, xác thực webhook trạng thái vận đơn (GHN không có cơ
   chế ký request). Webhook phải trỏ về `https://thanhly-dau-gia-hifen.vercel.app/api/webhooks/ghn`
   (kèm `?key=<giá trị này>` nếu có đặt).

@@ -48,6 +48,21 @@ model User {
   // Apify): 1 tài khoản chỉ được gọi API thật cách nhau tối thiểu SEARCH_RATE_LIMIT_SECONDS.
   lastSearchAt DateTime?
 
+  // Địa chỉ lấy hàng cho đơn vị vận chuyển (GHN) — cấu hình 1 lần ở /admin/cai-dat, dùng làm
+  // "from_*" khi tính phí/tạo vận đơn cho MỌI đơn gắn với chính seller này (trước đây đọc từ
+  // biến môi trường GHN_FROM_*, dùng chung 1 địa chỉ cho toàn sàn — không còn phù hợp khi
+  // nhiều seller tự bán tự gửi hàng). null = chưa cấu hình — bắt buộc phải có trước khi tạo
+  // đơn thủ công hoặc tạo vận đơn GHN, xem pickupAddressFromUser (lib/orders.ts).
+  pickupName         String?
+  pickupPhone        String?
+  pickupAddress      String?
+  pickupProvinceId   Int?
+  pickupProvinceName String?
+  pickupDistrictId   Int?
+  pickupDistrictName String?
+  pickupWardCode     String?
+  pickupWardName     String?
+
   createdAt DateTime @default(now())
 
   products               Product[]

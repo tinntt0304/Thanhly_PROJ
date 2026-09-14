@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import { getOrder, updateOrder } from "@/lib/actions/orders";
 import {
   orderDisplayStatusLabel,
@@ -7,6 +8,7 @@ import {
   isOrderCancellable,
   parseSelectedAttributes,
   formatOrderCode,
+  pickupAddressFromUser,
   ISSUE_GHN_STATUSES,
 } from "@/lib/orders";
 import { ghnStatusLabel } from "@/lib/ghn";
@@ -21,6 +23,11 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
 
   const boundUpdate = updateOrder.bind(null, order.id);
   const locks = getOrderFieldLocks(order.ghnStatus);
+  // Panel "Tạo vận đơn GHN" (OrderActions) cần biết trước liệu seller sở hữu đơn này đã cấu
+  // hình địa chỉ lấy hàng chưa — chưa có thì hiện lối đi sang /admin/cai-dat thay vì để
+  // getShippingQuote gọi GHN thất bại rồi mới báo lỗi.
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } });
+  const pickupConfigured = !!pickupAddressFromUser(seller);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -142,6 +149,8 @@ export default async function OrderDetailPage({ params }: PageProps<"/admin/orde
         status={order.status}
         hasGhnOrderCode={!!order.ghnOrderCode}
         cancellable={isOrderCancellable(order)}
+        pickupConfigured={pickupConfigured}
+        defaultShopPaysShipping={order.shopPaysShipping}
       />
     </div>
   );

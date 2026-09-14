@@ -44,6 +44,68 @@ export async function updateAccountInfo(
   return { success: true };
 }
 
+export type PickupAddressFormState = { error?: string; success?: boolean };
+
+const pickupAddressSchema = z.object({
+  pickupName: z.string().trim().min(1, "Thiếu tên liên hệ lấy hàng"),
+  pickupPhone: z
+    .string()
+    .trim()
+    .regex(/^0\d{9}$/, "Số điện thoại phải có đúng 10 chữ số (ví dụ: 0901234567)"),
+  pickupAddress: z.string().trim().min(1, "Thiếu địa chỉ lấy hàng (số nhà, tên đường...)"),
+  provinceId: z.coerce.number().int().positive("Chưa chọn tỉnh/thành"),
+  provinceName: z.string().trim().min(1),
+  districtId: z.coerce.number().int().positive("Chưa chọn quận/huyện"),
+  districtName: z.string().trim().min(1),
+  wardCode: z.string().trim().min(1, "Chưa chọn phường/xã"),
+  wardName: z.string().trim().min(1),
+});
+
+// Địa chỉ lấy hàng cho GHN — dùng làm from_* khi tính phí/tạo vận đơn cho MỌI đơn của chính
+// seller này (xem pickupAddressFromUser ở lib/orders.ts, createGhnShipment ở actions/orders.ts).
+// Bắt buộc phải có trước khi tạo đơn thủ công hoặc tạo vận đơn GHN — 2 nơi đó tự điều hướng
+// về đây (/admin/cai-dat) nếu chưa cấu hình.
+export async function updatePickupAddress(
+  _prevState: PickupAddressFormState | undefined,
+  formData: FormData
+): Promise<PickupAddressFormState> {
+  const session = await requireAdmin();
+
+  const parsed = pickupAddressSchema.safeParse({
+    pickupName: formData.get("pickupName"),
+    pickupPhone: formData.get("pickupPhone"),
+    pickupAddress: formData.get("pickupAddress"),
+    provinceId: formData.get("provinceId"),
+    provinceName: formData.get("provinceName"),
+    districtId: formData.get("districtId"),
+    districtName: formData.get("districtName"),
+    wardCode: formData.get("wardCode"),
+    wardName: formData.get("wardName"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
+  }
+  const data = parsed.data;
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      pickupName: data.pickupName,
+      pickupPhone: data.pickupPhone,
+      pickupAddress: data.pickupAddress,
+      pickupProvinceId: data.provinceId,
+      pickupProvinceName: data.provinceName,
+      pickupDistrictId: data.districtId,
+      pickupDistrictName: data.districtName,
+      pickupWardCode: data.wardCode,
+      pickupWardName: data.wardName,
+    },
+  });
+
+  revalidatePath("/admin/cai-dat");
+  return { success: true };
+}
+
 export type ChangePasswordFormState = { error?: string; success?: boolean };
 
 const changePasswordSchema = z
