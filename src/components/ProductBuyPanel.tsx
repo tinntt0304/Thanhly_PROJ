@@ -54,6 +54,9 @@ export function ProductBuyPanel({
 
   function selectAttribute(name: string, value: string) {
     setSelectedValues((prev) => ({ ...prev, [name]: value }));
+    // Đổi mẫu là chọn lại từ đầu — số lượng đang chọn có thể không còn hợp lệ với mẫu mới
+    // (mỗi mẫu tồn kho khác nhau), nên reset về 1 để buyer tự chọn lại đúng số lượng.
+    setQuantity(1);
     setError(null);
     setAddedMessage(null);
   }
