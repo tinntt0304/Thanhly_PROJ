@@ -24,7 +24,15 @@ export type AddToCartResult = { ok: true } | { ok: false; error: string };
 
 // Chỉ nhận sản phẩm có buyNowPrice (Mua ngay) — sản phẩm chỉ đấu giá không "thêm vào giỏ"
 // được vì giá không cố định, xem CartItem trong schema.prisma.
-export async function addToCart(productId: string, selectedAttributesJson?: string): Promise<AddToCartResult> {
+//
+// Thêm lại sản phẩm đã có trong giỏ thì CỘNG DỒN số lượng (kiểu Shopee: bấm "Thêm vào giỏ"
+// nhiều lần = tăng dần số lượng), kẹp lại trong [1, Product.quantity] — không ghi đè về đúng
+// `quantity` truyền vào.
+export async function addToCart(
+  productId: string,
+  selectedAttributesJson?: string,
+  quantity?: number
+): Promise<AddToCartResult> {
   const session = await requireAdmin();
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
@@ -50,10 +58,17 @@ export async function addToCart(productId: string, selectedAttributesJson?: stri
     }
   }
 
+  const addQty = Math.max(Math.trunc(quantity ?? 1) || 1, 1);
+  const existing = await prisma.cartItem.findUnique({
+    where: { buyerId_productId: { buyerId: session.user.id, productId } },
+    select: { quantity: true },
+  });
+  const nextQuantity = Math.min((existing?.quantity ?? 0) + addQty, Math.max(product.quantity, 1));
+
   await prisma.cartItem.upsert({
     where: { buyerId_productId: { buyerId: session.user.id, productId } },
-    update: { selectedAttributes },
-    create: { buyerId: session.user.id, productId, selectedAttributes },
+    update: { selectedAttributes, quantity: nextQuantity },
+    create: { buyerId: session.user.id, productId, selectedAttributes, quantity: nextQuantity },
   });
 
   revalidatePath("/gio-hang");
@@ -108,7 +123,7 @@ export async function getCartItems() {
   return prisma.cartItem.findMany({
     where: { buyerId: session.user.id },
     orderBy: { createdAt: "desc" },
-    include: { product: true },
+    include: { product: { include: { seller: { select: { id: true, name: true } } } } },
   });
 }
 
@@ -132,20 +147,35 @@ export type CheckoutCartState =
   | { ok: true; orderIds: string[] }
   | { ok: false; error: string };
 
-// Đặt hàng toàn bộ giỏ trong 1 transaction — tất cả hoặc không gì cả: nếu 1 sản phẩm bất kỳ
-// không còn mua được (hết hàng/đã huỷ/hết phiên) thì rollback toàn bộ, báo lỗi rõ sản phẩm nào,
-// không checkout một phần (tránh buyer hiểu lầm "đã đặt hết" trong khi thiếu vài món). Lặp lại
-// đúng pattern optimistic-lock của buyNowAction (actions/buy-now.ts) cho từng sản phẩm trong giỏ.
+// Đặt hàng CHỈ NHỮNG SẢN PHẨM buyer đã tick chọn (checkbox ở trang giỏ hàng, kiểu Shopee) —
+// không còn bắt buộc đặt cả giỏ cùng lúc. Sản phẩm không được chọn vẫn nằm nguyên trong giỏ
+// sau khi đặt hàng xong.
 //
-// Gộp theo người bán: nhiều sản phẩm CÙNG 1 seller trong giỏ → 1 Order duy nhất (nhiều
-// OrderItem) để dễ theo dõi/tạo 1 vận đơn GHN chung — giống cách Shopee tách đơn theo shop lúc
-// checkout. Giỏ có sản phẩm của nhiều seller khác nhau thì vẫn ra nhiều Order, mỗi seller 1 đơn
-// riêng (Order chỉ có đúng 1 sellerId, không gộp được xuyên seller).
+// Trong nhóm ĐÃ CHỌN: tất cả hoặc không gì cả — nếu 1 sản phẩm bất kỳ không còn mua được (hết
+// hàng/đã huỷ/hết phiên) thì rollback toàn bộ nhóm đã chọn, báo lỗi rõ sản phẩm nào (tránh buyer
+// hiểu lầm "đã đặt hết" trong khi thiếu vài món). Lặp lại đúng pattern optimistic-lock của
+// buyNowAction (actions/buy-now.ts) cho từng sản phẩm.
+//
+// Gộp theo người bán: nhiều sản phẩm ĐÃ CHỌN cùng 1 seller → 1 Order duy nhất (nhiều OrderItem)
+// để dễ theo dõi/tạo 1 vận đơn GHN chung — giống cách Shopee tách đơn theo shop lúc checkout.
+// Chọn sản phẩm của nhiều seller khác nhau thì vẫn ra nhiều Order, mỗi seller 1 đơn riêng
+// (Order chỉ có đúng 1 sellerId, không gộp được xuyên seller).
 export async function checkoutCart(
   _prevState: CheckoutCartState | undefined,
   formData: FormData
 ): Promise<CheckoutCartState> {
   const session = await requireAdmin();
+
+  let selectedProductIds: string[];
+  try {
+    const rawSelected = JSON.parse(formData.get("selectedProductIds")?.toString() ?? "[]");
+    selectedProductIds = z.array(z.string().min(1)).parse(rawSelected);
+  } catch {
+    return { ok: false, error: "Dữ liệu chọn sản phẩm không hợp lệ." };
+  }
+  if (selectedProductIds.length === 0) {
+    return { ok: false, error: "Vui lòng chọn ít nhất 1 sản phẩm để đặt hàng." };
+  }
 
   const parsed = checkoutSchema.safeParse({
     buyerName: formData.get("buyerName"),
@@ -165,11 +195,11 @@ export async function checkoutCart(
   const data = parsed.data;
 
   const cartItems = await prisma.cartItem.findMany({
-    where: { buyerId: session.user.id },
+    where: { buyerId: session.user.id, productId: { in: selectedProductIds } },
     include: { product: true },
   });
   if (cartItems.length === 0) {
-    return { ok: false, error: "Giỏ hàng đang trống." };
+    return { ok: false, error: "Sản phẩm đã chọn không còn trong giỏ, vui lòng tải lại trang." };
   }
 
   try {
@@ -266,7 +296,9 @@ export async function checkoutCart(
         ids.push(order.id);
       }
 
-      await tx.cartItem.deleteMany({ where: { buyerId: session.user.id } });
+      await tx.cartItem.deleteMany({
+        where: { buyerId: session.user.id, productId: { in: selectedProductIds } },
+      });
       return ids;
     });
 

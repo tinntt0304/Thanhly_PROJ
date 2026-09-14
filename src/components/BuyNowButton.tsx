@@ -153,16 +153,36 @@ export function BuyNowButton({
                   <label htmlFor="buyNowQuantity" className="text-sm font-medium text-text">
                     Số lượng (tối đa {stock})
                   </label>
-                  <input
-                    id="buyNowQuantity"
-                    name="quantity"
-                    type="number"
-                    min={1}
-                    max={stock}
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-24 rounded-md border border-neutral-300 px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  />
+                  <div className="flex items-center rounded-md border border-neutral-300">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
+                      className="px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+                      aria-label="Giảm số lượng"
+                    >
+                      −
+                    </button>
+                    <input
+                      id="buyNowQuantity"
+                      name="quantity"
+                      type="number"
+                      min={1}
+                      max={stock}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className="w-14 border-x border-neutral-300 px-1 py-2 text-center text-sm text-text focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
+                      disabled={quantity >= stock}
+                      className="px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+                      aria-label="Tăng số lượng"
+                    >
+                      +
+                    </button>
+                  </div>
                   <p className="text-sm text-neutral-700">
                     Thành tiền: <span className="font-semibold text-text">{formatVND(buyNowPrice * Math.max(quantity, 0))}</span>
                   </p>

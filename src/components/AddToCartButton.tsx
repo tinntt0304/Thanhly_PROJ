@@ -14,18 +14,21 @@ export function AddToCartButton({
   attributes,
   canBuy,
   isLoggedIn,
+  stock,
 }: {
   productId: string;
   attributes: Attribute[];
   canBuy: boolean;
   isLoggedIn: boolean;
+  // Số lượng thật còn lại — trần cho bộ đếm +/-, giống BuyNowButton (xem lib/actions/cart.ts).
+  stock: number;
 }) {
   const router = useRouter();
   const [selectedValues, setSelectedValues] = useState<Record<string, string>>({});
+  const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
-  const [showAttrPicker, setShowAttrPicker] = useState(false);
 
   if (!canBuy) return null;
 
@@ -44,17 +47,20 @@ export function AddToCartButton({
     if (attributes.length > 0) {
       const missing = attributes.find((attr) => !selectedValues[attr.name]);
       if (missing) {
-        setShowAttrPicker(true);
         setError(`Vui lòng chọn "${missing.name}".`);
         return;
       }
+    }
+    if (quantity < 1 || quantity > stock) {
+      setError(`Số lượng phải từ 1 đến ${stock}.`);
+      return;
     }
     setPending(true);
     setError(null);
     const json = JSON.stringify(
       attributes.map((attr) => ({ name: attr.name, value: selectedValues[attr.name] ?? "" }))
     );
-    const res = await addToCart(productId, json);
+    const res = await addToCart(productId, json, quantity);
     setPending(false);
     if (!res.ok) {
       setError(res.error);
@@ -77,7 +83,7 @@ export function AddToCartButton({
 
   return (
     <div className="flex flex-col gap-2">
-      {(showAttrPicker || attributes.length === 0) && attributes.length > 0 && (
+      {attributes.length > 0 && (
         <div className="flex flex-col gap-2">
           {attributes.map((attr) => (
             <div key={attr.name} className="flex flex-col gap-1">
@@ -102,6 +108,40 @@ export function AddToCartButton({
           ))}
         </div>
       )}
+
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-text">Số lượng</span>
+        <div className="flex items-center rounded-md border border-neutral-300">
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            disabled={quantity <= 1}
+            className="px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+            aria-label="Giảm số lượng"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            min={1}
+            max={stock}
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
+            disabled={quantity >= stock}
+            className="px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+            aria-label="Tăng số lượng"
+          >
+            +
+          </button>
+        </div>
+        <span className="text-xs text-neutral-500">Tối đa {stock}</span>
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="button"
