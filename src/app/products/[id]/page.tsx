@@ -78,7 +78,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           ← Quay lại danh sách
         </Link>
 
-        <div className="mt-4 grid gap-6 sm:grid-cols-2">
+        <div className="mt-4 rounded-lg border border-neutral-200 bg-surface p-4 sm:p-6">
+        <div className="grid gap-6 sm:grid-cols-2">
           <ProductGallery images={product.images} title={product.title} />
 
           <div className="flex flex-col gap-3">
@@ -184,6 +185,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               ))}
             </ul>
           )}
+        </div>
         </div>
       </div>
 
