@@ -170,7 +170,7 @@ export function ProductBuyPanel({
             max={stock}
             value={quantity}
             onChange={(e) => changeQuantity(Number(e.target.value))}
-            className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none"
+            className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             type="button"
