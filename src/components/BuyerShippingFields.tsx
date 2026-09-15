@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { getPublicGhnProvinces, getPublicGhnDistricts, getPublicGhnWards } from "@/lib/actions/orders";
 import { AddressPicker } from "@/components/AddressPicker";
 
@@ -19,6 +20,10 @@ export function BuyerShippingFields({
   defaultName?: string;
   defaultPhone?: string;
 }) {
+  // Chỉ cập nhật lúc rời khỏi ô địa chỉ (blur), không phải mỗi phím gõ — đủ để tự nhận diện
+  // tỉnh/quận/phường (xem AddressPicker) mà không gọi GHN liên tục lúc đang gõ dở.
+  const [addressHint, setAddressHint] = useState("");
+
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -56,10 +61,17 @@ export function BuyerShippingFields({
         <label htmlFor={`${idPrefix}-buyerAddress`} className="text-sm font-medium text-text">
           Địa chỉ (số nhà, tên đường...)
         </label>
-        <input id={`${idPrefix}-buyerAddress`} name="buyerAddress" required className={inputClass} />
+        <input
+          id={`${idPrefix}-buyerAddress`}
+          name="buyerAddress"
+          required
+          onBlur={(e) => setAddressHint(e.target.value)}
+          className={inputClass}
+        />
       </div>
 
       <AddressPicker
+        addressHint={addressHint}
         fetchProvinces={getPublicGhnProvinces}
         fetchDistricts={getPublicGhnDistricts}
         fetchWards={getPublicGhnWards}

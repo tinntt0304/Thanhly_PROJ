@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { getGhnProvinces, getGhnDistricts, getGhnWards } from "@/lib/actions/orders";
 import type { GhnProvince, GhnDistrict, GhnWard } from "@/lib/ghn";
+import {
+  normalizeAddressText,
+  findBestAddressMatch,
+  ADDRESS_LEVEL_PREFIXES,
+  ADDRESS_SHORT_PREFIXES,
+  PROVINCE_ALIASES_LIST,
+} from "@/lib/address-detect";
 
 const inputClass =
   "rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-text focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500";
@@ -27,6 +34,7 @@ export function AddressPicker({
   initialWardCode,
   initialWardName,
   locked = false,
+  addressHint,
   fetchProvinces = getGhnProvinces,
   fetchDistricts = getGhnDistricts,
   fetchWards = getGhnWards,
@@ -38,6 +46,15 @@ export function AddressPicker({
   initialWardCode?: string;
   initialWardName?: string;
   locked?: boolean;
+  // Địa chỉ tự do (ô "Địa chỉ (số nhà, tên đường...)" ở form cha) — mỗi khi đổi (thường
+  // truyền vào lúc onBlur, không phải mỗi phím gõ, để đỡ tốn lượt gọi GHN), tự đoán tỉnh/quận/
+  // phường khớp nhất và tự chọn sẵn, xem lib/address-detect.ts. CHỈ tự điền phần người dùng
+  // CHƯA tự tay chọn — không bao giờ ghi đè lựa chọn thủ công.
+  //
+  // Quận/huyện chỉ đoán được SAU khi đã có tỉnh (GHN bắt buộc province_id để liệt kê quận/
+  // huyện) — địa chỉ không nêu tỉnh (vd "35 Đồng Đen, Phường 12, Tân Bình") thì quận/phường
+  // tự điền ngay khi người dùng tự chọn tỉnh (1 lần bấm), không cần gõ lại địa chỉ.
+  addressHint?: string;
   fetchProvinces?: () => Promise<LookupResult<GhnProvince[]>>;
   fetchDistricts?: (provinceId: number) => Promise<LookupResult<GhnDistrict[]>>;
   fetchWards?: (districtId: number) => Promise<LookupResult<GhnWard[]>>;
@@ -57,6 +74,14 @@ export function AddressPicker({
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Theo dõi cấp nào đang là do TỰ ĐỘNG điền (không phải người dùng tự tay chọn) — chỉ tự
+  // động ghi đè/lấp đầy đúng những cấp này, không đụng vào lựa chọn thủ công. Dùng state (không
+  // phải ref) vì logic tự nhận diện bên dưới đọc/ghi giá trị này NGAY TRONG RENDER — lint dự án
+  // cấm đọc/ghi ref lúc render (react-hooks/refs).
+  const [provinceAutoFilled, setProvinceAutoFilled] = useState(false);
+  const [districtAutoFilled, setDistrictAutoFilled] = useState(false);
+  const [wardAutoFilled, setWardAutoFilled] = useState(false);
 
   useEffect(() => {
     fetchProvinces()
@@ -87,6 +112,99 @@ export function AddressPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [districtId]);
 
+  // === Tự nhận diện tỉnh/quận/phường từ addressHint ===
+  // Tính lại NGAY TRONG RENDER (không dùng useEffect) theo pattern "adjust state while
+  // rendering" của React — 3 khối độc lập, mỗi khối tự đoán 1 cấp ngay khi: có addressHint,
+  // đã tải xong danh sách của đúng cấp đó, cấp đó chưa được người dùng tự tay chọn, và chưa
+  // thử với đúng tổ hợp (hint, cấp cha đang có) này trước đó — tránh thử lại vô hạn lần.
+  const normalizedHint = addressHint ? normalizeAddressText(addressHint) : "";
+
+  const [provinceAttemptKey, setProvinceAttemptKey] = useState("");
+  if (
+    !locked &&
+    normalizedHint &&
+    normalizedHint !== provinceAttemptKey &&
+    provinces.length > 0 &&
+    (!provinceId || provinceAutoFilled)
+  ) {
+    setProvinceAttemptKey(normalizedHint);
+    const match = findBestAddressMatch(
+      normalizedHint,
+      provinces,
+      (p) => p.ProvinceName,
+      ADDRESS_LEVEL_PREFIXES.province,
+      ADDRESS_SHORT_PREFIXES.province,
+      PROVINCE_ALIASES_LIST
+    );
+    if (match) {
+      setProvinceAutoFilled(true);
+      setDistrictAutoFilled(false);
+      setWardAutoFilled(false);
+      setProvinceId(String(match.ProvinceID));
+      setProvinceName(match.ProvinceName);
+      setDistrictId("");
+      setDistrictName("");
+      setDistricts([]);
+      setWardCode("");
+      setWardName("");
+      setWards([]);
+      setLoadingDistricts(true);
+    }
+  }
+
+  const districtAttemptKey = `${normalizedHint}::${provinceId}`;
+  const [lastDistrictAttemptKey, setLastDistrictAttemptKey] = useState("");
+  if (
+    !locked &&
+    normalizedHint &&
+    districtAttemptKey !== lastDistrictAttemptKey &&
+    districts.length > 0 &&
+    (!districtId || districtAutoFilled)
+  ) {
+    setLastDistrictAttemptKey(districtAttemptKey);
+    const match = findBestAddressMatch(
+      normalizedHint,
+      districts,
+      (d) => d.DistrictName,
+      ADDRESS_LEVEL_PREFIXES.district,
+      ADDRESS_SHORT_PREFIXES.district
+    );
+    if (match) {
+      setDistrictAutoFilled(true);
+      setWardAutoFilled(false);
+      setDistrictId(String(match.DistrictID));
+      setDistrictName(match.DistrictName);
+      setWardCode("");
+      setWardName("");
+      setWards([]);
+      setLoadingWards(true);
+    }
+  }
+
+  const wardAttemptKey = `${normalizedHint}::${districtId}`;
+  const [lastWardAttemptKey, setLastWardAttemptKey] = useState("");
+  if (
+    !locked &&
+    normalizedHint &&
+    wardAttemptKey !== lastWardAttemptKey &&
+    wards.length > 0 &&
+    (!wardCode || wardAutoFilled)
+  ) {
+    setLastWardAttemptKey(wardAttemptKey);
+    const match = findBestAddressMatch(
+      normalizedHint,
+      wards,
+      (w) => w.WardName,
+      ADDRESS_LEVEL_PREFIXES.ward,
+      ADDRESS_SHORT_PREFIXES.ward
+    );
+    if (match) {
+      setWardAutoFilled(true);
+      setWardCode(match.WardCode);
+      setWardName(match.WardName);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -97,6 +215,9 @@ export function AddressPicker({
             onChange={(e) => {
               const id = e.target.value;
               const p = provinces.find((x) => String(x.ProvinceID) === id);
+              setProvinceAutoFilled(false);
+              setDistrictAutoFilled(false);
+              setWardAutoFilled(false);
               setProvinceId(id);
               setProvinceName(p?.ProvinceName ?? "");
               setDistrictId("");
@@ -127,6 +248,8 @@ export function AddressPicker({
             onChange={(e) => {
               const id = e.target.value;
               const d = districts.find((x) => String(x.DistrictID) === id);
+              setDistrictAutoFilled(false);
+              setWardAutoFilled(false);
               setDistrictId(id);
               setDistrictName(d?.DistrictName ?? "");
               setWardCode("");
@@ -154,6 +277,7 @@ export function AddressPicker({
             onChange={(e) => {
               const code = e.target.value;
               const w = wards.find((x) => x.WardCode === code);
+              setWardAutoFilled(false);
               setWardCode(code);
               setWardName(w?.WardName ?? "");
             }}

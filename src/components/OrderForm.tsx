@@ -82,6 +82,10 @@ export function OrderForm({
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
+  // Chỉ cập nhật lúc rời khỏi ô địa chỉ (blur), không phải mỗi phím gõ — đủ để AddressPicker
+  // tự nhận diện tỉnh/quận/phường mà không gọi GHN liên tục lúc đang gõ dở.
+  const [addressHint, setAddressHint] = useState(defaultBuyerAddress ?? "");
+
   const [phoneCheck, setPhoneCheck] = useState<PhoneCheckState>(
     defaultBuyerPhone?.trim() ? { kind: "loading" } : { kind: "idle" }
   );
@@ -207,6 +211,7 @@ export function OrderForm({
           defaultValue={defaultBuyerAddress}
           required
           readOnly={recipientLocked}
+          onBlur={(e) => setAddressHint(e.target.value)}
           className={recipientLocked ? lockedInputClass : inputClass}
         />
       </div>
@@ -219,6 +224,7 @@ export function OrderForm({
         initialWardCode={defaultWardCode}
         initialWardName={defaultWardName}
         locked={recipientLocked}
+        addressHint={addressHint}
       />
 
       {codLocked && (

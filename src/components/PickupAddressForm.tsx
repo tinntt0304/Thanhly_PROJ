@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { updatePickupAddress, type PickupAddressFormState } from "@/lib/actions/account";
 import { AddressPicker } from "@/components/AddressPicker";
 
@@ -34,6 +34,9 @@ export function PickupAddressForm({
   defaultWardName?: string;
 }) {
   const [state, formAction, pending] = useActionState(updatePickupAddress, initialState);
+  // Chỉ cập nhật lúc rời khỏi ô địa chỉ (blur), không phải mỗi phím gõ — đủ để AddressPicker
+  // tự nhận diện tỉnh/quận/phường mà không gọi GHN liên tục lúc đang gõ dở.
+  const [addressHint, setAddressHint] = useState(defaultPickupAddress ?? "");
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -77,6 +80,7 @@ export function PickupAddressForm({
           name="pickupAddress"
           defaultValue={defaultPickupAddress}
           required
+          onBlur={(e) => setAddressHint(e.target.value)}
           className={inputClass}
         />
       </div>
@@ -88,6 +92,7 @@ export function PickupAddressForm({
         initialDistrictName={defaultDistrictName}
         initialWardCode={defaultWardCode}
         initialWardName={defaultWardName}
+        addressHint={addressHint}
       />
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
