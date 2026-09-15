@@ -23,9 +23,9 @@ function ProductGrid({
   );
 }
 
-// Không còn state/tương tác client (ô tìm kiếm thật nằm ở HeroBanner — submit GET /?q=...,
-// đổi initialQuery qua URL) nên để component này chạy như Server Component, không cần "use
-// client" — bớt JS gửi xuống trình duyệt.
+// Không còn state/tương tác client (ô tìm kiếm thật nằm ở HeroBanner/HeroSearchForm — tìm
+// ngay khi gõ, debounce rồi router.replace(?q=...), đổi initialQuery qua URL) nên để component
+// này chạy như Server Component, không cần "use client" — bớt JS gửi xuống trình duyệt.
 export function HomeProductSections({
   products,
   initialQuery = "",

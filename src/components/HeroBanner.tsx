@@ -1,4 +1,5 @@
 import { BannerSlideshow } from "@/components/BannerSlideshow";
+import { HeroSearchForm } from "@/components/HeroSearchForm";
 
 export function HeroBanner({
   defaultQuery = "",
@@ -29,22 +30,7 @@ export function HeroBanner({
           Đấu giá minh bạch, trả giá bằng số điện thoại — không cần tạo tài khoản.
         </p>
 
-        <form action="/" method="get" className="mt-2 flex w-full max-w-xl gap-2 rounded-xl bg-surface p-2 shadow-lg">
-          <input
-            type="search"
-            name="q"
-            defaultValue={defaultQuery}
-            placeholder="Tìm sản phẩm theo tên..."
-            aria-label="Tìm sản phẩm"
-            className="min-w-0 flex-1 rounded-lg border-none bg-transparent px-3 py-2.5 text-sm text-text placeholder:text-neutral-500 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="shrink-0 rounded-lg bg-accent-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-600"
-          >
-            Tìm kiếm
-          </button>
-        </form>
+        <HeroSearchForm defaultQuery={defaultQuery} />
       </div>
     </section>
   );
