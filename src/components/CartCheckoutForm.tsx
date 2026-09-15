@@ -223,7 +223,7 @@ export function CartCheckoutForm({
                                   onChange={(e) => handleQuantityChange(item.id, Number(e.target.value), item.stock)}
                                   onBlur={(e) => handleQuantityCommit(item.id, Number(e.target.value))}
                                   disabled={updatingId === item.id}
-                                  className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none disabled:opacity-50"
+                                  className="w-12 border-x border-neutral-300 px-1 py-1 text-center text-sm text-text focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                                 <button
                                   type="button"
